@@ -1,12 +1,11 @@
 import { ModulePropertiesDefinition } from '../../../../shared/module/domain/ModuleProperties.js';
 import { moduleResource, type ModuleResource } from '../../../../shared/module/domain/ModuleResource.js';
-import type { NodePackagesVersionsReader } from '../../../../shared/module/domain/PackageVersions.js';
-import { InitApplicationService } from '../../application/InitApplicationService.js';
+import { InitFactory } from '../../domain/InitFactory.js';
 
 export const initSlug = 'init';
 
-export const createInitModuleResource = (versions: NodePackagesVersionsReader): ModuleResource => {
-  const modules = new InitApplicationService(versions);
+export const createInitModuleResource = (): ModuleResource => {
+  const factory = new InitFactory();
 
   return moduleResource()
     .slug(initSlug)
@@ -14,5 +13,5 @@ export const createInitModuleResource = (versions: NodePackagesVersionsReader): 
     .apiDoc('Init', 'Initialise le projet (package.json, .gitignore, README)')
     .standalone()
     .tags('setup')
-    .factory((properties) => modules.buildModule(properties));
+    .factory((properties) => factory.buildModule(properties));
 };

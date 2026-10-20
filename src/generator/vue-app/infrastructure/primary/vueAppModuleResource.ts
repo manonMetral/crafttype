@@ -1,12 +1,12 @@
 import { ModulePropertiesDefinition } from '../../../../shared/module/domain/ModuleProperties.js';
 import { moduleResource, type ModuleResource } from '../../../../shared/module/domain/ModuleResource.js';
 import type { NodePackagesVersionsReader } from '../../../../shared/module/domain/PackageVersions.js';
-import { VueAppApplicationService } from '../../application/VueAppApplicationService.js';
+import { VueAppFactory } from '../../domain/VueAppFactory.js';
 
 export const vueAppSlug = 'vue-app';
 
 export const createVueAppModuleResource = (versions: NodePackagesVersionsReader): ModuleResource => {
-  const modules = new VueAppApplicationService(versions);
+  const factory = new VueAppFactory(versions);
 
   return moduleResource()
     .slug(vueAppSlug)
@@ -14,5 +14,5 @@ export const createVueAppModuleResource = (versions: NodePackagesVersionsReader)
     .apiDoc('Frontend', 'Ajoute une application Vue.js avec Vite')
     .dependsOn('typescript')
     .tags('webapp')
-    .factory((properties) => modules.buildModule(properties));
+    .factory((properties) => factory.buildModule(properties));
 };
