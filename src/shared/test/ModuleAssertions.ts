@@ -3,17 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect } from 'vitest';
 import { createModulesApplicationService } from '../../composition.js';
-import type { ModuleProperties } from '../module/domain/ModuleProperties.js';
+import { moduleProperties, type ModuleProperties, type PropertyValue } from '../module/domain/ModuleProperties.js';
 import type { CraftModule } from '../module/domain/CraftModule.js';
 
 export const tmpDirForTest = (): string => mkdtempSync(join(tmpdir(), 'crafttype-test-'));
 
-export const propertiesFixture = (overrides: Partial<ModuleProperties> = {}): ModuleProperties => ({
-  projectFolder: tmpDirForTest(),
-  projectName: 'my-app',
-  serverPort: 3000,
-  ...overrides,
-});
+/** Propriétés d'un module pour un test : toutes celles du catalogue ont une valeur, `overrides` les remplace ou en ajoute. */
+export const propertiesFixture = (overrides: Readonly<Record<string, PropertyValue>> = {}): ModuleProperties => {
+  const { projectFolder = tmpDirForTest(), ...values } = { projectName: 'my-app', serverPort: 3000, ...overrides };
+  return moduleProperties(String(projectFolder), values);
+};
 
 /** Applique réellement le module sur un dossier temporaire (même principe que `assertThatModule` de Seed4J). */
 export const assertThatModule = (module: CraftModule): ModuleAssertions => {

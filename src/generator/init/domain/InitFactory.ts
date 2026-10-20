@@ -9,7 +9,7 @@ export class InitFactory {
       .addFile(SOURCE.template('gitignore'), '.gitignore')
       .addFile(SOURCE.template('editorconfig'), '.editorconfig')
       .addFile(SOURCE.template('README.md'), 'README.md')
-      .setPackageJsonField('name', properties.projectName)
+      .setPackageJsonField('name', properties.string('projectName'))
       .setPackageJsonField('version', '0.0.1')
       .setPackageJsonField('private', true)
       .setPackageJsonField('type', 'module')

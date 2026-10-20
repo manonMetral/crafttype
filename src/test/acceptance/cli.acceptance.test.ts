@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../composition.js';
 import { runCli } from '../../shared/module/infrastructure/primary/cli.js';
+import { databaseModuleResources } from '../../shared/test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../shared/test/ModuleAssertions.js';
 
 // Équivalent des tests Cucumber de Seed4J : on passe par la porte d'entrée (ici la CLI) et on vérifie
@@ -186,5 +187,79 @@ describe('CLI', () => {
       expect(real.output).toContain('versions conservées : 1');
       expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).devDependencies.typescript).toBe('99.0.0');
     });
+  });
+  describe('propriétés propres à un module', () => {
+    const runDatabase = (...argv: string[]) => {
+      const lines: string[] = [];
+      const code = runCli(argv, createModulesApplicationService({ extraResources: databaseModuleResources }), (line) => lines.push(line));
+      return { code, output: lines.join('\n') };
+    };
+
+    it('dérive les options de la définition du module', () => {
+      const projectFolder = tmpDirForTest();
+
+      const { code } = runDatabase('apply', 'database', '--project-folder', projectFolder, '--database-name', 'shop', '--pool-size', '25', '--no-migrations');
+
+      expect(code).toBe(0);
+      const { scripts } = JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8'));
+      expect(scripts).toEqual({ 'db:info': 'echo shop:25' });
+    });
+
+    it('active une propriété booléenne avec son option seule', () => {
+      const projectFolder = tmpDirForTest();
+
+      runDatabase('apply', 'database', '--project-folder', projectFolder, '--database-name', 'shop', '--migrations');
+
+      expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).scripts['db:migrate']).toBe('echo migrate');
+    });
+
+    it('nomme l’option manquante ou invalide avec son flag', () => {
+      const projectFolder = tmpDirForTest();
+
+      expect(runDatabase('apply', 'database', '--project-folder', projectFolder).output).toBe('Erreur : Option obligatoire manquante : --database-name');
+      expect(runDatabase('apply', 'database', '--project-folder', projectFolder, '--database-name', 'shop', '--pool-size', '0').output).toBe(
+        'Erreur : Option --pool-size invalide : la taille doit valoir au moins 1',
+      );
+    });
+
+    it('refuse l’option d’un autre module', () => {
+      const { code, output } = runDatabase('apply', 'database-seed', '--project-folder', tmpDirForTest(), '--pool-size', '5');
+
+      expect(code).toBe(1);
+      expect(output).toContain('Erreur : option inconnue : --pool-size');
+    });
+
+    it('décrit les options du module avec --help, sans rien écrire', () => {
+      const projectFolder = tmpDirForTest();
+
+      const { code, output } = runDatabase('apply', 'database', '--help', '--project-folder', projectFolder);
+
+      expect(code).toBe(0);
+      expect(output).toBe(
+        [
+          'Module database : Configure la base de données',
+          'Options :',
+          '  --project-folder <texte>  (obligatoire) Dossier du projet à générer ou à enrichir',
+          '  --database-name <texte>   (obligatoire) Nom de la base',
+          '  --pool-size <nombre>      (défaut : 10) Taille du pool de connexions',
+          '  --migrations              (défaut : true) Active les migrations',
+        ].join('\n'),
+      );
+      expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
+    });
+  });
+
+  it('refuse un module inconnu avant de lire ses options', () => {
+    const { code, output } = run('apply', 'nope', '--project-folder', tmpDirForTest());
+
+    expect(code).toBe(1);
+    expect(output).toBe('Erreur : Module inconnu : nope');
+  });
+
+  it('demande le module juste après apply', () => {
+    const { code, output } = run('apply', '--project-folder', tmpDirForTest(), 'init');
+
+    expect(code).toBe(1);
+    expect(output).toContain('Usage :');
   });
 });

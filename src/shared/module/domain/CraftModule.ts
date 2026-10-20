@@ -102,8 +102,7 @@ export class CraftModuleBuilder {
         scripts: { ...this.scripts },
       },
       context: {
-        projectName: this.properties.projectName,
-        serverPort: this.properties.serverPort,
+        ...this.properties.values,
         ...this.extraContext,
       },
     };

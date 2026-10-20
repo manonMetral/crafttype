@@ -9,7 +9,7 @@ import {
 } from '../domain/ChangePlan.js';
 import { MissingModuleDependenciesError, UnknownModuleError } from '../domain/errors.js';
 import { isRecord, parseJsonObject } from '../domain/jsonFile.js';
-import type { KnownProperties, ModuleProperties, RawProperties } from '../domain/ModuleProperties.js';
+import type { KnownProperties, ModuleProperties, PropertyValue, RawProperties } from '../domain/ModuleProperties.js';
 import type { ModuleResource, ModuleSlug } from '../domain/ModuleResource.js';
 import type { CraftModule } from '../domain/CraftModule.js';
 import type {
@@ -182,7 +182,7 @@ export class ModulesApplicationService {
   }
 
   /** Propriétés déjà posées par les modules appliqués ; le plus récent l'emporte. */
-  private knownProperties(projectFolder: string | number | undefined): KnownProperties {
+  private knownProperties(projectFolder: PropertyValue | undefined): KnownProperties {
     const folder = String(projectFolder ?? '');
     if (folder.trim() === '') {
       return {};
