@@ -1,4 +1,5 @@
 import { ModuleConflictError } from './errors.js';
+import { keepsExistingVersion } from './versions.js';
 
 /** Que faire quand un module veut poser un contenu différent de celui qui existe déjà. */
 export type ConflictPolicy = 'fail' | 'overwrite' | 'skip';
@@ -16,8 +17,12 @@ export interface PlannedChange {
   readonly next: string;
 }
 
-/** `conflict` : le conflit n'est pas tranché (politique `fail`), le module ne peut pas être appliqué. */
-export type Decision = 'create' | 'unchanged' | 'overwrite' | 'skip' | 'conflict';
+/**
+ * `keep` : une dépendance est déjà présente dans une version égale, plus récente ou compatible avec celle du catalogue.
+ * Ce n'est pas un conflit et aucune politique ne la remplace, pour ne jamais faire reculer une version.
+ * `conflict` : le conflit n'est pas tranché (politique `fail`), le module ne peut pas être appliqué.
+ */
+export type Decision = 'create' | 'unchanged' | 'keep' | 'overwrite' | 'skip' | 'conflict';
 
 export interface DecidedChange extends PlannedChange {
   readonly decision: Decision;
@@ -27,6 +32,7 @@ export interface ApplyReport {
   readonly created: number;
   readonly replaced: number;
   readonly unchanged: number;
+  readonly kept: number;
   readonly skipped: number;
   readonly conflicts: number;
 }
@@ -68,9 +74,16 @@ export class ChangePlan {
   }
 }
 
+const isDependency = ({ kind, current, next }: PlannedChange): boolean =>
+  (kind === 'dependency' || kind === 'devDependency') && isJsonString(current) && isJsonString(next);
+
+/** Une version dans un package.json est une chaîne ; toute autre forme est comparée telle quelle, donc en conflit. */
+const isJsonString = (value: string | undefined): boolean => value !== undefined && value.startsWith('"');
+
 const decisionFor = (change: PlannedChange, policy: ConflictPolicy): Decision => {
   if (change.current === undefined) return 'create';
   if (change.current === change.next) return 'unchanged';
+  if (isDependency(change) && keepsExistingVersion(JSON.parse(change.current) as string, JSON.parse(change.next) as string)) return 'keep';
   return { fail: 'conflict', overwrite: 'overwrite', skip: 'skip' }[policy] as Decision;
 };
 
@@ -80,6 +93,7 @@ export const reportOf = (changes: readonly DecidedChange[]): ApplyReport => {
     created: count('create'),
     replaced: count('overwrite'),
     unchanged: count('unchanged'),
+    kept: count('keep'),
     skipped: count('skip'),
     conflicts: count('conflict'),
   };

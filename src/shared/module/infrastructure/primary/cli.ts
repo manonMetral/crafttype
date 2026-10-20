@@ -85,6 +85,7 @@ const apply = (args: readonly string[], service: ModulesApplicationService, out:
 const LABELS: Record<DecidedChange['decision'], string> = {
   create: 'créer',
   unchanged: 'inchangé',
+  keep: 'conserver',
   overwrite: 'remplacer',
   skip: 'ignorer',
   conflict: 'conflit',
@@ -92,7 +93,8 @@ const LABELS: Record<DecidedChange['decision'], string> = {
 
 const report = (result: ApplyResult, projectFolder: string, out: (line: string) => void): number => {
   const { slug, dryRun, changes, report: counts } = result;
-  const summary = `créés : ${counts.created}, remplacés : ${counts.replaced}, inchangés : ${counts.unchanged}, ignorés : ${counts.skipped}`;
+  const kept = counts.kept > 0 ? `, versions conservées : ${counts.kept}` : '';
+  const summary = `créés : ${counts.created}, remplacés : ${counts.replaced}, inchangés : ${counts.unchanged}, ignorés : ${counts.skipped}${kept}`;
 
   if (dryRun) {
     out(`Simulation du module ${slug} dans ${projectFolder} (rien n'est écrit) :`);
@@ -110,7 +112,7 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
   return 0;
 };
 
-const hasConflictingContent = ({ decision }: DecidedChange): boolean => decision === 'conflict' || decision === 'overwrite' || decision === 'skip';
+const hasConflictingContent = ({ decision }: DecidedChange): boolean => decision === 'conflict' || decision === 'overwrite' || decision === 'skip' || decision === 'keep';
 
 const CONFLICT_HINT = 'Relancez avec --skip-conflicts pour garder les éléments existants ou --force pour les remplacer.';
 

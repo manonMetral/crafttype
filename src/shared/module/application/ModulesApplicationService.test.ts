@@ -222,7 +222,7 @@ describe('ModulesApplicationService', () => {
 
       expect(first.report).toMatchObject({ replaced: 0, unchanged: 0, skipped: 0, conflicts: 0 });
       expect(first.report.created).toBeGreaterThan(0);
-      expect(second.report).toEqual({ created: 0, replaced: 0, unchanged: first.report.created, skipped: 0, conflicts: 0 });
+      expect(second.report).toEqual({ created: 0, replaced: 0, unchanged: first.report.created, kept: 0, skipped: 0, conflicts: 0 });
     });
 
     it('garde l’existant et applique le reste avec skip', () => {
@@ -272,6 +272,65 @@ describe('ModulesApplicationService', () => {
       expect(readFileSync(join(projectFolder, 'package.json'), 'utf8')).toBe(before);
       expect(readFileSync(join(projectFolder, 'tsconfig.json'), 'utf8')).toBe('{ "perso": true }');
       expect(readFileSync(join(projectFolder, '.crafttype/modules/history.json'), 'utf8')).toBe(historyBefore);
+    });
+
+    describe('versions de dépendances', () => {
+      const setTypescriptVersion = (projectFolder: string, version: string) => {
+        const packageJson = readJson(projectFolder, 'package.json');
+        packageJson.devDependencies.typescript = version;
+        writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
+      };
+
+      it('garde une version plus récente que le catalogue sans y voir un conflit', () => {
+        const { service, projectFolder } = initialized();
+        setTypescriptVersion(projectFolder, '99.0.0');
+
+        const { report } = service.apply('typescript', { projectFolder });
+
+        expect(report).toMatchObject({ kept: 1, conflicts: 0 });
+        expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('99.0.0');
+      });
+
+      it('ne fait jamais reculer une version, même avec overwrite', () => {
+        const { service, projectFolder } = initialized();
+        setTypescriptVersion(projectFolder, '99.0.0');
+
+        const { report } = service.apply('typescript', { projectFolder }, { onConflict: 'overwrite' });
+
+        expect(report).toMatchObject({ kept: 1, replaced: 0 });
+        expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('99.0.0');
+      });
+
+      it('garde un intervalle qui accepte la version du catalogue', () => {
+        const { service, projectFolder } = initialized();
+        setTypescriptVersion(projectFolder, '>=5');
+
+        expect(service.apply('typescript', { projectFolder }).report.kept).toBe(1);
+      });
+
+      it('refuse une version plus ancienne que le catalogue, et la remplace avec overwrite', () => {
+        const { service, projectFolder } = initialized();
+        setTypescriptVersion(projectFolder, '4.0.0');
+
+        expect(() => service.apply('typescript', { projectFolder })).toThrow(/devDependencies\.typescript/);
+
+        service.apply('typescript', { projectFolder }, { onConflict: 'overwrite' });
+        expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('7.0.2');
+      });
+
+      it('applique le reste du module quand seule une version plus récente diffère', () => {
+        const { service, projectFolder } = initialized();
+        setTypescriptVersion(projectFolder, '99.0.0');
+        const packageJson = readJson(projectFolder, 'package.json');
+        delete packageJson.devDependencies['@types/node'];
+        writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
+
+        const { report } = service.apply('typescript', { projectFolder });
+
+        expect(report).toMatchObject({ created: 1, kept: 1 });
+        expect(readJson(projectFolder, 'package.json').devDependencies['@types/node']).toBeDefined();
+        expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('99.0.0');
+      });
     });
 
     it('simule ce que ferait chaque politique', () => {

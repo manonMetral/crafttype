@@ -79,6 +79,8 @@ Le moteur calcule d'abord un plan (`ChangePlan`) : chaque fichier ou entrée du 
 - `overwrite` (`--force`) : l'existant est remplacé ;
 - `skip` (`--skip-conflicts`) : l'existant est gardé, le reste est appliqué.
 
+Cas particulier des versions de dépendances : si le projet a déjà la dépendance dans une version égale, plus récente ou compatible avec celle du catalogue (comparaison `semver`, voir `domain/versions.ts`), le plan la marque `keep`. Ce n'est pas un conflit et aucune politique ne la remplace, pour qu'un module ne fasse jamais reculer une version montée par Renovate. Une version plus ancienne ou non comparable (tag, URL, workspace) reste un conflit.
+
 `--dry-run` affiche le plan sans rien écrire. Un module n'a rien à faire pour en profiter : tout passe par `moduleBuilder`.
 
 ## 4. Le catalogue

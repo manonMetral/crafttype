@@ -24,12 +24,14 @@
   "devDependencies": {
     "@types/mustache": "^4.2.6",
     "@types/node": "^26.6.5",
+    "@types/semver": "^7.8.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "mustache": "^4.2.0"
+    "mustache": "^4.2.0",
+    "semver": "^7.8.5"
   },
   "license": "Apache-2.0",
   "repository": {
