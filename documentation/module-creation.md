@@ -43,10 +43,9 @@ export class EslintFactory {
 
 Ajouter le paquet dans `resources/generator/dependencies/common/package.json`, ou dans `<framework>/package.json` pour un module propre à un framework.
 
-## 3. Le service d'application et la ressource
+## 3. La ressource
 
-- `application/EslintApplicationService.ts` : instancie la fabrique et expose `buildModule`.
-- `infrastructure/primary/eslintModuleResource.ts` :
+`infrastructure/primary/eslintModuleResource.ts` instancie la fabrique et décrit la place du module dans le catalogue :
 
 ```ts
 moduleResource()
@@ -55,10 +54,23 @@ moduleResource()
   .apiDoc('Qualité', 'Ajoute ESLint')
   .dependsOn('typescript')   // ou .standalone()
   .tags('quality')
-  .factory((properties) => modules.buildModule(properties));
+  .factory((properties) => factory.buildModule(properties)); // const factory = new EslintFactory(versions)
 ```
 
+`apiDoc` (groupe et libellé) et `tags` sont des métadonnées de catalogue : `list` n'affiche que le libellé, le reste est réservé à un futur filtrage ou à une API.
+
 Les étapes sont ordonnées par le compilateur, comme dans le builder de Seed4J.
+
+### Propriétés
+
+`propertiesDefinition` déclare les options que le module accepte (`addProjectName()`, `addServerPort()`). Une option non déclarée est refusée.
+Pour chaque propriété, la valeur explicite l'emporte, puis la valeur que l'historique du projet a déjà enregistrée pour un module précédent, puis la valeur par défaut.
+Ainsi `vue-app` relit le port posé par `fastify-server` et le nom posé par `init`. L'historique ne garde que les propriétés déclarées par chaque module.
+Les valeurs sont validées dans `ModulePropertiesDefinition.resolve` (nom de paquet npm, port de 1 à 65535) : une nouvelle propriété y ajoute sa validation.
+
+### Fichiers existants
+
+Un module ne remplace jamais un fichier ou une entrée du `package.json` (champ, script, version) dont le contenu diffère : il échoue en listant les conflits, sans rien écrire. `--force` les remplace. Réappliquer un module à l'identique ne change rien.
 
 ## 4. Le catalogue
 
@@ -67,4 +79,4 @@ Ajouter le module dans `src/generator/modules.ts`, après les modules dont il d�
 ## 5. Test d'acceptation et CI
 
 - Un test d'acceptation ne duplique pas le test de fabrique : il vérifie seulement que le module est joignable par la CLI (`src/test/acceptance/`).
-- Ajouter le slug dans la boucle de `tests-ci/generate.sh`, pour que l'application complète qui l'inclut soit installée, compilée et testée.
+- Rien à faire dans `tests-ci/generate.sh` : le script applique tous les modules de `crafttype list`, dans l'ordre du catalogue. Si le module a une option obligatoire, ajoutez-la dans ce script.

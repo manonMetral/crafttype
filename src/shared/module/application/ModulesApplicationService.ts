@@ -1,5 +1,6 @@
-import { MissingModuleDependenciesError, UnknownModuleError } from '../domain/errors.js';
-import type { ModuleProperties, RawProperties } from '../domain/ModuleProperties.js';
+import { MissingModuleDependenciesError, ModuleConflictError, UnknownModuleError } from '../domain/errors.js';
+import { isRecord, parseJsonObject } from '../domain/jsonFile.js';
+import type { KnownProperties, ModuleProperties, RawProperties } from '../domain/ModuleProperties.js';
 import type { ModuleResource, ModuleSlug } from '../domain/ModuleResource.js';
 import type { CraftModule } from '../domain/CraftModule.js';
 import type {
@@ -21,6 +22,16 @@ export interface ModulesApplicationServiceDependencies {
   readonly clock: () => Date;
 }
 
+export interface ApplyOptions {
+  /** Remplace les fichiers et les entrées du package.json existants qui diffèrent, au lieu de refuser. */
+  readonly force?: boolean;
+}
+
+interface PackageJsonPlan {
+  readonly content: string;
+  readonly conflicts: readonly string[];
+}
+
 /** Orchestration : aucune règle métier ici, uniquement l'enchaînement des ports. */
 export class ModulesApplicationService {
   constructor(private readonly dependencies: ModulesApplicationServiceDependencies) {}
@@ -37,34 +48,70 @@ export class ModulesApplicationService {
     return resource;
   }
 
-  buildModule(slug: ModuleSlug, raw: RawProperties): { resource: ModuleResource; properties: ModuleProperties; module: CraftModule } {
+  buildModule(
+    slug: ModuleSlug,
+    raw: RawProperties,
+    known: KnownProperties = {},
+  ): { resource: ModuleResource; properties: ModuleProperties; module: CraftModule } {
     const resource = this.find(slug);
-    const properties = resource.propertiesDefinition.resolve(raw);
+    const properties = resource.propertiesDefinition.resolve(raw, known);
     return { resource, properties, module: resource.factory(properties) };
   }
 
-  apply(slug: ModuleSlug, raw: RawProperties): AppliedModule {
-    const { resource, properties, module } = this.buildModule(slug, raw);
+  apply(slug: ModuleSlug, raw: RawProperties, options: ApplyOptions = {}): AppliedModule {
+    const { resource, properties, module } = this.buildModule(slug, raw, this.knownProperties(raw.projectFolder));
 
     this.checkDependencies(resource, properties);
-    this.applyModule(module);
+    this.applyModule(module, options);
 
-    const { projectFolder: _, ...portableProperties } = properties;
-    const applied: AppliedModule = { slug, properties: portableProperties, appliedAt: this.dependencies.clock().toISOString() };
+    const applied: AppliedModule = {
+      slug,
+      properties: resource.propertiesDefinition.portable(properties),
+      appliedAt: this.dependencies.clock().toISOString(),
+    };
     this.dependencies.history.record(properties.projectFolder, applied);
     return applied;
   }
 
-  /** Applique un module sans passer par le catalogue ni l'historique (utilisé par les tests de module). */
-  applyModule(module: CraftModule): void {
+  /**
+   * Applique un module sans passer par le catalogue ni l'historique (utilisé par les tests de module).
+   * Rien n'est écrit si un fichier ou une entrée du package.json existant serait écrasé par un contenu différent,
+   * sauf avec `force`. Réappliquer un module à l'identique ne change rien.
+   */
+  applyModule(module: CraftModule, { force = false }: ApplyOptions = {}): void {
     const { files, resourcesReader, renderer } = this.dependencies;
 
-    for (const file of module.files) {
-      const content = resourcesReader.read(file.module, file.path);
-      files.write(module.projectFolder, file.destination, file.rendered ? renderer.render(content, module.context) : content);
+    const writes = module.files
+      .map((file) => {
+        const content = resourcesReader.read(file.module, file.path);
+        return { path: file.destination, content: file.rendered ? renderer.render(content, module.context) : content };
+      })
+      .filter(({ path, content }) => files.read(module.projectFolder, path) !== content);
+    const packageJson = this.planPackageJson(module);
+
+    const conflicts = [
+      ...writes.filter(({ path }) => files.read(module.projectFolder, path) !== undefined).map(({ path }) => path),
+      ...(packageJson?.conflicts ?? []),
+    ];
+    if (conflicts.length > 0 && !force) {
+      throw new ModuleConflictError(conflicts);
     }
 
-    this.mergePackageJson(module);
+    for (const { path, content } of writes) {
+      files.write(module.projectFolder, path, content);
+    }
+    if (packageJson !== undefined) {
+      files.write(module.projectFolder, PACKAGE_JSON, packageJson.content);
+    }
+  }
+
+  /** Propriétés déjà posées par les modules appliqués ; le plus récent l'emporte. */
+  private knownProperties(projectFolder: string | number | undefined): KnownProperties {
+    const folder = String(projectFolder ?? '');
+    if (folder.trim() === '') {
+      return {};
+    }
+    return this.dependencies.history.list(folder).reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
   }
 
   private checkDependencies(resource: ModuleResource, properties: ModuleProperties): void {
@@ -76,16 +123,15 @@ export class ModulesApplicationService {
     }
   }
 
-  private mergePackageJson(module: CraftModule): void {
+  private planPackageJson(module: CraftModule): PackageJsonPlan | undefined {
     const { fields, dependencies, devDependencies, scripts } = module.packageJson;
     const hasChanges = [fields, dependencies, devDependencies, scripts].some((part) => Object.keys(part).length > 0);
     if (!hasChanges) {
-      return;
+      return undefined;
     }
 
-    const { files } = this.dependencies;
-    const existing = files.read(module.projectFolder, PACKAGE_JSON);
-    const current: Record<string, unknown> = existing === undefined ? {} : JSON.parse(existing);
+    const existing = this.dependencies.files.read(module.projectFolder, PACKAGE_JSON);
+    const current = existing === undefined ? {} : parseJsonObject(PACKAGE_JSON, existing);
 
     const merged = {
       ...current,
@@ -95,11 +141,24 @@ export class ModulesApplicationService {
       devDependencies: sortKeys({ ...asRecord(current['devDependencies']), ...devDependencies }),
     };
 
-    files.write(module.projectFolder, PACKAGE_JSON, `${JSON.stringify(removeEmpty(merged), null, 2)}\n`);
+    const conflicts = [
+      ...differences('', fields, current),
+      ...differences('scripts.', scripts, asRecord(current['scripts'])),
+      ...differences('dependencies.', dependencies, asRecord(current['dependencies'])),
+      ...differences('devDependencies.', devDependencies, asRecord(current['devDependencies'])),
+    ];
+
+    return { content: `${JSON.stringify(removeEmpty(merged), null, 2)}\n`, conflicts };
   }
 }
 
-const asRecord = (value: unknown): Record<string, string> => (typeof value === 'object' && value !== null ? (value as Record<string, string>) : {});
+/** Entrées déjà présentes avec une autre valeur que celle que le module veut poser. */
+const differences = (prefix: string, wanted: Readonly<Record<string, unknown>>, existing: Record<string, unknown>): string[] =>
+  Object.entries(wanted)
+    .filter(([key, value]) => existing[key] !== undefined && JSON.stringify(existing[key]) !== JSON.stringify(value))
+    .map(([key, value]) => `${PACKAGE_JSON} : ${prefix}${key} (existant : ${JSON.stringify(existing[key])}, module : ${JSON.stringify(value)})`);
+
+const asRecord = (value: unknown): Record<string, string> => (isRecord(value) ? (value as Record<string, string>) : {});
 
 const sortKeys = (record: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
