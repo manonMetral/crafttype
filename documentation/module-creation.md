@@ -71,7 +71,15 @@ Les valeurs sont validées dans `ModulePropertiesDefinition.resolve` (nom de paq
 
 ### Fichiers existants
 
-Un module ne remplace jamais un fichier ou une entrée du `package.json` (champ, script, version) dont le contenu diffère : il échoue en listant les conflits, sans rien écrire. `--force` les remplace. Réappliquer un module à l'identique ne change rien.
+Un module ne remplace jamais un fichier ou une entrée du `package.json` (champ, script, version) dont le contenu diffère : il échoue en listant les conflits, sans rien écrire. Réappliquer un module à l'identique ne change rien.
+
+Le moteur calcule d'abord un plan (`ChangePlan`) : chaque fichier ou entrée du `package.json` est créé, inchangé ou en conflit. Une politique tranche ensuite les conflits :
+
+- `fail` (défaut) : le module est refusé, rien n'est écrit ni enregistré dans l'historique ;
+- `overwrite` (`--force`) : l'existant est remplacé ;
+- `skip` (`--skip-conflicts`) : l'existant est gardé, le reste est appliqué.
+
+`--dry-run` affiche le plan sans rien écrire. Un module n'a rien à faire pour en profiter : tout passe par `moduleBuilder`.
 
 ## 4. Le catalogue
 

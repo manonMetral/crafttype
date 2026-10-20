@@ -103,4 +103,69 @@ describe('CLI', () => {
     expect(code).toBe(1);
     expect(output).toContain('Erreur : Fichier package.json invalide');
   });
+
+  describe('conflits', () => {
+    const initialized = () => {
+      const projectFolder = tmpDirForTest();
+      run('apply', 'init', '--project-folder', projectFolder);
+      writeFileSync(join(projectFolder, 'README.md'), 'mon readme');
+      return projectFolder;
+    };
+
+    it('garde l’existant avec --skip-conflicts et le dit', () => {
+      const projectFolder = initialized();
+
+      const { code, output } = run('apply', 'init', '--project-folder', projectFolder, '--project-name', 'autre', '--skip-conflicts');
+
+      expect(code).toBe(0);
+      expect(output).toContain('ignorés : ');
+      expect(output).toContain('ignoré : README.md');
+      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('mon readme');
+    });
+
+    it('indique les deux issues quand un conflit bloque', () => {
+      const { code, output } = run('apply', 'init', '--project-folder', initialized());
+
+      expect(code).toBe(1);
+      expect(output).toContain('--skip-conflicts');
+      expect(output).toContain('--force');
+    });
+
+    it('refuse --force avec --skip-conflicts', () => {
+      const { code, output } = run('apply', 'init', '--project-folder', initialized(), '--force', '--skip-conflicts');
+
+      expect(code).toBe(1);
+      expect(output).toContain('--force et --skip-conflicts sont incompatibles');
+    });
+
+    it('simule sans écrire avec --dry-run', () => {
+      const projectFolder = tmpDirForTest();
+
+      const { code, output } = run('apply', 'init', '--project-folder', projectFolder, '--dry-run');
+
+      expect(code).toBe(0);
+      expect(output).toContain('Simulation du module init');
+      expect(output).toMatch(/créer\s+README\.md/);
+      expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
+      expect(existsSync(join(projectFolder, '.crafttype'))).toBe(false);
+    });
+
+    it('signale les conflits en simulation avec un code de sortie 1', () => {
+      const projectFolder = initialized();
+
+      const { code, output } = run('apply', 'init', '--project-folder', projectFolder, '--dry-run');
+
+      expect(code).toBe(1);
+      expect(output).toMatch(/conflit\s+README\.md/);
+      expect(output).toContain('--skip-conflicts');
+      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('mon readme');
+    });
+
+    it('simule le remplacement avec --dry-run --force', () => {
+      const { code, output } = run('apply', 'init', '--project-folder', initialized(), '--dry-run', '--force');
+
+      expect(code).toBe(0);
+      expect(output).toMatch(/remplacer\s+README\.md/);
+    });
+  });
 });

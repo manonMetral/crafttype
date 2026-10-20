@@ -1,4 +1,13 @@
-import { MissingModuleDependenciesError, ModuleConflictError, UnknownModuleError } from '../domain/errors.js';
+import {
+  ChangePlan,
+  reportOf,
+  type ApplyReport,
+  type ChangeKind,
+  type ConflictPolicy,
+  type DecidedChange,
+  type PlannedChange,
+} from '../domain/ChangePlan.js';
+import { MissingModuleDependenciesError, UnknownModuleError } from '../domain/errors.js';
 import { isRecord, parseJsonObject } from '../domain/jsonFile.js';
 import type { KnownProperties, ModuleProperties, RawProperties } from '../domain/ModuleProperties.js';
 import type { ModuleResource, ModuleSlug } from '../domain/ModuleResource.js';
@@ -23,13 +32,17 @@ export interface ModulesApplicationServiceDependencies {
 }
 
 export interface ApplyOptions {
-  /** Remplace les fichiers et les entrées du package.json existants qui diffèrent, au lieu de refuser. */
-  readonly force?: boolean;
+  /** `fail` (défaut) refuse le module s'il y a un conflit, `overwrite` remplace l'existant, `skip` le garde. */
+  readonly onConflict?: ConflictPolicy;
+  /** Calcule et renvoie les changements sans rien écrire, ni dans le projet ni dans l'historique. */
+  readonly dryRun?: boolean;
 }
 
-interface PackageJsonPlan {
-  readonly content: string;
-  readonly conflicts: readonly string[];
+export interface ApplyResult {
+  readonly slug: ModuleSlug;
+  readonly dryRun: boolean;
+  readonly changes: readonly DecidedChange[];
+  readonly report: ApplyReport;
 }
 
 /** Orchestration : aucune règle métier ici, uniquement l'enchaînement des ports. */
@@ -58,51 +71,114 @@ export class ModulesApplicationService {
     return { resource, properties, module: resource.factory(properties) };
   }
 
-  apply(slug: ModuleSlug, raw: RawProperties, options: ApplyOptions = {}): AppliedModule {
+  apply(slug: ModuleSlug, raw: RawProperties, { onConflict = 'fail', dryRun = false }: ApplyOptions = {}): ApplyResult {
     const { resource, properties, module } = this.buildModule(slug, raw, this.knownProperties(raw.projectFolder));
 
     this.checkDependencies(resource, properties);
-    this.applyModule(module, options);
+    const plan = this.plan(module);
 
-    const applied: AppliedModule = {
+    if (dryRun) {
+      const changes = plan.decide(onConflict);
+      return { slug, dryRun, changes, report: reportOf(changes) };
+    }
+
+    const changes = plan.resolve(onConflict);
+    this.write(module, changes);
+
+    this.dependencies.history.record(properties.projectFolder, {
       slug,
       properties: resource.propertiesDefinition.portable(properties),
       appliedAt: this.dependencies.clock().toISOString(),
-    };
-    this.dependencies.history.record(properties.projectFolder, applied);
-    return applied;
+    });
+    return { slug, dryRun, changes, report: reportOf(changes) };
   }
 
   /**
    * Applique un module sans passer par le catalogue ni l'historique (utilisé par les tests de module).
    * Rien n'est écrit si un fichier ou une entrée du package.json existant serait écrasé par un contenu différent,
-   * sauf avec `force`. Réappliquer un module à l'identique ne change rien.
+   * sauf si la politique l'autorise. Réappliquer un module à l'identique ne change rien.
    */
-  applyModule(module: CraftModule, { force = false }: ApplyOptions = {}): void {
+  applyModule(module: CraftModule, { onConflict = 'fail' }: Pick<ApplyOptions, 'onConflict'> = {}): ApplyReport {
+    const changes = this.plan(module).resolve(onConflict);
+    this.write(module, changes);
+    return reportOf(changes);
+  }
+
+  /** Ce que le module changerait dans le projet, d'après l'état actuel des fichiers. */
+  private plan(module: CraftModule): ChangePlan {
     const { files, resourcesReader, renderer } = this.dependencies;
+    const { projectFolder, packageJson } = module;
 
-    const writes = module.files
-      .map((file) => {
-        const content = resourcesReader.read(file.module, file.path);
-        return { path: file.destination, content: file.rendered ? renderer.render(content, module.context) : content };
-      })
-      .filter(({ path, content }) => files.read(module.projectFolder, path) !== content);
-    const packageJson = this.planPackageJson(module);
+    const fileChanges = module.files.map((file) => {
+      const content = resourcesReader.read(file.module, file.path);
+      const next = file.rendered ? renderer.render(content, module.context) : content;
+      return { kind: 'file' as const, target: file.destination, current: files.read(projectFolder, file.destination), next };
+    });
 
-    const conflicts = [
-      ...writes.filter(({ path }) => files.read(module.projectFolder, path) !== undefined).map(({ path }) => path),
-      ...(packageJson?.conflicts ?? []),
+    const sections: readonly [ChangeKind, Readonly<Record<string, unknown>>, string | undefined][] = [
+      ['field', packageJson.fields, undefined],
+      ['script', packageJson.scripts, 'scripts'],
+      ['dependency', packageJson.dependencies, 'dependencies'],
+      ['devDependency', packageJson.devDependencies, 'devDependencies'],
     ];
-    if (conflicts.length > 0 && !force) {
-      throw new ModuleConflictError(conflicts);
+    if (sections.every(([, wanted]) => Object.keys(wanted).length === 0)) {
+      return new ChangePlan(fileChanges);
     }
 
-    for (const { path, content } of writes) {
-      files.write(module.projectFolder, path, content);
+    const current = this.readPackageJson(projectFolder);
+    const packageJsonChanges = sections.flatMap(([kind, wanted, section]) => {
+      const existing = section === undefined ? current : asRecord(current[section]);
+      return Object.entries(wanted).map(([target, value]) => ({
+        kind,
+        target,
+        current: existing[target] === undefined ? undefined : JSON.stringify(existing[target]),
+        next: JSON.stringify(value),
+      }));
+    });
+    return new ChangePlan([...fileChanges, ...packageJsonChanges]);
+  }
+
+  /** Écrit uniquement ce qui est à créer ou à remplacer, pour ne pas toucher aux fichiers déjà à jour. */
+  private write(module: CraftModule, changes: readonly DecidedChange[]): void {
+    const { files } = this.dependencies;
+    const toWrite = changes.filter(({ decision }) => decision === 'create' || decision === 'overwrite');
+
+    for (const { kind, target, next } of toWrite) {
+      if (kind === 'file') {
+        files.write(module.projectFolder, target, next);
+      }
     }
-    if (packageJson !== undefined) {
-      files.write(module.projectFolder, PACKAGE_JSON, packageJson.content);
+
+    const packageJsonChanges = toWrite.filter(({ kind }) => kind !== 'file');
+    if (packageJsonChanges.length === 0) {
+      return;
     }
+
+    const packageJson = this.readPackageJson(module.projectFolder);
+    const touched = new Set<string>();
+    for (const { kind, target, next } of packageJsonChanges) {
+      const section = SECTIONS[kind as Exclude<ChangeKind, 'file'>];
+      if (section === undefined) {
+        packageJson[target] = JSON.parse(next);
+        continue;
+      }
+      const entries = asRecord(packageJson[section]);
+      entries[target] = JSON.parse(next);
+      packageJson[section] = entries;
+      touched.add(section);
+    }
+    for (const section of ['dependencies', 'devDependencies']) {
+      if (touched.has(section)) {
+        packageJson[section] = sortKeys(asRecord(packageJson[section]));
+      }
+    }
+
+    files.write(module.projectFolder, PACKAGE_JSON, `${JSON.stringify(packageJson, null, 2)}\n`);
+  }
+
+  private readPackageJson(projectFolder: string): Record<string, unknown> {
+    const existing = this.dependencies.files.read(projectFolder, PACKAGE_JSON);
+    return existing === undefined ? {} : parseJsonObject(PACKAGE_JSON, existing);
   }
 
   /** Propriétés déjà posées par les modules appliqués ; le plus récent l'emporte. */
@@ -122,46 +198,16 @@ export class ModulesApplicationService {
       throw new MissingModuleDependenciesError(resource.slug, missing);
     }
   }
-
-  private planPackageJson(module: CraftModule): PackageJsonPlan | undefined {
-    const { fields, dependencies, devDependencies, scripts } = module.packageJson;
-    const hasChanges = [fields, dependencies, devDependencies, scripts].some((part) => Object.keys(part).length > 0);
-    if (!hasChanges) {
-      return undefined;
-    }
-
-    const existing = this.dependencies.files.read(module.projectFolder, PACKAGE_JSON);
-    const current = existing === undefined ? {} : parseJsonObject(PACKAGE_JSON, existing);
-
-    const merged = {
-      ...current,
-      ...fields,
-      scripts: { ...asRecord(current['scripts']), ...scripts },
-      dependencies: sortKeys({ ...asRecord(current['dependencies']), ...dependencies }),
-      devDependencies: sortKeys({ ...asRecord(current['devDependencies']), ...devDependencies }),
-    };
-
-    const conflicts = [
-      ...differences('', fields, current),
-      ...differences('scripts.', scripts, asRecord(current['scripts'])),
-      ...differences('dependencies.', dependencies, asRecord(current['dependencies'])),
-      ...differences('devDependencies.', devDependencies, asRecord(current['devDependencies'])),
-    ];
-
-    return { content: `${JSON.stringify(removeEmpty(merged), null, 2)}\n`, conflicts };
-  }
 }
 
-/** Entrées déjà présentes avec une autre valeur que celle que le module veut poser. */
-const differences = (prefix: string, wanted: Readonly<Record<string, unknown>>, existing: Record<string, unknown>): string[] =>
-  Object.entries(wanted)
-    .filter(([key, value]) => existing[key] !== undefined && JSON.stringify(existing[key]) !== JSON.stringify(value))
-    .map(([key, value]) => `${PACKAGE_JSON} : ${prefix}${key} (existant : ${JSON.stringify(existing[key])}, module : ${JSON.stringify(value)})`);
+const SECTIONS: Record<Exclude<ChangeKind, 'file'>, string | undefined> = {
+  field: undefined,
+  script: 'scripts',
+  dependency: 'dependencies',
+  devDependency: 'devDependencies',
+};
 
-const asRecord = (value: unknown): Record<string, string> => (isRecord(value) ? (value as Record<string, string>) : {});
+const asRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? { ...value } : {});
 
-const sortKeys = (record: Record<string, string>): Record<string, string> =>
+const sortKeys = (record: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
-
-const removeEmpty = (record: Record<string, unknown>): Record<string, unknown> =>
-  Object.fromEntries(Object.entries(record).filter(([, value]) => !(typeof value === 'object' && value !== null && Object.keys(value).length === 0)));

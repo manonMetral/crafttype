@@ -20,7 +20,15 @@ npm run cli -- apply vue-app --project-folder ../mon-app
 Les modules appliqués sont notés dans `.crafttype/modules/history.json` du projet généré, avec les propriétés qu'ils déclarent. Un module refuse de s'appliquer si les modules dont il dépend ne sont pas dans cet historique.
 Les options déjà données à un module précédent (`--project-name` pour `init`, `--server-port` pour `fastify-server`) sont reprises par les suivants : `vue-app` proxifie vers le port choisi pour le serveur.
 
-Un module ne remplace jamais un fichier ou une entrée du `package.json` dont le contenu diffère : il liste les conflits et s'arrête. `--force` les remplace.
+Un module ne remplace jamais un fichier ou une entrée du `package.json` dont le contenu diffère : par défaut il liste les conflits et s'arrête, sans rien écrire. Trois options changent ce comportement :
+
+| Option | Effet |
+|---|---|
+| `--skip-conflicts` | applique le module en gardant les éléments existants qui diffèrent, et les liste |
+| `--force` | remplace les éléments existants qui diffèrent |
+| `--dry-run` | affiche ce que le module créerait, laisserait inchangé ou trouverait en conflit, sans rien écrire (code de sortie 1 s'il reste un conflit) |
+
+`--force` et `--skip-conflicts` sont incompatibles ; `--dry-run` se combine avec l'un ou l'autre pour voir leur effet.
 
 ## Vérifier que ça marche
 
