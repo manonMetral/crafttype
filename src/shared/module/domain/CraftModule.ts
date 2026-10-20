@@ -1,3 +1,5 @@
+import { posix } from 'node:path';
+import { DuplicateDestinationError } from './errors.js';
 import type { ModuleProperties } from './ModuleProperties.js';
 import type { PackageVersions } from './PackageVersions.js';
 
@@ -56,7 +58,11 @@ export class CraftModuleBuilder {
   constructor(private readonly properties: ModuleProperties) {}
 
   addFile(source: Source, destination: string): this {
-    this.files.push({ ...source, destination });
+    const normalized = posix.normalize(destination);
+    if (this.files.some((file) => file.destination === normalized)) {
+      throw new DuplicateDestinationError(normalized);
+    }
+    this.files.push({ ...source, destination: normalized });
     return this;
   }
 

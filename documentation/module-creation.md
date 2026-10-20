@@ -37,6 +37,7 @@ export class EslintFactory {
 ```
 
 - `SOURCE.template('x')` lit `x.mustache` et le rend avec les propriétés. `SOURCE.file('x')` copie sans rendre : à utiliser dès que le fichier contient des `{{ }}` (templates Vue).
+- Un même fichier de destination ne peut être déclaré qu'une fois : un second `addFile` vers le même chemin (`./src/a.txt` et `src/a.txt` comptent pour le même) lève `DuplicateDestinationError` dès la construction du module.
 - Une dépendance sans version dans `resources/generator/dependencies/` fait échouer la construction. C'est voulu.
 
 ## 2. Les versions
