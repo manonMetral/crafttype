@@ -1,0 +1,22 @@
+import type { ModuleProperties } from '../../../shared/module/domain/ModuleProperties.js';
+import { from, moduleBuilder, type CraftModule } from '../../../shared/module/domain/CraftModule.js';
+import type { NodePackagesVersionsReader } from '../../../shared/module/domain/PackageVersions.js';
+
+const SOURCE = from('init');
+
+export class InitFactory {
+  constructor(_versions: NodePackagesVersionsReader) {}
+
+  buildModule(properties: ModuleProperties): CraftModule {
+    return moduleBuilder(properties)
+      .addFile(SOURCE.template('gitignore'), '.gitignore')
+      .addFile(SOURCE.template('editorconfig'), '.editorconfig')
+      .addFile(SOURCE.template('README.md'), 'README.md')
+      .setPackageJsonField('name', properties.projectName)
+      .setPackageJsonField('version', '0.0.1')
+      .setPackageJsonField('private', true)
+      .setPackageJsonField('type', 'module')
+      .setPackageJsonField('engines', { node: '>=22.12' })
+      .build();
+  }
+}

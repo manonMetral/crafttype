@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Catalogue de versions injectées dans les projets générés : un seul lot, validé par la CI de génération",
+      "matchFileNames": ["resources/generator/dependencies/**/package.json"],
+      "groupName": "catalogue de versions des projets générés",
+      "rangeStrategy": "pin",
+      "semanticCommitType": "feat",
+      "semanticCommitScope": "catalogue"
+    },
+    {
+      "description": "Outillage de CraftType lui-même",
+      "matchFileNames": ["package.json"],
+      "groupName": "outillage de développement",
+      "matchUpdateTypes": ["minor", "patch"]
+    }
+  ]
+}

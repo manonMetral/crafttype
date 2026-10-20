@@ -1,0 +1,23 @@
+import { allModuleResources } from './generator/modules.js';
+import { ModulesApplicationService } from './shared/module/application/ModulesApplicationService.js';
+import { FileSystemModulesHistory } from './shared/module/infrastructure/secondary/FileSystemModulesHistory.js';
+import { FileSystemModuleResourcesReader } from './shared/module/infrastructure/secondary/FileSystemModuleResourcesReader.js';
+import { FileSystemNodePackagesVersionsReader } from './shared/module/infrastructure/secondary/FileSystemNodePackagesVersionsReader.js';
+import { FileSystemProjectFiles } from './shared/module/infrastructure/secondary/FileSystemProjectFiles.js';
+import { MustacheTemplateRenderer } from './shared/module/infrastructure/secondary/MustacheTemplateRenderer.js';
+import { resourcesRoot } from './shared/module/infrastructure/secondary/resourcesRoot.js';
+
+/** Racine de composition : le seul endroit qui connaît à la fois le domaine et les adaptateurs. */
+export const createModulesApplicationService = (options: { clock?: () => Date } = {}): ModulesApplicationService => {
+  const root = resourcesRoot();
+  const files = new FileSystemProjectFiles();
+
+  return new ModulesApplicationService({
+    resources: allModuleResources(new FileSystemNodePackagesVersionsReader(root)),
+    files,
+    resourcesReader: new FileSystemModuleResourcesReader(root),
+    renderer: new MustacheTemplateRenderer(),
+    history: new FileSystemModulesHistory(files),
+    clock: options.clock ?? (() => new Date()),
+  });
+};

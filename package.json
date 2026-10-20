@@ -1,0 +1,43 @@
+{
+  "name": "crafttype",
+  "version": "0.0.0",
+  "description": "Générateur modulaire de projets Node.js (Fastify) et Vue.js, inspiré de Seed4J",
+  "type": "module",
+  "bin": {
+    "crafttype": "./dist/shared/module/infrastructure/primary/main.js"
+  },
+  "files": [
+    "dist",
+    "resources"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "cli": "tsx src/shared/module/infrastructure/primary/main.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint:types": "tsc --noEmit",
+    "ci:generate": "bash tests-ci/generate.sh"
+  },
+  "devDependencies": {
+    "@types/mustache": "^4.2.6",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "mustache": "^4.2.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manonMetral/crafttype.git"
+  },
+  "bugs": {
+    "url": "https://github.com/manonMetral/crafttype/issues"
+  },
+  "homepage": "https://github.com/manonMetral/crafttype#readme"
+}
