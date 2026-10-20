@@ -35,8 +35,7 @@ Suivez [documentation/module-creation.md](documentation/module-creation.md). En 
 
 1. Écrire d'abord le test de la fabrique avec `assertThatModule`.
 2. Écrire la fabrique, les templates dans `resources/generator/<module>/` et, si besoin, les versions dans `resources/generator/dependencies/`.
-3. Déclarer la ressource de module, puis l'ajouter dans `src/generator/modules.ts` après les modules dont elle dépend.
-4. Ajouter le slug dans la boucle de `tests-ci/generate.sh`, pour que l'application complète l'inclue.
+3. Déclarer la ressource de module, puis l'ajouter dans `src/generator/modules.ts` après les modules dont elle dépend. `tests-ci/generate.sh` l'inclut alors automatiquement dans l'application complète.
 
 Respectez l'architecture hexagonale du dépôt : le domaine ne dépend d'aucun adaptateur, les accès au disque et à mustache restent dans `infrastructure/secondary`.
 

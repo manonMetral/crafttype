@@ -12,7 +12,7 @@ describe('catalogue de modules', () => {
     expect(new Set(slugs).size).toBe(slugs.length);
   });
 
-  it('ne référence que des modules existants et sans cycle (ordre du catalogue respecté)', () => {
+  it('ne dépend que de modules déclarés avant lui, donc existants et sans cycle', () => {
     const seen = new Set<string>();
     for (const { slug, dependsOn } of resources) {
       for (const dependency of dependsOn) {

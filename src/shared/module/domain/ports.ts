@@ -1,5 +1,5 @@
 import type { ModuleSlug } from './ModuleResource.js';
-import type { ModuleProperties } from './ModuleProperties.js';
+import type { KnownProperties } from './ModuleProperties.js';
 import type { TemplateContext } from './CraftModule.js';
 
 /** Port : écrit dans le projet généré. */
@@ -20,8 +20,11 @@ export interface TemplateRenderer {
 
 export interface AppliedModule {
   readonly slug: ModuleSlug;
-  /** Sans `projectFolder` : le chemin local n'a pas de sens une fois le projet déplacé ou cloné. */
-  readonly properties: Omit<ModuleProperties, 'projectFolder'>;
+  /**
+   * Seulement les propriétés que le module déclare, et sans `projectFolder` (le chemin local n'a pas de sens
+   * une fois le projet déplacé ou cloné). Les modules suivants les réutilisent comme valeurs par défaut.
+   */
+  readonly properties: KnownProperties;
   readonly appliedAt: string;
 }
 

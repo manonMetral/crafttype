@@ -17,7 +17,10 @@ npm run cli -- apply fastify-server --project-folder ../mon-app --server-port 30
 npm run cli -- apply vue-app --project-folder ../mon-app
 ```
 
-Les modules appliqués sont notés dans `.crafttype/modules/history.json` du projet généré. Un module refuse de s'appliquer si les modules dont il dépend ne sont pas dans cet historique.
+Les modules appliqués sont notés dans `.crafttype/modules/history.json` du projet généré, avec les propriétés qu'ils déclarent. Un module refuse de s'appliquer si les modules dont il dépend ne sont pas dans cet historique.
+Les options déjà données à un module précédent (`--project-name` pour `init`, `--server-port` pour `fastify-server`) sont reprises par les suivants : `vue-app` proxifie vers le port choisi pour le serveur.
+
+Un module ne remplace jamais un fichier ou une entrée du `package.json` dont le contenu diffère : il liste les conflits et s'arrête. `--force` les remplace.
 
 ## Vérifier que ça marche
 
@@ -34,8 +37,8 @@ Chaque module est un « hexagone », comme dans Seed4J (voir `documentation/hexa
 src/
   shared/module/            noyau : modèle de module, moteur d'application, adaptateurs (fichiers, mustache, CLI)
   generator/<module>/
-    domain/                 fabrique : construit le CraftModule à partir des propriétés
     application/            service d'orchestration
+    domain/                 fabrique : construit le CraftModule à partir des propriétés
     infrastructure/primary/ ressource de module (slug, propriétés, dépendances, tags)
   generator/modules.ts      catalogue des modules
   composition.ts            racine de composition
