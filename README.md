@@ -37,6 +37,7 @@ Chaque module est un « hexagone », comme dans Seed4J (voir `documentation/hexa
 src/
   shared/module/            noyau : modèle de module, moteur d'application, adaptateurs (fichiers, mustache, CLI)
   generator/<module>/
+    application/            service d'orchestration
     domain/                 fabrique : construit le CraftModule à partir des propriétés
     infrastructure/primary/ ressource de module (slug, propriétés, dépendances, tags)
   generator/modules.ts      catalogue des modules

@@ -43,9 +43,10 @@ export class EslintFactory {
 
 Ajouter le paquet dans `resources/generator/dependencies/common/package.json`, ou dans `<framework>/package.json` pour un module propre à un framework.
 
-## 3. La ressource
+## 3. Le service d'application et la ressource
 
-`infrastructure/primary/eslintModuleResource.ts` instancie la fabrique et décrit la place du module dans le catalogue :
+- `application/EslintApplicationService.ts` : instancie la fabrique et expose `buildModule`. L'adaptateur primaire passe par lui et n'appelle jamais le domaine directement, même quand il ne fait que relayer : c'est là que viendra l'orchestration d'un module plus riche.
+- `infrastructure/primary/eslintModuleResource.ts` décrit la place du module dans le catalogue :
 
 ```ts
 moduleResource()
@@ -54,7 +55,7 @@ moduleResource()
   .apiDoc('Qualité', 'Ajoute ESLint')
   .dependsOn('typescript')   // ou .standalone()
   .tags('quality')
-  .factory((properties) => factory.buildModule(properties)); // const factory = new EslintFactory(versions)
+  .factory((properties) => modules.buildModule(properties)); // const modules = new EslintApplicationService(versions)
 ```
 
 `apiDoc` (groupe et libellé) et `tags` sont des métadonnées de catalogue : `list` n'affiche que le libellé, le reste est réservé à un futur filtrage ou à une API.

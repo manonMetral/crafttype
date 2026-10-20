@@ -1,12 +1,11 @@
 import { ModulePropertiesDefinition } from '../../../../shared/module/domain/ModuleProperties.js';
 import { moduleResource, type ModuleResource } from '../../../../shared/module/domain/ModuleResource.js';
-import type { NodePackagesVersionsReader } from '../../../../shared/module/domain/PackageVersions.js';
 import { InitApplicationService } from '../../application/InitApplicationService.js';
 
 export const initSlug = 'init';
 
-export const createInitModuleResource = (versions: NodePackagesVersionsReader): ModuleResource => {
-  const modules = new InitApplicationService(versions);
+export const createInitModuleResource = (): ModuleResource => {
+  const modules = new InitApplicationService();
 
   return moduleResource()
     .slug(initSlug)

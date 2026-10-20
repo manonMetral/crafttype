@@ -1,12 +1,9 @@
 import type { ModuleProperties } from '../../../shared/module/domain/ModuleProperties.js';
 import { from, moduleBuilder, type CraftModule } from '../../../shared/module/domain/CraftModule.js';
-import type { NodePackagesVersionsReader } from '../../../shared/module/domain/PackageVersions.js';
 
 const SOURCE = from('init');
 
 export class InitFactory {
-  constructor(_versions: NodePackagesVersionsReader) {}
-
   buildModule(properties: ModuleProperties): CraftModule {
     return moduleBuilder(properties)
       .addFile(SOURCE.template('gitignore'), '.gitignore')
