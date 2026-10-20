@@ -1,4 +1,5 @@
 import { allModuleResources } from './generator/modules.js';
+import type { ModuleResource } from './shared/module/domain/ModuleResource.js';
 import { ModulesApplicationService } from './shared/module/application/ModulesApplicationService.js';
 import { FileSystemModulesHistory } from './shared/module/infrastructure/secondary/FileSystemModulesHistory.js';
 import { FileSystemModuleResourcesReader } from './shared/module/infrastructure/secondary/FileSystemModuleResourcesReader.js';
@@ -7,13 +8,16 @@ import { FileSystemProjectFiles } from './shared/module/infrastructure/secondary
 import { MustacheTemplateRenderer } from './shared/module/infrastructure/secondary/MustacheTemplateRenderer.js';
 import { resourcesRoot } from './shared/module/infrastructure/secondary/resourcesRoot.js';
 
-/** Racine de composition : le seul endroit qui connaît à la fois le domaine et les adaptateurs. */
-export const createModulesApplicationService = (options: { clock?: () => Date } = {}): ModulesApplicationService => {
+/**
+ * Racine de composition : le seul endroit qui connaît à la fois le domaine et les adaptateurs.
+ * `extraResources` ajoute des modules au catalogue (extensions, tests).
+ */
+export const createModulesApplicationService = (options: { clock?: () => Date; extraResources?: readonly ModuleResource[] } = {}): ModulesApplicationService => {
   const root = resourcesRoot();
   const files = new FileSystemProjectFiles();
 
   return new ModulesApplicationService({
-    resources: allModuleResources(new FileSystemNodePackagesVersionsReader(root)),
+    resources: [...allModuleResources(new FileSystemNodePackagesVersionsReader(root)), ...(options.extraResources ?? [])],
     files,
     resourcesReader: new FileSystemModuleResourcesReader(root),
     renderer: new MustacheTemplateRenderer(),

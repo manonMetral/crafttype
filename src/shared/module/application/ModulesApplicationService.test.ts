@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync, utimesSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../../composition.js';
+import { databaseModuleResources } from '../../test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../test/ModuleAssertions.js';
 import {
   InvalidProjectFileError,
@@ -396,5 +397,51 @@ describe('ModulesApplicationService', () => {
         expect(() => service.apply('vitest', { projectFolder })).toThrow(InvalidProjectFileError);
       },
     );
+  });
+  describe('propriétés propres à un module', () => {
+    const database = () => createModulesApplicationService({ clock, extraResources: databaseModuleResources });
+
+    it('transmet les valeurs typées à la fabrique du module', () => {
+      const service = database();
+      const projectFolder = tmpDirForTest();
+
+      service.apply('database', { projectFolder, databaseName: 'shop', poolSize: '25', migrations: false });
+
+      const { scripts } = readJson(projectFolder, 'package.json');
+      expect(scripts).toEqual({ 'db:info': 'echo shop:25' });
+    });
+
+    it('enregistre ces valeurs dans l’historique et les redonne aux modules suivants', () => {
+      const service = database();
+      const projectFolder = tmpDirForTest();
+      service.apply('database', { projectFolder, databaseName: 'shop' });
+
+      service.apply('database-seed', { projectFolder });
+
+      const { modules } = readJson(projectFolder, '.crafttype/modules/history.json');
+      expect(modules[0].properties).toEqual({ databaseName: 'shop', poolSize: 10, migrations: true });
+      expect(modules[1].properties).toEqual({ databaseName: 'shop' });
+      expect(readJson(projectFolder, 'package.json').scripts['db:seed']).toBe('echo seed shop');
+    });
+
+    it('laisse une valeur explicite l’emporter sur celle de l’historique', () => {
+      const service = database();
+      const projectFolder = tmpDirForTest();
+      service.apply('database', { projectFolder, databaseName: 'shop' });
+
+      service.apply('database-seed', { projectFolder, databaseName: 'autre' }, { onConflict: 'overwrite' });
+
+      expect(readJson(projectFolder, 'package.json').scripts['db:seed']).toBe('echo seed autre');
+    });
+
+    it('refuse une propriété obligatoire absente, invalide, ou que le module ne déclare pas', () => {
+      const service = database();
+      const projectFolder = tmpDirForTest();
+
+      expect(() => service.apply('database', { projectFolder })).toThrow(MissingPropertyError);
+      expect(() => service.apply('database', { projectFolder, databaseName: 'shop', poolSize: 0 })).toThrow(InvalidPropertyError);
+      expect(() => service.apply('database', { projectFolder, databaseName: 'shop', serverPort: 4000 })).toThrow(InvalidPropertyError);
+      expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
+    });
   });
 });

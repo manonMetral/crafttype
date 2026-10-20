@@ -26,6 +26,23 @@ export class InvalidPropertyError extends CraftTypeError {
   }
 }
 
+/** Un module lit une propriété qu'il ne déclare pas, ou avec un autre type : défaut de définition du module. */
+export class PropertyAccessError extends CraftTypeError {
+  constructor(
+    readonly key: string,
+    reason: string,
+  ) {
+    super(`Propriété ${key} inaccessible : ${reason}`);
+  }
+}
+
+/** La définition des propriétés d'un module est incohérente (clé réservée ou dupliquée, clé illisible en option). */
+export class InvalidPropertyDefinitionError extends CraftTypeError {
+  constructor(key: string, reason: string) {
+    super(`Définition de la propriété ${key} invalide : ${reason}`);
+  }
+}
+
 export class MissingModuleDependenciesError extends CraftTypeError {
   constructor(slug: string, missing: readonly string[]) {
     super(`Le module ${slug} requiert d'abord : ${missing.join(', ')}`);

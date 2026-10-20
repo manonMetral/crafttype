@@ -2,12 +2,15 @@ import { parseArgs } from 'node:util';
 import type { ApplyResult, ModulesApplicationService } from '../../application/ModulesApplicationService.js';
 import { describeConflict, describeChange, type ConflictPolicy, type DecidedChange } from '../../domain/ChangePlan.js';
 import { CraftTypeError, InvalidPropertyError, MissingPropertyError, ModuleConflictError } from '../../domain/errors.js';
-import type { RawProperties } from '../../domain/ModuleProperties.js';
+import type { ModulePropertiesDefinition, PropertyDefinition, PropertyValue } from '../../domain/ModuleProperties.js';
 
 const USAGE = `Usage :
   crafttype list
-  crafttype apply <module> --project-folder <dossier> [--project-name <nom>] [--server-port <port>]
+  crafttype apply <module> --project-folder <dossier> [--<propriété> <valeur> ...]
                   [--force | --skip-conflicts] [--dry-run]
+  crafttype apply <module> --help
+
+Le module vient juste après « apply ». Les propriétés qu'il accepte (nom du projet, port...) sont listées par --help.
 
 Un module ne remplace jamais un fichier ou une entrée du package.json dont le contenu diffère : par défaut il refuse.
   --force           remplace les éléments existants qui diffèrent
@@ -46,30 +49,41 @@ export const runCli = (argv: readonly string[], service: ModulesApplicationServi
   }
 };
 
-const apply = (args: readonly string[], service: ModulesApplicationService, out: (line: string) => void): number => {
-  const { values, positionals } = parseArgs({
-    args: [...args],
-    allowPositionals: true,
-    options: {
-      'project-folder': { type: 'string' },
-      'project-name': { type: 'string' },
-      'server-port': { type: 'string' },
-      force: { type: 'boolean' },
-      'skip-conflicts': { type: 'boolean' },
-      'dry-run': { type: 'boolean' },
-    },
-  });
+const COMMON_OPTIONS = {
+  'project-folder': { type: 'string' },
+  force: { type: 'boolean' },
+  'skip-conflicts': { type: 'boolean' },
+  'dry-run': { type: 'boolean' },
+  help: { type: 'boolean' },
+} as const;
 
-  const [slug] = positionals;
-  if (slug === undefined) {
+const apply = (args: readonly string[], service: ModulesApplicationService, out: (line: string) => void): number => {
+  const [slug, ...options] = args;
+  if (slug === undefined || slug.startsWith('-')) {
     out(USAGE);
     return 1;
   }
 
-  const raw: RawProperties = {};
-  if (values['project-folder'] !== undefined) raw.projectFolder = values['project-folder'];
-  if (values['project-name'] !== undefined) raw.projectName = values['project-name'];
-  if (values['server-port'] !== undefined) raw.serverPort = values['server-port'];
+  const definition = service.find(slug).propertiesDefinition;
+  const { values } = parseArgs({
+    args: options,
+    allowPositionals: false,
+    allowNegative: true,
+    options: { ...COMMON_OPTIONS, ...Object.fromEntries(definition.custom.map(({ key, type }) => [toOption(key), { type: type === 'boolean' ? 'boolean' : 'string' } as const])) },
+  });
+
+  if (values.help === true) {
+    describeModule(slug, service, definition, out);
+    return 0;
+  }
+
+  const parsed: Readonly<Record<string, string | boolean | undefined>> = values;
+  const raw: Record<string, PropertyValue> = {};
+  if (values['project-folder'] !== undefined) raw['projectFolder'] = values['project-folder'];
+  for (const { key } of definition.custom) {
+    const value = parsed[toOption(key)];
+    if (value !== undefined) raw[key] = value;
+  }
 
   if (values.force === true && values['skip-conflicts'] === true) {
     out('Erreur : --force et --skip-conflicts sont incompatibles');
@@ -79,7 +93,24 @@ const apply = (args: readonly string[], service: ModulesApplicationService, out:
   const onConflict: ConflictPolicy = values.force === true ? 'overwrite' : values['skip-conflicts'] === true ? 'skip' : 'fail';
 
   const result = service.apply(slug, raw, { onConflict, dryRun: values['dry-run'] === true });
-  return report(result, String(raw.projectFolder), out);
+  return report(result, String(raw['projectFolder']), out);
+};
+
+const describeModule = (slug: string, service: ModulesApplicationService, definition: ModulePropertiesDefinition, out: (line: string) => void): void => {
+  out(`Module ${slug} : ${service.find(slug).apiDoc.operation}`);
+  out('Options :');
+  const lines = definition.properties.map((property) => [`--${toOption(property.key)} ${valueHint(property)}`.trimEnd(), summary(property)] as const);
+  const width = Math.max(...lines.map(([flag]) => flag.length));
+  for (const [flag, text] of lines) {
+    out(`  ${flag.padEnd(width)}  ${text}`);
+  }
+};
+
+const valueHint = ({ type }: PropertyDefinition): string => (type === 'boolean' ? '' : type === 'number' ? '<nombre>' : '<texte>');
+
+const summary = ({ mandatory, defaultValue, description }: PropertyDefinition): string => {
+  const constraint = mandatory ? '(obligatoire) ' : typeof defaultValue === 'function' || defaultValue === undefined ? '' : `(défaut : ${String(defaultValue)}) `;
+  return `${constraint}${description}`;
 };
 
 const LABELS: Record<DecidedChange['decision'], string> = {
@@ -130,7 +161,9 @@ const describe = (error: CraftTypeError): string => {
   return error.message;
 };
 
-const toFlag = (key: string): string => `--${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
+const toOption = (key: string): string => key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+
+const toFlag = (key: string): string => `--${toOption(key)}`;
 
 /** Erreurs de `parseArgs` : option inconnue, valeur manquante... */
 const isUsageError = (error: unknown): error is TypeError & { code: string } =>

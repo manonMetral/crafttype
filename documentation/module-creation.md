@@ -65,10 +65,29 @@ Les étapes sont ordonnées par le compilateur, comme dans le builder de Seed4J.
 
 ### Propriétés
 
-`propertiesDefinition` déclare les options que le module accepte (`addProjectName()`, `addServerPort()`). Une option non déclarée est refusée.
-Pour chaque propriété, la valeur explicite l'emporte, puis la valeur que l'historique du projet a déjà enregistrée pour un module précédent, puis la valeur par défaut.
+`propertiesDefinition` déclare les propriétés que le module accepte. Une propriété non déclarée est refusée. Deux sont prêtes à l'emploi (`addProjectName()`, `addServerPort()`) ; pour les autres, on les décrit avec `addString`, `addNumber` ou `addBoolean` :
+
+```ts
+ModulePropertiesDefinition.builder()
+  .addString('databaseName', { description: 'Nom de la base', mandatory: true })
+  .addNumber('poolSize', {
+    description: 'Taille du pool de connexions',
+    defaultValue: 10,
+    validate: (size) => (Number(size) >= 1 ? undefined : 'la taille doit valoir au moins 1'),
+  })
+  .addBoolean('migrations', { description: 'Active les migrations', defaultValue: true })
+  .build();
+```
+
+- La clé est en camelCase. La ligne de commande en tire l'option : `databaseName` donne `--database-name`, et une propriété booléenne s'active avec `--migrations` et se coupe avec `--no-migrations`. `crafttype apply <module> --help` liste les options du module.
+- `defaultValue` est une valeur fixe, ou une fonction du dossier du projet (c'est ainsi que `projectName` en dérive son nom). Sans valeur par défaut, une propriété non obligatoire reste absente.
+- `validate` reçoit la valeur déjà convertie au bon type et renvoie le motif du refus, ou `undefined`. Le texte apparaît dans `Option --pool-size invalide : ...`.
+- La fabrique lit les valeurs avec `properties.string('databaseName')`, `properties.number('poolSize')` et `properties.boolean('migrations')`. Lire une propriété que le module ne déclare pas, ou avec le mauvais type, lève `PropertyAccessError`.
+- Les valeurs déclarées sont aussi disponibles dans les templates mustache (`{{databaseName}}`).
+- Les clés `projectFolder`, `force`, `skipConflicts`, `dryRun` et `help` sont réservées, et une clé ne peut pas être déclarée deux fois.
+
+Pour chaque propriété, la valeur explicite l'emporte, puis la valeur que l'historique du projet a déjà enregistrée pour un module précédent (par une propriété de même clé), puis la valeur par défaut. Une propriété obligatoire déjà posée par un module précédent n'est donc pas redemandée.
 Ainsi `vue-app` relit le port posé par `fastify-server` et le nom posé par `init`. L'historique ne garde que les propriétés déclarées par chaque module.
-Les valeurs sont validées dans `ModulePropertiesDefinition.resolve` (nom de paquet npm, port de 1 à 65535) : une nouvelle propriété y ajoute sa validation.
 
 ### Fichiers existants
 

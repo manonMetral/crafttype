@@ -19,6 +19,7 @@ npm run cli -- apply vue-app --project-folder ../mon-app
 
 Les modules appliqués sont notés dans `.crafttype/modules/history.json` du projet généré, avec les propriétés qu'ils déclarent. Un module refuse de s'appliquer si les modules dont il dépend ne sont pas dans cet historique.
 Les options déjà données à un module précédent (`--project-name` pour `init`, `--server-port` pour `fastify-server`) sont reprises par les suivants : `vue-app` proxifie vers le port choisi pour le serveur.
+Chaque module déclare ses propres options : `npm run cli -- apply <module> --help` les liste.
 
 Un module ne remplace jamais un fichier ou une entrée du `package.json` dont le contenu diffère : par défaut il liste les conflits et s'arrête, sans rien écrire. Trois options changent ce comportement :
 
