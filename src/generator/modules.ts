@@ -8,7 +8,7 @@ import { createVueAppModuleResource } from './vue-app/infrastructure/primary/vue
 
 /** Catalogue des modules : ajouter une ligne ici pour exposer un nouveau module. */
 export const allModuleResources = (versions: NodePackagesVersionsReader): readonly ModuleResource[] => [
-  createInitModuleResource(),
+  createInitModuleResource(versions),
   createTypescriptModuleResource(versions),
   createVitestModuleResource(versions),
   createFastifyServerModuleResource(versions),

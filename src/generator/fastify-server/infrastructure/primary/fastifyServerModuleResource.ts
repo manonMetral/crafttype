@@ -1,12 +1,12 @@
 import { ModulePropertiesDefinition } from '../../../../shared/module/domain/ModuleProperties.js';
 import { moduleResource, type ModuleResource } from '../../../../shared/module/domain/ModuleResource.js';
 import type { NodePackagesVersionsReader } from '../../../../shared/module/domain/PackageVersions.js';
-import { FastifyServerFactory } from '../../domain/FastifyServerFactory.js';
+import { FastifyServerApplicationService } from '../../application/FastifyServerApplicationService.js';
 
 export const fastifyServerSlug = 'fastify-server';
 
 export const createFastifyServerModuleResource = (versions: NodePackagesVersionsReader): ModuleResource => {
-  const factory = new FastifyServerFactory(versions);
+  const modules = new FastifyServerApplicationService(versions);
 
   return moduleResource()
     .slug(fastifyServerSlug)
@@ -14,5 +14,5 @@ export const createFastifyServerModuleResource = (versions: NodePackagesVersions
     .apiDoc('Serveur', 'Ajoute un serveur Fastify avec un endpoint de santé')
     .dependsOn('typescript', 'vitest')
     .tags('server')
-    .factory((properties) => factory.buildModule(properties));
+    .factory((properties) => modules.buildModule(properties));
 };
