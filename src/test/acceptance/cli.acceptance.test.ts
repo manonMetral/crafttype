@@ -167,5 +167,24 @@ describe('CLI', () => {
       expect(code).toBe(0);
       expect(output).toMatch(/remplacer\s+README\.md/);
     });
+
+    it('conserve une version plus récente et le dit, sans conflit', () => {
+      const projectFolder = tmpDirForTest();
+      for (const module of ['init', 'typescript']) {
+        run('apply', module, '--project-folder', projectFolder);
+      }
+      const packageJson = JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8'));
+      packageJson.devDependencies.typescript = '99.0.0';
+      writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
+
+      const dryRun = run('apply', 'typescript', '--project-folder', projectFolder, '--dry-run');
+      const real = run('apply', 'typescript', '--project-folder', projectFolder, '--force');
+
+      expect(dryRun.code).toBe(0);
+      expect(dryRun.output).toMatch(/conserver\s+package\.json : devDependencies\.typescript \(existant : "99\.0\.0"/);
+      expect(real.code).toBe(0);
+      expect(real.output).toContain('versions conservées : 1');
+      expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).devDependencies.typescript).toBe('99.0.0');
+    });
   });
 });

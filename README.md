@@ -30,6 +30,8 @@ Un module ne remplace jamais un fichier ou une entrée du `package.json` dont le
 
 `--force` et `--skip-conflicts` sont incompatibles ; `--dry-run` se combine avec l'un ou l'autre pour voir leur effet.
 
+**Versions de dépendances.** Une dépendance déjà présente dans le `package.json` avec une version égale, plus récente ou compatible avec celle du catalogue (`^5.0.0` pour `5.12.7`) n'est pas un conflit : elle est conservée, même avec `--force`, pour ne jamais faire reculer un projet mis à jour par Renovate. Une version plus ancienne, un tag (`latest`), une URL ou une référence de workspace restent des conflits.
+
 ## Vérifier que ça marche
 
 ```bash
