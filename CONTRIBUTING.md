@@ -50,3 +50,4 @@ Les versions injectées dans les projets générés vivent dans `resources/gener
 - Un commit = un changement cohérent, avec un message de la forme `type: description` (`feat`, `fix`, `docs`, `test`, `chore`, `refactor`), comme dans l'historique.
 - Ajoutez ou adaptez les tests, et la documentation si le comportement change.
 - Décrivez dans la pull request ce qui change et comment vous l'avez vérifié.
+- `main` est protégée : la CI doit être verte et une personne listée dans [`.github/CODEOWNERS`](.github/CODEOWNERS) doit approuver la pull request avant la fusion.
