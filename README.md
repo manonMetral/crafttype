@@ -3,7 +3,7 @@
 Générateur modulaire de projets **Node.js (Fastify)** et **Vue.js**, inspiré de [Seed4J](https://github.com/seed4j/seed4j).
 Chaque module ajoute une seule chose à un projet (TypeScript, Vitest, un serveur Fastify, une application Vue...) et s'applique à la demande, dans l'ordre voulu.
 
-> État : prototype de la phase 0. Le noyau et cinq modules fonctionnent, la CLI est minimale.
+> État : prototype de la phase 0. Le noyau et six modules fonctionnent, la CLI est minimale.
 
 ## Utilisation
 
@@ -13,6 +13,7 @@ npm run cli -- list
 npm run cli -- apply init --project-folder ../mon-app --project-name mon-app
 npm run cli -- apply typescript --project-folder ../mon-app
 npm run cli -- apply vitest --project-folder ../mon-app
+npm run cli -- apply prettier --project-folder ../mon-app
 npm run cli -- apply fastify-server --project-folder ../mon-app --server-port 3000
 npm run cli -- apply vue-app --project-folder ../mon-app
 ```
