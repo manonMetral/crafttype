@@ -1,13 +1,18 @@
 import { parseArgs } from 'node:util';
-import type { ModulesApplicationService } from '../../application/ModulesApplicationService.js';
+import type { ApplyResult, ModulesApplicationService } from '../../application/ModulesApplicationService.js';
+import { describeConflict, describeChange, type ConflictPolicy, type DecidedChange } from '../../domain/ChangePlan.js';
 import { CraftTypeError, InvalidPropertyError, MissingPropertyError, ModuleConflictError } from '../../domain/errors.js';
 import type { RawProperties } from '../../domain/ModuleProperties.js';
 
 const USAGE = `Usage :
   crafttype list
-  crafttype apply <module> --project-folder <dossier> [--project-name <nom>] [--server-port <port>] [--force]
+  crafttype apply <module> --project-folder <dossier> [--project-name <nom>] [--server-port <port>]
+                  [--force | --skip-conflicts] [--dry-run]
 
-  --force  remplace les fichiers et les entrées du package.json existants qui diffèrent (refusé par défaut)`;
+Un module ne remplace jamais un fichier ou une entrée du package.json dont le contenu diffère : par défaut il refuse.
+  --force           remplace les éléments existants qui diffèrent
+  --skip-conflicts  applique le module en gardant les éléments existants qui diffèrent
+  --dry-run         affiche ce que le module ferait, sans rien écrire`;
 
 /** Adaptateur primaire : traduit la ligne de commande en appels au service d'application. */
 export const runCli = (argv: readonly string[], service: ModulesApplicationService, out: (line: string) => void): number => {
@@ -50,6 +55,8 @@ const apply = (args: readonly string[], service: ModulesApplicationService, out:
       'project-name': { type: 'string' },
       'server-port': { type: 'string' },
       force: { type: 'boolean' },
+      'skip-conflicts': { type: 'boolean' },
+      'dry-run': { type: 'boolean' },
     },
   });
 
@@ -64,10 +71,48 @@ const apply = (args: readonly string[], service: ModulesApplicationService, out:
   if (values['project-name'] !== undefined) raw.projectName = values['project-name'];
   if (values['server-port'] !== undefined) raw.serverPort = values['server-port'];
 
-  const applied = service.apply(slug, raw, { force: values.force === true });
-  out(`Module ${applied.slug} appliqué dans ${raw.projectFolder}`);
+  if (values.force === true && values['skip-conflicts'] === true) {
+    out('Erreur : --force et --skip-conflicts sont incompatibles');
+    out(USAGE);
+    return 1;
+  }
+  const onConflict: ConflictPolicy = values.force === true ? 'overwrite' : values['skip-conflicts'] === true ? 'skip' : 'fail';
+
+  const result = service.apply(slug, raw, { onConflict, dryRun: values['dry-run'] === true });
+  return report(result, String(raw.projectFolder), out);
+};
+
+const LABELS: Record<DecidedChange['decision'], string> = {
+  create: 'créer',
+  unchanged: 'inchangé',
+  overwrite: 'remplacer',
+  skip: 'ignorer',
+  conflict: 'conflit',
+};
+
+const report = (result: ApplyResult, projectFolder: string, out: (line: string) => void): number => {
+  const { slug, dryRun, changes, report: counts } = result;
+  const summary = `créés : ${counts.created}, remplacés : ${counts.replaced}, inchangés : ${counts.unchanged}, ignorés : ${counts.skipped}`;
+
+  if (dryRun) {
+    out(`Simulation du module ${slug} dans ${projectFolder} (rien n'est écrit) :`);
+    for (const change of changes) {
+      out(`  ${LABELS[change.decision].padEnd(10)} ${hasConflictingContent(change) ? describeConflict(change) : describeChange(change)}`);
+    }
+    out(counts.conflicts > 0 ? `${summary}, conflits : ${counts.conflicts}\n${CONFLICT_HINT}` : summary);
+    return counts.conflicts > 0 ? 1 : 0;
+  }
+
+  out(`Module ${slug} appliqué dans ${projectFolder} (${summary})`);
+  for (const change of changes.filter(({ decision }) => decision === 'overwrite' || decision === 'skip')) {
+    out(`  ${change.decision === 'overwrite' ? 'remplacé' : 'ignoré'} : ${describeConflict(change)}`);
+  }
   return 0;
 };
+
+const hasConflictingContent = ({ decision }: DecidedChange): boolean => decision === 'conflict' || decision === 'overwrite' || decision === 'skip';
+
+const CONFLICT_HINT = 'Relancez avec --skip-conflicts pour garder les éléments existants ou --force pour les remplacer.';
 
 /** Nomme les erreurs métier avec les options de la ligne de commande plutôt qu'avec les clés internes. */
 const describe = (error: CraftTypeError): string => {
@@ -78,7 +123,7 @@ const describe = (error: CraftTypeError): string => {
     return `Option ${toFlag(error.key)} invalide : ${error.reason}`;
   }
   if (error instanceof ModuleConflictError) {
-    return `${error.message}\nRelancez avec --force pour les remplacer.`;
+    return `${error.message}\n${CONFLICT_HINT}`;
   }
   return error.message;
 };

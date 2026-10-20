@@ -181,7 +181,7 @@ describe('ModulesApplicationService', () => {
       const { service, projectFolder } = initialized();
       writeFileSync(join(projectFolder, 'README.md'), 'mon readme');
 
-      service.apply('init', { projectFolder, projectName: 'autre' }, { force: true });
+      service.apply('init', { projectFolder, projectName: 'autre' }, { onConflict: 'overwrite' });
 
       expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toContain('# autre');
       expect(readJson(projectFolder, 'package.json').name).toBe('autre');
@@ -194,6 +194,113 @@ describe('ModulesApplicationService', () => {
 
       expect(() => service.apply('init', { projectFolder })).toThrow(ModuleConflictError);
       expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
+    });
+  });
+
+  describe('politique de conflit', () => {
+    const initialized = () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+      service.apply('init', { projectFolder, projectName: 'shop' });
+      service.apply('typescript', { projectFolder });
+      return { service, projectFolder };
+    };
+    const edit = (projectFolder: string) => {
+      writeFileSync(join(projectFolder, 'tsconfig.json'), '{ "perso": true }');
+      const packageJson = readJson(projectFolder, 'package.json');
+      packageJson.scripts.typecheck = 'tsc -b';
+      delete packageJson.devDependencies['@types/node'];
+      writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
+    };
+
+    it('compte ce qui est créé quand le projet est neuf, puis tout inchangé en réappliquant', () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+
+      const first = service.apply('init', { projectFolder, projectName: 'shop' });
+      const second = service.apply('init', { projectFolder, projectName: 'shop' });
+
+      expect(first.report).toMatchObject({ replaced: 0, unchanged: 0, skipped: 0, conflicts: 0 });
+      expect(first.report.created).toBeGreaterThan(0);
+      expect(second.report).toEqual({ created: 0, replaced: 0, unchanged: first.report.created, skipped: 0, conflicts: 0 });
+    });
+
+    it('garde l’existant et applique le reste avec skip', () => {
+      const { service, projectFolder } = initialized();
+      edit(projectFolder);
+
+      const { report, changes } = service.apply('typescript', { projectFolder }, { onConflict: 'skip' });
+
+      expect(readFileSync(join(projectFolder, 'tsconfig.json'), 'utf8')).toBe('{ "perso": true }');
+      const packageJson = readJson(projectFolder, 'package.json');
+      expect(packageJson.scripts.typecheck).toBe('tsc -b');
+      expect(packageJson.devDependencies['@types/node']).toBeDefined();
+      expect(report).toMatchObject({ created: 1, skipped: 2, replaced: 0, conflicts: 0 });
+      expect(changes.filter(({ decision }) => decision === 'skip').map(({ target }) => target)).toEqual(['tsconfig.json', 'typecheck']);
+    });
+
+    it('enregistre le module dans l’historique avec skip', () => {
+      const { service, projectFolder } = initialized();
+      edit(projectFolder);
+
+      service.apply('typescript', { projectFolder }, { onConflict: 'skip' });
+
+      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug)).toEqual(['init', 'typescript']);
+    });
+
+    it('remplace et compte les remplacements avec overwrite', () => {
+      const { service, projectFolder } = initialized();
+      edit(projectFolder);
+
+      const { report } = service.apply('typescript', { projectFolder }, { onConflict: 'overwrite' });
+
+      expect(report).toMatchObject({ created: 1, replaced: 2, skipped: 0 });
+      expect(readJson(projectFolder, 'package.json').scripts.typecheck).toBe('tsc --noEmit');
+    });
+
+    it('simule sans rien écrire ni enregistrer, y compris en présence de conflits', () => {
+      const { service, projectFolder } = initialized();
+      edit(projectFolder);
+      const before = readFileSync(join(projectFolder, 'package.json'), 'utf8');
+      const historyBefore = readFileSync(join(projectFolder, '.crafttype/modules/history.json'), 'utf8');
+
+      const { dryRun, report, changes } = service.apply('typescript', { projectFolder }, { dryRun: true });
+
+      expect(dryRun).toBe(true);
+      expect(report).toMatchObject({ created: 1, conflicts: 2 });
+      expect(changes.find(({ target }) => target === 'tsconfig.json')?.decision).toBe('conflict');
+      expect(readFileSync(join(projectFolder, 'package.json'), 'utf8')).toBe(before);
+      expect(readFileSync(join(projectFolder, 'tsconfig.json'), 'utf8')).toBe('{ "perso": true }');
+      expect(readFileSync(join(projectFolder, '.crafttype/modules/history.json'), 'utf8')).toBe(historyBefore);
+    });
+
+    it('simule ce que ferait chaque politique', () => {
+      const { service, projectFolder } = initialized();
+      edit(projectFolder);
+
+      const decisions = (onConflict: 'fail' | 'overwrite' | 'skip') =>
+        service.apply('typescript', { projectFolder }, { dryRun: true, onConflict }).changes.map(({ decision }) => decision);
+
+      expect(decisions('fail')).toContain('conflict');
+      expect(decisions('overwrite')).toContain('overwrite');
+      expect(decisions('skip')).toContain('skip');
+    });
+
+    it('simule sur un dossier qui n’existe pas encore sans le créer', () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = join(tmpDirForTest(), 'nouveau');
+
+      const { report } = service.apply('init', { projectFolder }, { dryRun: true });
+
+      expect(report.created).toBeGreaterThan(0);
+      expect(existsSync(projectFolder)).toBe(false);
+    });
+
+    it('refuse toujours par défaut et sans rien écrire', () => {
+      const { service, projectFolder } = initialized();
+      edit(projectFolder);
+
+      expect(() => service.apply('typescript', { projectFolder })).toThrow(ModuleConflictError);
     });
   });
 
