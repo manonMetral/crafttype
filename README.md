@@ -46,6 +46,10 @@ resources/generator/
 
 Créer un module : voir [documentation/module-creation.md](documentation/module-creation.md).
 
+## Contribuer
+
+Voir [CONTRIBUTING.md](CONTRIBUTING.md) et le [code de conduite](CODE_OF_CONDUCT.md).
+
 ## Licence
 
 Apache-2.0, voir [LICENSE](LICENSE). CraftType s'inspire du fonctionnement de Seed4J (également Apache-2.0) sans en reprendre le code.
