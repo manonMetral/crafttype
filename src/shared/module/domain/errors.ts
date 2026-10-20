@@ -38,6 +38,13 @@ export class UnknownPackageVersionError extends CraftTypeError {
   }
 }
 
+/** Un module déclare deux fois le même fichier de destination : défaut de définition du module, pas du projet. */
+export class DuplicateDestinationError extends CraftTypeError {
+  constructor(readonly destination: string) {
+    super(`Le module déclare deux fois le fichier ${destination}`);
+  }
+}
+
 /** Le module modifierait des éléments existants du projet (fichiers, entrées du package.json) avec un contenu différent. */
 export class ModuleConflictError extends CraftTypeError {
   constructor(readonly conflicts: readonly string[]) {
