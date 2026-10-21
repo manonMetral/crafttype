@@ -66,6 +66,34 @@ describe('CLI', () => {
     expect(output).toContain('Erreur : Option --project-name invalide');
   });
 
+  describe('aide', () => {
+    it.each([[[]], [['help']], [['--help']], [['-h']], [['apply', '--help']], [['apply', '-h']]])('affiche l’usage et réussit avec %j', (argv) => {
+      const { code, output } = run(...argv);
+
+      expect(code).toBe(0);
+      expect(output).toContain('Usage :');
+    });
+
+    it('affiche les options d’un module avec -h comme avec --help', () => {
+      const long = run('apply', 'fastify-server', '--help');
+      const short = run('apply', 'fastify-server', '-h');
+
+      expect(short).toEqual(long);
+      expect(short.output).toContain('--server-port');
+    });
+
+    it('refuse une commande inconnue avec l’usage et un code d’erreur', () => {
+      const { code, output } = run('inconnue');
+
+      expect(code).toBe(1);
+      expect(output).toContain('Usage :');
+    });
+
+    it('refuse apply sans module', () => {
+      expect(run('apply').code).toBe(1);
+    });
+  });
+
   it('signale une option inconnue sans stack trace', () => {
     const { code, output } = run('apply', 'init', '--foo');
 

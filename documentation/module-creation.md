@@ -84,6 +84,7 @@ ModulePropertiesDefinition.builder()
 - `validate` reçoit la valeur déjà convertie au bon type et renvoie le motif du refus, ou `undefined`. Le texte apparaît dans `Option --pool-size invalide : ...`.
 - La fabrique lit les valeurs avec `properties.string('databaseName')`, `properties.number('poolSize')` et `properties.boolean('migrations')`. Lire une propriété que le module ne déclare pas, ou avec le mauvais type, lève `PropertyAccessError`.
 - Les valeurs déclarées sont aussi disponibles dans les templates mustache (`{{databaseName}}`).
+- **Mustache n'échappe rien** (`MustacheTemplateRenderer`) : `{{databaseName}}` est inséré tel quel, que le fichier soit du TypeScript, du JSON ou du HTML. Une propriété de texte libre doit donc être restreinte avec `validate` au format des fichiers où elle sera rendue (par exemple refuser `"`, `<` et `\` pour un fichier JSON ou HTML), ou n'être lue que dans une fabrique (`properties.string(...)`) pour une valeur que le moteur sérialise lui-même, comme une entrée du `package.json`. `projectName` est sûr parce qu'il est limité à un nom de paquet npm, et `serverPort` parce que c'est un entier.
 - Les clés `projectFolder`, `force`, `skipConflicts`, `dryRun` et `help` sont réservées, et une clé ne peut pas être déclarée deux fois.
 
 Pour chaque propriété, la valeur explicite l'emporte, puis la valeur que l'historique du projet a déjà enregistrée pour un module précédent (par une propriété de même clé), puis la valeur par défaut. Une propriété obligatoire déjà posée par un module précédent n'est donc pas redemandée.

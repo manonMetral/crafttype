@@ -9,6 +9,7 @@ const USAGE = `Usage :
   crafttype apply <module> --project-folder <dossier> [--<propriété> <valeur> ...]
                   [--force | --skip-conflicts] [--dry-run]
   crafttype apply <module> --help
+  crafttype --help
 
 Le module vient juste après « apply ». Les propriétés qu'il accepte (nom du projet, port...) sont listées par --help.
 
@@ -31,9 +32,15 @@ export const runCli = (argv: readonly string[], service: ModulesApplicationServi
         return 0;
       case 'apply':
         return apply(rest, service, out);
+      case undefined:
+      case 'help':
+      case '--help':
+      case '-h':
+        out(USAGE);
+        return 0;
       default:
         out(USAGE);
-        return command === undefined || command === 'help' ? 0 : 1;
+        return 1;
     }
   } catch (error) {
     if (error instanceof CraftTypeError) {
@@ -54,11 +61,15 @@ const COMMON_OPTIONS = {
   force: { type: 'boolean' },
   'skip-conflicts': { type: 'boolean' },
   'dry-run': { type: 'boolean' },
-  help: { type: 'boolean' },
+  help: { type: 'boolean', short: 'h' },
 } as const;
 
 const apply = (args: readonly string[], service: ModulesApplicationService, out: (line: string) => void): number => {
   const [slug, ...options] = args;
+  if (slug === '--help' || slug === '-h') {
+    out(USAGE);
+    return 0;
+  }
   if (slug === undefined || slug.startsWith('-')) {
     out(USAGE);
     return 1;
