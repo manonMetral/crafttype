@@ -19,6 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:types": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\" \"tests-ci/**/*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests-ci/**/*.mjs\"",
     "ci:generate": "bash tests-ci/generate.sh"
   },
   "devDependencies": {
@@ -26,6 +28,7 @@
     "@types/node": "^22.20.5",
     "@types/semver": "^7.8.0",
     "arch-unit-ts": "^1.0.12",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
