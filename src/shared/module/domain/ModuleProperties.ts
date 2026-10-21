@@ -252,12 +252,12 @@ const convert = (key: string, type: PropertyType, value: PropertyValue): Propert
 
 const lastSegment = (folder: string): string => folder.split(/[\\/]/).filter(Boolean).at(-1) ?? '';
 
-/** Default name taken from the folder: "Mon App" becomes "mon-app". */
+/** Default name taken from the folder: "My App" becomes "my-app". */
 const slugify = (value: string): string =>
   value
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '')
     .slice(0, MAX_PROJECT_NAME_LENGTH) || 'app';

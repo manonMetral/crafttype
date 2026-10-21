@@ -1,7 +1,7 @@
 # CraftType
 
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
-Each module adds one single thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
+Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
 > Status: end of phase 1. The core and ten modules work, the CLI is minimal. ESLint (blocked, see below) and npm publication are still to come.
 

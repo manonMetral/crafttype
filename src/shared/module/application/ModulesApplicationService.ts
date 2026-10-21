@@ -137,7 +137,7 @@ export class ModulesApplicationService {
     return new ChangePlan([...fileChanges, ...editChanges, ...packageJsonChanges], this.dependencies.versions);
   }
 
-  /** One change per modified file: the insertions in a same file are chained in the order the module declares them. */
+  /** One change per modified file: the insertions in the same file are chained in the order the module declares them. */
   private planEdits({ projectFolder, edits }: CraftModule): PlannedChange[] {
     const byPath = new Map<string, FileEdit[]>();
     for (const edit of edits) {

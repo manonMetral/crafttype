@@ -90,7 +90,7 @@ describe('needle names', () => {
     expect(isValidNeedleName(name)).toBe(true);
   });
 
-  it.each(['', 'Imports', 'main_imports', '-x', 'x-', 'a--b', '1a', 'a b', 'a.b'])('refuse %j', (name) => {
+  it.each(['', 'Imports', 'main_imports', '-x', 'x-', 'a--b', '1a', 'a b', 'a.b'])('rejects %j', (name) => {
     expect(isValidNeedleName(name)).toBe(false);
   });
 
