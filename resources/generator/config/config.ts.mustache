@@ -1,0 +1,33 @@
+export interface ServerConfig {
+  readonly port: number;
+  readonly host: string;
+}
+
+const MAX_PORT = 65_535;
+
+/** Lit la configuration du serveur dans l'environnement et refuse au démarrage une valeur invalide. */
+export function loadConfig(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): ServerConfig {
+  return { port: parsePort(env['PORT']), host: parseHost(env['HOST']) };
+}
+
+function parsePort(value: string | undefined): number {
+  const text = value?.trim() ?? '';
+  if (text === '') {
+    return {{serverPort}};
+  }
+
+  const port = /^\d+$/.test(text) ? Number(text) : Number.NaN;
+  if (!Number.isInteger(port) || port < 1 || port > MAX_PORT) {
+    throw new Error(
+      `PORT invalide : « ${text} » (entier de 1 à ${MAX_PORT} attendu)`,
+    );
+  }
+  return port;
+}
+
+function parseHost(value: string | undefined): string {
+  const host = value?.trim() ?? '';
+  return host === '' ? '127.0.0.1' : host;
+}

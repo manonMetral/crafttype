@@ -138,13 +138,17 @@ Comportement du moteur :
 - Si le fichier est introuvable, ou si le repère manque ou apparaît plusieurs fois, le module échoue avec une `NeedleError` qui nomme le fichier et le repère, sans rien écrire ni enregistrer, y compris en `--dry-run`. L'équipe a modifié le fichier à la main : le moteur ne devine pas où insérer. La correction est de remettre la ligne du repère à l'endroit voulu.
 - Un module ne peut pas à la fois créer (`addFile`) et modifier (`insertAtNeedle`) le même fichier.
 
-Repères posés aujourd'hui par le catalogue (tous par `vue-app`) :
+Repères posés aujourd'hui par le catalogue :
 
 | Fichier | Repère | Usage |
 |---|---|---|
 | `src/webapp/main.ts` | `main-imports` | imports du point d'entrée (Pinia, routeur...) |
 | `src/webapp/main.ts` | `main-plugins` | `app.use(...)` avant `app.mount` |
 | `src/webapp/App.vue` | `app-template` | contenu du `<main>` de l'application (`<RouterView />`...) |
+| `src/server/app.ts` | `app-imports` | imports de `buildApp` |
+| `src/server/app.ts` | `app-server-options` | complète `serverOptions` avant `Fastify(serverOptions)` (logger, identifiant de requête...) |
+| `src/server/main.ts` | `main-imports` | imports du point d'entrée |
+| `src/server/main.ts` | `main-settings` | code qui ajuste `settings` (port, adresse) avant le démarrage : `Object.assign(settings, ...)` |
 
 Les repères sont des commentaires qui restent dans le code généré. Le moteur n'analyse pas le code (pas d'AST) : il convient aux ajouts à des endroits prévus d'avance, pas à la réécriture d'un code arbitraire.
 

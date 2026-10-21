@@ -1,12 +1,16 @@
 import { buildApp } from './app.js';
+// crafttype-needle-main-imports
 
-const port = Number(process.env['PORT'] ?? {{serverPort}});
-const host = process.env['HOST'] ?? '127.0.0.1';
+const settings = {
+  port: Number(process.env['PORT'] ?? {{serverPort}}),
+  host: process.env['HOST'] ?? '127.0.0.1',
+};
+// crafttype-needle-main-settings
 
 const app = buildApp();
 
 try {
-  await app.listen({ port, host });
+  await app.listen(settings);
 } catch (error) {
   app.log.error(error);
   process.exit(1);
