@@ -146,9 +146,10 @@ Repères posés aujourd'hui par le catalogue :
 | `src/webapp/main.ts` | `main-plugins` | `app.use(...)` avant `app.mount` |
 | `src/webapp/App.vue` | `app-template` | contenu du `<main>` de l'application (`<RouterView />`...) |
 | `src/server/app.ts` | `app-imports` | imports de `buildApp` |
-| `src/server/app.ts` | `app-server-options` | complète `serverOptions` avant `Fastify(serverOptions)` (logger, identifiant de requête...) |
+| `src/server/app.ts` | `app-server-options` | complète `serverOptions` avant `Fastify(serverOptions)` (logger, génération des identifiants de requête...) |
+| `src/server/app.ts` | `app-plugins` | hooks et plugins, juste après la création de l'application |
 | `src/server/main.ts` | `main-imports` | imports du point d'entrée |
-| `src/server/main.ts` | `main-settings` | code qui ajuste `settings` (port, adresse) avant le démarrage : `Object.assign(settings, ...)` |
+| `src/server/main.ts` | `main-settings` | début du `try` de démarrage : code qui ajuste `settings` (port, adresse) ou prépare le serveur. Ses erreurs s'affichent comme message, sans stack trace |
 
 Les repères sont des commentaires qui restent dans le code généré. Le moteur n'analyse pas le code (pas d'AST) : il convient aux ajouts à des endroits prévus d'avance, pas à la réécriture d'un code arbitraire.
 

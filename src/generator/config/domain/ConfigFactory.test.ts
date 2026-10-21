@@ -15,17 +15,21 @@ describe('ConfigFactory', () => {
     return projectFolder;
   };
 
-  it('crée la configuration et son test avec le port choisi', () => {
-    assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithServer(), serverPort: 4321 })))
-      .hasFileContaining('src/server/config.ts', 'return 4321;', 'PORT invalide')
-      .hasFileContaining('src/server/config.test.ts', 'port: 4321', 'refuse PORT=%s');
+  it('crée la configuration et son test, copiés tels quels', () => {
+    assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithServer() })))
+      .hasFileContaining('src/server/config.ts', 'PORT invalide', 'defaults: ServerConfig')
+      .hasFileContaining('src/server/config.test.ts', 'refuse PORT=%s');
   });
 
-  it('remplace dans main.ts les valeurs lues à la main par la configuration validée', () => {
+  it('ne rend aucun template : les valeurs par défaut sont celles de main.ts', () => {
+    expect(factory.buildModule(propertiesFixture()).files.every(({ rendered }) => !rendered)).toBe(true);
+  });
+
+  it('complète les valeurs par défaut de main.ts avec la configuration validée', () => {
     assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithServer() }))).hasFileContaining(
       'src/server/main.ts',
       "import { loadConfig } from './config.js';",
-      'Object.assign(settings, loadConfig());',
+      'Object.assign(settings, loadConfig(settings));',
     );
   });
 });

@@ -10,6 +10,7 @@ export function buildApp(options: { logger?: boolean } = {}): FastifyInstance {
   };
   // crafttype-needle-app-server-options
   const app = Fastify(serverOptions);
+  // crafttype-needle-app-plugins
 
   app.get('/api/health', async () => ({ status: 'UP' }));
 

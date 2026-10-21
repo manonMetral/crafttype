@@ -25,4 +25,23 @@ npm run typecheck
 npm test
 npm run server:build
 npm run webapp:build
+
+# Une configuration invalide arrête le serveur avec un message d'erreur, sans stack trace. Le délai évite qu'un
+# serveur qui démarrerait par erreur bloque la CI.
+expect_startup_error() {
+  local message="$1"
+  shift
+  local output
+  if output=$(timeout 10 env "$@" node dist/server/main.js 2>&1); then
+    echo "Le serveur aurait dû refuser : $*" >&2
+    exit 1
+  fi
+  if [[ "$output" != *"$message"* || "$output" == *"    at "* ]]; then
+    echo "Attendu : le message « $message » sans stack trace ($*). Obtenu :" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+}
+expect_startup_error 'PORT invalide' PORT=abc
+expect_startup_error 'LOG_LEVEL invalide' LOG_LEVEL=bavard
 echo "OK : $APP"

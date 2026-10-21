@@ -5,13 +5,13 @@ const SOURCE = from('config');
 const SERVER = 'src/server';
 
 export class ConfigFactory {
-  /** Remplace les valeurs lues à la main dans `main.ts` (repère `main-settings` posé par fastify-server) par une configuration validée. */
+  /** Complète les valeurs par défaut de `settings` (`main.ts` de fastify-server, repère `main-settings`) avec l'environnement, validé. */
   buildModule(properties: ModuleProperties): CraftModule {
     return moduleBuilder(properties)
-      .addFile(SOURCE.template('config.ts'), `${SERVER}/config.ts`)
-      .addFile(SOURCE.template('config.test.ts'), `${SERVER}/config.test.ts`)
+      .addFile(SOURCE.file('config.ts'), `${SERVER}/config.ts`)
+      .addFile(SOURCE.file('config.test.ts'), `${SERVER}/config.test.ts`)
       .insertAtNeedle(`${SERVER}/main.ts`, 'main-imports', "import { loadConfig } from './config.js';")
-      .insertAtNeedle(`${SERVER}/main.ts`, 'main-settings', 'Object.assign(settings, loadConfig());')
+      .insertAtNeedle(`${SERVER}/main.ts`, 'main-settings', 'Object.assign(settings, loadConfig(settings));')
       .build();
   }
 }

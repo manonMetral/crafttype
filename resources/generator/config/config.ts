@@ -5,17 +5,24 @@ export interface ServerConfig {
 
 const MAX_PORT = 65_535;
 
-/** Lit la configuration du serveur dans l'environnement et refuse au démarrage une valeur invalide. */
+/**
+ * Complète les valeurs par défaut de `main.ts` avec l'environnement (PORT, HOST)
+ * et refuse au démarrage une valeur invalide.
+ */
 export function loadConfig(
+  defaults: ServerConfig,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): ServerConfig {
-  return { port: parsePort(env['PORT']), host: parseHost(env['HOST']) };
+  return {
+    port: parsePort(env['PORT'], defaults.port),
+    host: parseHost(env['HOST'], defaults.host),
+  };
 }
 
-function parsePort(value: string | undefined): number {
+function parsePort(value: string | undefined, fallback: number): number {
   const text = value?.trim() ?? '';
   if (text === '') {
-    return {{serverPort}};
+    return fallback;
   }
 
   const port = /^\d+$/.test(text) ? Number(text) : Number.NaN;
@@ -27,7 +34,7 @@ function parsePort(value: string | undefined): number {
   return port;
 }
 
-function parseHost(value: string | undefined): string {
+function parseHost(value: string | undefined, fallback: string): string {
   const host = value?.trim() ?? '';
-  return host === '' ? '127.0.0.1' : host;
+  return host === '' ? fallback : host;
 }

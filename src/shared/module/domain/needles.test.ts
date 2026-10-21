@@ -61,6 +61,7 @@ describe('insertAtNeedle', () => {
     expect(error.message).toContain('src/main.ts');
     expect(error.message).toContain('crafttype-needle-absent');
     expect(error.message).toContain('introuvable');
+    expect(error.message).toContain('version plus ancienne');
   });
 
   it('refuse un repère présent plusieurs fois', () => {

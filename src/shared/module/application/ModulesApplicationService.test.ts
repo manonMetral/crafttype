@@ -562,17 +562,19 @@ describe('ModulesApplicationService', () => {
         for (const module of modules) service.apply(module, { projectFolder });
         for (const module of modules) expect(service.apply(module, { projectFolder }).report).toMatchObject({ created: 0, edited: 0, conflicts: 0 });
 
-        expect(read(projectFolder, 'src/server/main.ts')).toContain('Object.assign(settings, loadConfig());\n// crafttype-needle-main-settings');
-        expect(read(projectFolder, 'src/server/app.ts')).toContain("serverOptions.requestIdHeader = 'x-request-id';\n  // crafttype-needle-app-server-options");
+        expect(read(projectFolder, 'src/server/main.ts')).toContain('  Object.assign(settings, loadConfig(settings));\n  // crafttype-needle-main-settings');
+        expect(read(projectFolder, 'src/server/app.ts')).toContain('  serverOptions.genReqId = genReqId;\n  // crafttype-needle-app-server-options');
       });
 
-      it('config reprend le port choisi pour fastify-server', () => {
+      it('config n’a pas de port propre : elle complète celui de fastify-server', () => {
         const { service, projectFolder } = withServer(4321);
 
         service.apply('config', { projectFolder });
 
-        expect(read(projectFolder, 'src/server/config.ts')).toContain('return 4321;');
-        expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.at(-1).properties).toEqual({ serverPort: 4321 });
+        expect(read(projectFolder, 'src/server/main.ts')).toContain('port: 4321');
+        expect(read(projectFolder, 'src/server/config.ts')).not.toContain('4321');
+        expect(() => service.apply('config', { projectFolder, serverPort: 5000 })).toThrow(InvalidPropertyError);
+        expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.at(-1).properties).toEqual({});
       });
 
       it('logs n’enregistre aucune propriété et n’ajoute aucune dépendance', () => {
