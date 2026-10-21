@@ -1,5 +1,5 @@
 import { ModuleConflictError } from './errors.js';
-import { keepsExistingVersion } from './versions.js';
+import type { VersionComparator } from './ports.js';
 
 /** Que faire quand un module veut poser un contenu différent de celui qui existe déjà. */
 export type ConflictPolicy = 'fail' | 'overwrite' | 'skip';
@@ -56,11 +56,14 @@ export const describeConflict = (change: PlannedChange): string =>
 
 /** Ce qu'un module changerait dans un projet, avant toute écriture. */
 export class ChangePlan {
-  constructor(readonly changes: readonly PlannedChange[]) {}
+  constructor(
+    readonly changes: readonly PlannedChange[],
+    private readonly versions: VersionComparator,
+  ) {}
 
   /** Tranche chaque changement selon la politique, sans jamais échouer : sert à la simulation. */
   decide(policy: ConflictPolicy): readonly DecidedChange[] {
-    return this.changes.map((change) => ({ ...change, decision: decisionFor(change, policy) }));
+    return this.changes.map((change) => ({ ...change, decision: decisionFor(change, policy, this.versions) }));
   }
 
   /** Comme `decide`, mais refuse le plan s'il reste un conflit non tranché. */
@@ -80,10 +83,10 @@ const isDependency = ({ kind, current, next }: PlannedChange): boolean =>
 /** Une version dans un package.json est une chaîne ; toute autre forme est comparée telle quelle, donc en conflit. */
 const isJsonString = (value: string | undefined): boolean => value !== undefined && value.startsWith('"');
 
-const decisionFor = (change: PlannedChange, policy: ConflictPolicy): Decision => {
+const decisionFor = (change: PlannedChange, policy: ConflictPolicy, versions: VersionComparator): Decision => {
   if (change.current === undefined) return 'create';
   if (change.current === change.next) return 'unchanged';
-  if (isDependency(change) && keepsExistingVersion(JSON.parse(change.current) as string, JSON.parse(change.next) as string)) return 'keep';
+  if (isDependency(change) && versions.keepsExistingVersion(JSON.parse(change.current) as string, JSON.parse(change.next) as string)) return 'keep';
   return { fail: 'conflict', overwrite: 'overwrite', skip: 'skip' }[policy] as Decision;
 };
 

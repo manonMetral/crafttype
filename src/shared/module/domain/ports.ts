@@ -33,3 +33,14 @@ export interface ModulesHistory {
   list(projectFolder: string): readonly AppliedModule[];
   record(projectFolder: string, applied: AppliedModule): void;
 }
+
+/**
+ * Port : faut-il garder la version déjà présente dans le projet plutôt que celle du catalogue ?
+ * Oui si elle accepte la version du catalogue (`^5.0.0` pour `5.12.7`) ou lui est supérieure ou égale :
+ * c'est le cas d'un projet dont Renovate a déjà fait monter les versions. Une version plus ancienne, un tag
+ * (`latest`), une URL ou une référence de workspace ne sont pas comparables : le module ne peut pas la garder
+ * sans risque, c'est un conflit.
+ */
+export interface VersionComparator {
+  keepsExistingVersion(existing: string, wanted: string): boolean;
+}

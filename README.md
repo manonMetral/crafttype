@@ -59,6 +59,8 @@ resources/generator/
   dependencies/             versions des paquets npm (common, vue), à faire suivre par Renovate
 ```
 
+Ces règles sont vérifiées par `src/test/architecture/HexagonalArch.test.ts` (arch-unit-ts) : contextes étanches entre eux, domaine sans dépendance vers l'application ou l'infrastructure, couches hexagonales dans chaque contexte.
+
 Créer un module : voir [documentation/module-creation.md](documentation/module-creation.md).
 
 ## Contribuer

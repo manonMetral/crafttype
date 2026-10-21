@@ -37,7 +37,7 @@ Suivez [documentation/module-creation.md](documentation/module-creation.md). En 
 2. Écrire la fabrique, les templates dans `resources/generator/<module>/` et, si besoin, les versions dans `resources/generator/dependencies/`.
 3. Déclarer la ressource de module, puis l'ajouter dans `src/generator/modules.ts` après les modules dont elle dépend. `tests-ci/generate.sh` l'inclut alors automatiquement dans l'application complète.
 
-Respectez l'architecture hexagonale du dépôt : le domaine ne dépend d'aucun adaptateur, les accès au disque et à mustache restent dans `infrastructure/secondary`.
+Respectez l'architecture hexagonale du dépôt : le domaine ne dépend d'aucun adaptateur, les accès au disque et à mustache restent dans `infrastructure/secondary`. Une bibliothèque tierce utilisée par le domaine passe par un port (voir `VersionComparator` et son adaptateur `SemverVersionComparator`). `src/test/architecture/HexagonalArch.test.ts` ([arch-unit-ts](https://github.com/arch-unit-ts/arch-unit-ts)) vérifie ces règles dans `npm test` : un nouveau module qui les enfreint fait échouer les tests en nommant le fichier fautif.
 
 ## Versions des dépendances
 
