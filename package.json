@@ -1,6 +1,6 @@
 {
   "name": "crafttype",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Modular generator of Node.js (Fastify) and Vue.js projects, inspired by Seed4J",
   "type": "module",
   "bin": {
