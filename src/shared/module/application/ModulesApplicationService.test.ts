@@ -525,6 +525,24 @@ describe('ModulesApplicationService', () => {
       expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug)).not.toContain('pinia');
     });
 
+    it.each([
+      ['pinia puis vue-router', ['pinia', 'vue-router']],
+      ['vue-router puis pinia', ['vue-router', 'pinia']],
+    ])('combine deux modules sur le même fichier : %s', (_, modules) => {
+      const { service, projectFolder } = withVueApp();
+
+      for (const module of modules) service.apply(module, { projectFolder });
+      for (const module of modules) service.apply(module, { projectFolder });
+
+      const main = lines(projectFolder);
+      for (const line of ["import { createPinia } from 'pinia';", "import { router } from './router.js';", 'app.use(createPinia());', 'app.use(router);']) {
+        expect(main.filter((candidate) => candidate === line), line).toHaveLength(1);
+      }
+      expect(main.indexOf('// crafttype-needle-main-imports')).toBeGreaterThan(main.indexOf("import { router } from './router.js';"));
+      expect(main.indexOf('// crafttype-needle-main-plugins')).toBeGreaterThan(main.indexOf('app.use(router);'));
+      expect(readFileSync(join(projectFolder, 'src/webapp/App.vue'), 'utf8')).toContain('    <RouterView />\n    <!-- crafttype-needle-app-template -->');
+    });
+
     it('explique que le fichier à modifier est introuvable', () => {
       const { service, projectFolder } = withVueApp();
       rmSync(join(projectFolder, MAIN));

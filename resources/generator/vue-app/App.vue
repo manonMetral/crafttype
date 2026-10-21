@@ -17,5 +17,6 @@ onMounted(async () => {
   <main>
     <h1>Bienvenue</h1>
     <p>État du serveur : {{ status }}</p>
+    <!-- crafttype-needle-app-template -->
   </main>
 </template>
