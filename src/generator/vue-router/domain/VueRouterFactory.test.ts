@@ -13,8 +13,14 @@ describe('VueRouterFactory', () => {
   const projectWithVueApp = (): string => {
     const projectFolder = tmpDirForTest();
     mkdirSync(join(projectFolder, 'src/webapp'), { recursive: true });
-    writeFileSync(join(projectFolder, 'src/webapp/main.ts'), '// crafttype-needle-main-imports\n// crafttype-needle-main-plugins\n');
-    writeFileSync(join(projectFolder, 'src/webapp/App.vue'), '<template>\n  <main>\n    <!-- crafttype-needle-app-template -->\n  </main>\n</template>\n');
+    writeFileSync(
+      join(projectFolder, 'src/webapp/main.ts'),
+      '// crafttype-needle-main-imports\n// crafttype-needle-main-plugins\n',
+    );
+    writeFileSync(
+      join(projectFolder, 'src/webapp/App.vue'),
+      '<template>\n  <main>\n    <!-- crafttype-needle-app-template -->\n  </main>\n</template>\n',
+    );
     return projectFolder;
   };
 

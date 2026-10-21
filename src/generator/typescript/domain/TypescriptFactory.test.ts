@@ -8,7 +8,10 @@ describe('TypescriptFactory', () => {
   const factory = new TypescriptFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
   it('ajoute la configuration TypeScript, les dépendances et le script de typecheck', () => {
-    const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining('tsconfig.json', '"strict": true');
+    const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining(
+      'tsconfig.json',
+      '"strict": true',
+    );
 
     expect(result.hasPackageJson().devDependencies).toHaveProperty('typescript');
     expect(result.hasPackageJson().devDependencies).toHaveProperty('@types/node');

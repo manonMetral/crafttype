@@ -36,7 +36,7 @@ describe('CLI', () => {
     const { code, output } = run('apply', 'vitest', '--project-folder', tmpDirForTest());
 
     expect(code).toBe(1);
-    expect(output).toBe('Erreur : Le module vitest requiert d\'abord : typescript');
+    expect(output).toBe("Erreur : Le module vitest requiert d'abord : typescript");
   });
 
   it('nomme l’option manquante avec son flag', () => {
@@ -64,6 +64,37 @@ describe('CLI', () => {
 
     expect(code).toBe(1);
     expect(output).toContain('Erreur : Option --project-name invalide');
+  });
+
+  describe('aide', () => {
+    it.each([[[]], [['help']], [['--help']], [['-h']], [['apply', '--help']], [['apply', '-h']]])(
+      'affiche l’usage et réussit avec %j',
+      (argv) => {
+        const { code, output } = run(...argv);
+
+        expect(code).toBe(0);
+        expect(output).toContain('Usage :');
+      },
+    );
+
+    it('affiche les options d’un module avec -h comme avec --help', () => {
+      const long = run('apply', 'fastify-server', '--help');
+      const short = run('apply', 'fastify-server', '-h');
+
+      expect(short).toEqual(long);
+      expect(short.output).toContain('--server-port');
+    });
+
+    it('refuse une commande inconnue avec l’usage et un code d’erreur', () => {
+      const { code, output } = run('inconnue');
+
+      expect(code).toBe(1);
+      expect(output).toContain('Usage :');
+    });
+
+    it('refuse apply sans module', () => {
+      expect(run('apply').code).toBe(1);
+    });
   });
 
   it('signale une option inconnue sans stack trace', () => {
@@ -116,7 +147,15 @@ describe('CLI', () => {
     it('garde l’existant avec --skip-conflicts et le dit', () => {
       const projectFolder = initialized();
 
-      const { code, output } = run('apply', 'init', '--project-folder', projectFolder, '--project-name', 'autre', '--skip-conflicts');
+      const { code, output } = run(
+        'apply',
+        'init',
+        '--project-folder',
+        projectFolder,
+        '--project-name',
+        'autre',
+        '--skip-conflicts',
+      );
 
       expect(code).toBe(0);
       expect(output).toContain('ignorés : ');
@@ -185,20 +224,34 @@ describe('CLI', () => {
       expect(dryRun.output).toMatch(/conserver\s+package\.json : devDependencies\.typescript \(existant : "99\.0\.0"/);
       expect(real.code).toBe(0);
       expect(real.output).toContain('versions conservées : 1');
-      expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).devDependencies.typescript).toBe('99.0.0');
+      expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).devDependencies.typescript).toBe(
+        '99.0.0',
+      );
     });
   });
   describe('propriétés propres à un module', () => {
     const runDatabase = (...argv: string[]) => {
       const lines: string[] = [];
-      const code = runCli(argv, createModulesApplicationService({ extraResources: databaseModuleResources }), (line) => lines.push(line));
+      const code = runCli(argv, createModulesApplicationService({ extraResources: databaseModuleResources }), (line) =>
+        lines.push(line),
+      );
       return { code, output: lines.join('\n') };
     };
 
     it('dérive les options de la définition du module', () => {
       const projectFolder = tmpDirForTest();
 
-      const { code } = runDatabase('apply', 'database', '--project-folder', projectFolder, '--database-name', 'shop', '--pool-size', '25', '--no-migrations');
+      const { code } = runDatabase(
+        'apply',
+        'database',
+        '--project-folder',
+        projectFolder,
+        '--database-name',
+        'shop',
+        '--pool-size',
+        '25',
+        '--no-migrations',
+      );
 
       expect(code).toBe(0);
       const { scripts } = JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8'));
@@ -210,20 +263,40 @@ describe('CLI', () => {
 
       runDatabase('apply', 'database', '--project-folder', projectFolder, '--database-name', 'shop', '--migrations');
 
-      expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).scripts['db:migrate']).toBe('echo migrate');
+      expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).scripts['db:migrate']).toBe(
+        'echo migrate',
+      );
     });
 
     it('nomme l’option manquante ou invalide avec son flag', () => {
       const projectFolder = tmpDirForTest();
 
-      expect(runDatabase('apply', 'database', '--project-folder', projectFolder).output).toBe('Erreur : Option obligatoire manquante : --database-name');
-      expect(runDatabase('apply', 'database', '--project-folder', projectFolder, '--database-name', 'shop', '--pool-size', '0').output).toBe(
-        'Erreur : Option --pool-size invalide : la taille doit valoir au moins 1',
+      expect(runDatabase('apply', 'database', '--project-folder', projectFolder).output).toBe(
+        'Erreur : Option obligatoire manquante : --database-name',
       );
+      expect(
+        runDatabase(
+          'apply',
+          'database',
+          '--project-folder',
+          projectFolder,
+          '--database-name',
+          'shop',
+          '--pool-size',
+          '0',
+        ).output,
+      ).toBe('Erreur : Option --pool-size invalide : la taille doit valoir au moins 1');
     });
 
     it('refuse l’option d’un autre module', () => {
-      const { code, output } = runDatabase('apply', 'database-seed', '--project-folder', tmpDirForTest(), '--pool-size', '5');
+      const { code, output } = runDatabase(
+        'apply',
+        'database-seed',
+        '--project-folder',
+        tmpDirForTest(),
+        '--pool-size',
+        '5',
+      );
 
       expect(code).toBe(1);
       expect(output).toContain('Erreur : option inconnue : --pool-size');
@@ -279,7 +352,9 @@ describe('CLI', () => {
       expect(code).toBe(0);
       expect(output).toContain('(créés : 1, modifiés : 1, remplacés : 0, inchangés : 0, ignorés : 0)');
       expect(output).toContain('  modifié : src/webapp/main.ts');
-      expect(readFileSync(join(projectFolder, 'src/webapp/main.ts'), 'utf8')).toContain("import { createPinia } from 'pinia';");
+      expect(readFileSync(join(projectFolder, 'src/webapp/main.ts'), 'utf8')).toContain(
+        "import { createPinia } from 'pinia';",
+      );
     });
 
     it('ajoute le routeur : fichiers créés, main.ts et App.vue modifiés', () => {

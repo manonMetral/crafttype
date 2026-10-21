@@ -1,0 +1,11 @@
+{
+  // Typage du front : tsc vérifie les fichiers .ts de src/webapp (main.ts, router.ts...). Le <script> des fichiers .vue
+  // n'est pas vérifié : vue-tsc ne supporte pas encore TypeScript 7. À remplacer par `vue-tsc --noEmit` dès qu'il le supportera.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src/webapp"],
+  "exclude": []
+}

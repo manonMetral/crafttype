@@ -21,6 +21,7 @@ npm ci
 ## Vérifier ses changements
 
 ```bash
+npm run format        # met le code en forme (Prettier) ; format:check le vérifie, la CI aussi
 npm run lint:types    # typecheck
 npm test              # tests unitaires et d'acceptation
 npm run build         # compilation vers dist/

@@ -2,13 +2,12 @@ import {
   ChangePlan,
   reportOf,
   type ApplyReport,
-  type ChangeKind,
   type ConflictPolicy,
   type DecidedChange,
   type PlannedChange,
 } from '../domain/ChangePlan.js';
 import { MissingModuleDependenciesError, NeedleError, UnknownModuleError } from '../domain/errors.js';
-import { isRecord, parseJsonObject } from '../domain/jsonFile.js';
+import { PACKAGE_JSON_PATH, PackageJsonDocument } from '../domain/PackageJsonDocument.js';
 import { insertAtNeedle, needleToken, type FileEdit } from '../domain/needles.js';
 import type { KnownProperties, ModuleProperties, PropertyValue, RawProperties } from '../domain/ModuleProperties.js';
 import type { ModuleResource, ModuleSlug } from '../domain/ModuleResource.js';
@@ -21,8 +20,6 @@ import type {
   TemplateRenderer,
   VersionComparator,
 } from '../domain/ports.js';
-
-const PACKAGE_JSON = 'package.json';
 
 export interface ModulesApplicationServiceDependencies {
   readonly resources: readonly ModuleResource[];
@@ -115,31 +112,28 @@ export class ModulesApplicationService {
     const fileChanges = module.files.map((file) => {
       const content = resourcesReader.read(file.module, file.path);
       const next = file.rendered ? renderer.render(content, module.context) : content;
-      return { kind: 'file' as const, target: file.destination, current: files.read(projectFolder, file.destination), next };
+      return {
+        kind: 'file' as const,
+        target: file.destination,
+        current: files.read(projectFolder, file.destination),
+        next,
+      };
     });
 
     const editChanges = this.planEdits(module);
 
-    const sections: readonly [ChangeKind, Readonly<Record<string, unknown>>, string | undefined][] = [
-      ['field', packageJson.fields, undefined],
-      ['script', packageJson.scripts, 'scripts'],
-      ['dependency', packageJson.dependencies, 'dependencies'],
-      ['devDependency', packageJson.devDependencies, 'devDependencies'],
-    ];
-    if (sections.every(([, wanted]) => Object.keys(wanted).length === 0)) {
+    const wanted = PackageJsonDocument.wantedBy(packageJson);
+    if (wanted.length === 0) {
       return new ChangePlan([...fileChanges, ...editChanges], this.dependencies.versions);
     }
 
-    const current = this.readPackageJson(projectFolder);
-    const packageJsonChanges = sections.flatMap(([kind, wanted, section]) => {
-      const existing = section === undefined ? current : asRecord(current[section]);
-      return Object.entries(wanted).map(([target, value]) => ({
-        kind,
-        target,
-        current: existing[target] === undefined ? undefined : JSON.stringify(existing[target]),
-        next: JSON.stringify(value),
-      }));
-    });
+    const current = PackageJsonDocument.parse(files.read(projectFolder, PACKAGE_JSON_PATH));
+    const packageJsonChanges = wanted.map(({ kind, target, value }) => ({
+      kind,
+      target,
+      current: current.entry(kind, target),
+      next: value,
+    }));
     return new ChangePlan([...fileChanges, ...editChanges, ...packageJsonChanges], this.dependencies.versions);
   }
 
@@ -153,7 +147,11 @@ export class ModulesApplicationService {
     return [...byPath].map(([path, fileEdits]) => {
       const current = this.dependencies.files.read(projectFolder, path);
       if (current === undefined) {
-        throw new NeedleError(path, needleToken(fileEdits[0]?.needle ?? ''), 'fichier introuvable : appliquez d\'abord le module qui le crée');
+        throw new NeedleError(
+          path,
+          needleToken(fileEdits[0]?.needle ?? ''),
+          "fichier introuvable : appliquez d'abord le module qui le crée",
+        );
       }
       return { kind: 'edit' as const, target: path, current, next: fileEdits.reduce(insertAtNeedle, current) };
     });
@@ -162,7 +160,9 @@ export class ModulesApplicationService {
   /** Écrit uniquement ce qui est à créer, à modifier ou à remplacer, pour ne pas toucher aux fichiers déjà à jour. */
   private write(module: CraftModule, changes: readonly DecidedChange[]): void {
     const { files } = this.dependencies;
-    const toWrite = changes.filter(({ decision }) => decision === 'create' || decision === 'edit' || decision === 'overwrite');
+    const toWrite = changes.filter(
+      ({ decision }) => decision === 'create' || decision === 'edit' || decision === 'overwrite',
+    );
 
     for (const { kind, target, next } of toWrite) {
       if (kind === 'file' || kind === 'edit') {
@@ -170,36 +170,15 @@ export class ModulesApplicationService {
       }
     }
 
-    const packageJsonChanges = toWrite.filter(({ kind }) => kind !== 'file' && kind !== 'edit');
-    if (packageJsonChanges.length === 0) {
+    const entries = toWrite.flatMap(({ kind, target, next }) =>
+      kind === 'file' || kind === 'edit' ? [] : [{ kind, target, value: next }],
+    );
+    if (entries.length === 0) {
       return;
     }
 
-    const packageJson = this.readPackageJson(module.projectFolder);
-    const touched = new Set<string>();
-    for (const { kind, target, next } of packageJsonChanges) {
-      const section = SECTIONS[kind as Exclude<ChangeKind, 'file' | 'edit'>];
-      if (section === undefined) {
-        packageJson[target] = JSON.parse(next);
-        continue;
-      }
-      const entries = asRecord(packageJson[section]);
-      entries[target] = JSON.parse(next);
-      packageJson[section] = entries;
-      touched.add(section);
-    }
-    for (const section of ['dependencies', 'devDependencies']) {
-      if (touched.has(section)) {
-        packageJson[section] = sortKeys(asRecord(packageJson[section]));
-      }
-    }
-
-    files.write(module.projectFolder, PACKAGE_JSON, `${JSON.stringify(packageJson, null, 2)}\n`);
-  }
-
-  private readPackageJson(projectFolder: string): Record<string, unknown> {
-    const existing = this.dependencies.files.read(projectFolder, PACKAGE_JSON);
-    return existing === undefined ? {} : parseJsonObject(PACKAGE_JSON, existing);
+    const current = PackageJsonDocument.parse(files.read(module.projectFolder, PACKAGE_JSON_PATH));
+    files.write(module.projectFolder, PACKAGE_JSON_PATH, current.with(entries).serialize());
   }
 
   /** Propriétés déjà posées par les modules appliqués ; le plus récent l'emporte. */
@@ -208,7 +187,9 @@ export class ModulesApplicationService {
     if (folder.trim() === '') {
       return {};
     }
-    return this.dependencies.history.list(folder).reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
+    return this.dependencies.history
+      .list(folder)
+      .reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
   }
 
   private checkDependencies(resource: ModuleResource, properties: ModuleProperties): void {
@@ -220,15 +201,3 @@ export class ModulesApplicationService {
     }
   }
 }
-
-const SECTIONS: Record<Exclude<ChangeKind, 'file' | 'edit'>, string | undefined> = {
-  field: undefined,
-  script: 'scripts',
-  dependency: 'dependencies',
-  devDependency: 'devDependencies',
-};
-
-const asRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? { ...value } : {});
-
-const sortKeys = (record: Record<string, unknown>): Record<string, unknown> =>
-  Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));

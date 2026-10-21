@@ -39,7 +39,12 @@ export class ModuleAssertions {
     return this;
   }
 
-  hasPackageJson(): { dependencies: Record<string, string>; devDependencies: Record<string, string>; scripts: Record<string, string>; [key: string]: unknown } {
+  hasPackageJson(): {
+    dependencies: Record<string, string>;
+    devDependencies: Record<string, string>;
+    scripts: Record<string, string>;
+    [key: string]: unknown;
+  } {
     return JSON.parse(readFileSync(join(this.projectFolder, 'package.json'), 'utf8'));
   }
 

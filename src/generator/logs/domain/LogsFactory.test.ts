@@ -11,7 +11,10 @@ describe('LogsFactory', () => {
   const projectWithServer = (): string => {
     const projectFolder = tmpDirForTest();
     mkdirSync(join(projectFolder, 'src/server'), { recursive: true });
-    writeFileSync(join(projectFolder, 'src/server/app.ts'), '// crafttype-needle-app-imports\n// crafttype-needle-app-server-options\n// crafttype-needle-app-plugins\n');
+    writeFileSync(
+      join(projectFolder, 'src/server/app.ts'),
+      '// crafttype-needle-app-imports\n// crafttype-needle-app-server-options\n// crafttype-needle-app-plugins\n',
+    );
     return projectFolder;
   };
 

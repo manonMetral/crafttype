@@ -1,10 +1,11 @@
 import { ModuleConflictError } from './errors.js';
+import { describePackageJsonEntry, type PackageJsonEntryKind } from './PackageJsonDocument.js';
 import type { VersionComparator } from './ports.js';
 
 /** Que faire quand un module veut poser un contenu différent de celui qui existe déjà. */
 export type ConflictPolicy = 'fail' | 'overwrite' | 'skip';
 
-export type ChangeKind = 'file' | 'edit' | 'field' | 'script' | 'dependency' | 'devDependency';
+export type ChangeKind = 'file' | 'edit' | PackageJsonEntryKind;
 
 /**
  * Un changement que le module voudrait apporter au projet.
@@ -40,22 +41,15 @@ export interface ApplyReport {
   readonly conflicts: number;
 }
 
-const PACKAGE_JSON = 'package.json';
-
-const PACKAGE_JSON_SECTION: Record<Exclude<ChangeKind, 'file' | 'edit'>, string> = {
-  field: '',
-  script: 'scripts.',
-  dependency: 'dependencies.',
-  devDependency: 'devDependencies.',
-};
-
 /** Nom lisible de l'élément concerné : le chemin d'un fichier, ou l'entrée du package.json. */
 export const describeChange = ({ kind, target }: PlannedChange): string =>
-  kind === 'file' || kind === 'edit' ? target : `${PACKAGE_JSON} : ${PACKAGE_JSON_SECTION[kind]}${target}`;
+  kind === 'file' || kind === 'edit' ? target : describePackageJsonEntry(kind, target);
 
 /** Description d'un conflit : l'élément, et pour le package.json la valeur existante face à celle du module. */
 export const describeConflict = (change: PlannedChange): string =>
-  change.kind === 'file' || change.kind === 'edit' ? describeChange(change) : `${describeChange(change)} (existant : ${change.current}, module : ${change.next})`;
+  change.kind === 'file' || change.kind === 'edit'
+    ? describeChange(change)
+    : `${describeChange(change)} (existant : ${change.current}, module : ${change.next})`;
 
 /** Ce qu'un module changerait dans un projet, avant toute écriture. */
 export class ChangePlan {
@@ -90,7 +84,11 @@ const decisionFor = (change: PlannedChange, policy: ConflictPolicy, versions: Ve
   if (change.current === undefined) return 'create';
   if (change.current === change.next) return 'unchanged';
   if (change.kind === 'edit') return 'edit';
-  if (isDependency(change) && versions.keepsExistingVersion(JSON.parse(change.current) as string, JSON.parse(change.next) as string)) return 'keep';
+  if (
+    isDependency(change) &&
+    versions.keepsExistingVersion(JSON.parse(change.current) as string, JSON.parse(change.next) as string)
+  )
+    return 'keep';
   return { fail: 'conflict', overwrite: 'overwrite', skip: 'skip' }[policy] as Decision;
 };
 

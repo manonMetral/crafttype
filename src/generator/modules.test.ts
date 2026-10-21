@@ -22,7 +22,10 @@ describe('catalogue de modules', () => {
     }
   });
 
-  it.each(resources.map((resource) => [resource.slug, resource] as const))('le module %s se construit avec les propriétés par défaut', (_slug, resource) => {
-    expect(() => resource.factory(propertiesFixture())).not.toThrow();
-  });
+  it.each(resources.map((resource) => [resource.slug, resource] as const))(
+    'le module %s se construit avec les propriétés par défaut',
+    (_slug, resource) => {
+      expect(() => resource.factory(propertiesFixture())).not.toThrow();
+    },
+  );
 });

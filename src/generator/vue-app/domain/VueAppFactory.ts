@@ -17,11 +17,13 @@ export class VueAppFactory {
       .addFile(SOURCE.file('main.ts'), `${WEBAPP}/main.ts`)
       .addFile(SOURCE.file('App.vue'), `${WEBAPP}/App.vue`)
       .addFile(SOURCE.file('env.d.ts'), `${WEBAPP}/env.d.ts`)
+      .addFile(SOURCE.file('tsconfig.webapp.json'), 'tsconfig.webapp.json')
       .addDependency('vue', vue)
       .addDevDependency('vite', vue)
       .addDevDependency('@vitejs/plugin-vue', vue)
       .addScript('webapp:dev', 'vite')
       .addScript('webapp:build', 'vite build')
+      .addScript('webapp:typecheck', 'tsc --noEmit -p tsconfig.webapp.json')
       .build();
   }
 }

@@ -1,0 +1,6 @@
+# Les modèles de resources/generator sont mis en forme par le Prettier du projet généré (80 colonnes), pas par celui-ci :
+# tests-ci/generate.sh en vérifie le résultat avec `format:check`.
+resources/
+dist/
+node_modules/
+coverage/

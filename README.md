@@ -36,6 +36,8 @@ Un module ne remplace jamais un fichier ou une entrée du `package.json` dont le
 
 `--force` et `--skip-conflicts` sont incompatibles ; `--dry-run` se combine avec l'un ou l'autre pour voir leur effet.
 
+**Typage du front.** `vue-app` ajoute `npm run webapp:typecheck` (`tsc` sur `src/webapp`) : il vérifie les fichiers `.ts` (`main.ts`, `router.ts`...) mais pas le `<script>` des fichiers `.vue`. `vue-tsc`, qui le ferait, ne fonctionne pas encore avec TypeScript 7 (testé avec la version 3.3.13) ; il remplacera ce script dès qu'il le supportera. `vite build` ne vérifie aucun type.
+
 **Modules qui complètent un fichier.** `pinia` et `vue-router` (fichiers de `vue-app`), `config` et `logs` (fichiers de `fastify-server`) n'écrasent rien : ils y insèrent son code à des repères (`// crafttype-needle-main-imports`...) que `vue-app` y a posés, dans l'ordre où vous les appliquez. Ce n'est pas un conflit, et la commande affiche le fichier modifié. Si un repère a été supprimé à la main, le module échoue en le nommant, sans rien écrire (voir `documentation/module-creation.md`).
 
 **Versions de dépendances.** Une dépendance déjà présente dans le `package.json` avec une version égale, plus récente ou compatible avec celle du catalogue (`^5.0.0` pour `5.12.7`) n'est pas un conflit : elle est conservée, même avec `--force`, pour ne jamais faire reculer un projet mis à jour par Renovate. Une version plus ancienne, un tag (`latest`), une URL ou une référence de workspace restent des conflits.

@@ -6,7 +6,9 @@ export class FileSystemNodePackagesVersionsReader implements NodePackagesVersion
   constructor(private readonly root: string) {}
 
   get(source = 'common'): PackageVersions {
-    const content = JSON.parse(readFileSync(join(this.root, 'generator', 'dependencies', source, 'package.json'), 'utf8'));
+    const content = JSON.parse(
+      readFileSync(join(this.root, 'generator', 'dependencies', source, 'package.json'), 'utf8'),
+    );
     return new PackageVersions({ ...content.dependencies, ...content.devDependencies });
   }
 }

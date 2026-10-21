@@ -8,7 +8,10 @@ describe('VitestFactory', () => {
   const factory = new VitestFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
   it('ajoute la configuration Vitest, la dépendance et les scripts de test', () => {
-    const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining('vitest.config.ts', 'src/**/*.test.ts');
+    const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining(
+      'vitest.config.ts',
+      'src/**/*.test.ts',
+    );
 
     expect(result.hasPackageJson().devDependencies).toHaveProperty('vitest');
     expect(result.hasPackageJson().scripts).toMatchObject({ test: 'vitest run', 'test:watch': 'vitest' });
