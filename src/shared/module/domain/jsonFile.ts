@@ -3,7 +3,7 @@ import { InvalidProjectFileError } from './errors.js';
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** Lit un fichier JSON du projet généré, qui doit contenir un objet. */
+/** Reads a JSON file of the generated project, which must contain an object. */
 export const parseJsonObject = (path: string, content: string): Record<string, unknown> => {
   let parsed: unknown;
   try {
@@ -13,7 +13,7 @@ export const parseJsonObject = (path: string, content: string): Record<string, u
   }
 
   if (!isRecord(parsed)) {
-    throw new InvalidProjectFileError(path, 'un objet JSON est attendu');
+    throw new InvalidProjectFileError(path, 'a JSON object is expected');
   }
   return parsed;
 };

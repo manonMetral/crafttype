@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Génère une application complète avec tous les modules, puis l'installe, la compile et lance ses tests.
-# Usage : tests-ci/generate.sh [dossier-de-sortie]
+# Generates a complete application with all modules, then installs it, builds it and runs its tests.
+# Usage: tests-ci/generate.sh [output-folder]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="${1:-$(mktemp -d)/fullapp}"
 CRAFTTYPE=(npx --prefix "$ROOT" tsx "$ROOT/src/shared/module/infrastructure/primary/main.ts")
 
-# Tous les modules du catalogue, dans l'ordre de `crafttype list` (les dépendances viennent avant).
-# Le nom du projet n'est demandé que par `init` : les autres modules le relisent dans l'historique.
-# (boucle plutôt que `mapfile`, absent du bash 3.2 de macOS)
+# All catalog modules, in the order of `crafttype list` (dependencies come first).
+# Only `init` takes the project name: the other modules read it back from the history.
+# (loop rather than `mapfile`, which is missing from macOS bash 3.2)
 MODULES=()
 while IFS= read -r module; do
   MODULES+=("$module")
@@ -31,15 +31,15 @@ npm test
 npm run server:build
 npm run webapp:build
 
-# Le typage du front doit refuser une erreur de type dans un fichier .ts.
-echo "export const probe: number = 'texte';" > src/webapp/probe.ts
+# Front-end typing must reject a type error in a .ts file.
+echo "export const probe: number = 'text';" > src/webapp/probe.ts
 if npm run webapp:typecheck > /dev/null 2>&1; then
-  echo "webapp:typecheck aurait dû refuser une erreur de type dans src/webapp/probe.ts" >&2
+  echo "webapp:typecheck should have rejected a type error in src/webapp/probe.ts" >&2
   exit 1
 fi
 rm src/webapp/probe.ts
 
-# Une configuration invalide arrête le serveur avec un message d'erreur, sans stack trace.
-node "$ROOT/tests-ci/expect-startup-error.mjs" 'PORT invalide' PORT=abc
-node "$ROOT/tests-ci/expect-startup-error.mjs" 'LOG_LEVEL invalide' LOG_LEVEL=bavard
+# An invalid configuration stops the server with an error message, without a stack trace.
+node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid PORT' PORT=abc
+node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid LOG_LEVEL' LOG_LEVEL=verbose
 echo "OK : $APP"

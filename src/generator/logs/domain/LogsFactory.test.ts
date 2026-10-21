@@ -7,7 +7,7 @@ import { LogsFactory } from './LogsFactory.js';
 describe('LogsFactory', () => {
   const factory = new LogsFactory();
 
-  // Ce que fastify-server a déjà créé : seuls les repères comptent pour ce module.
+  // What fastify-server has already created: only the needles matter to this module.
   const projectWithServer = (): string => {
     const projectFolder = tmpDirForTest();
     mkdirSync(join(projectFolder, 'src/server'), { recursive: true });
@@ -18,19 +18,19 @@ describe('LogsFactory', () => {
     return projectFolder;
   };
 
-  it('crée le logger et son test, copiés tels quels', () => {
+  it('creates the logger and its test, copied as is', () => {
     assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithServer() })))
-      .hasFileContaining('src/server/logger.ts', 'LOG_LEVEL invalide')
+      .hasFileContaining('src/server/logger.ts', 'Invalid LOG_LEVEL')
       .hasFileContaining('src/server/logger.test.ts', 'x-request-id');
   });
 
-  it('n’ajoute aucune dépendance : le logger est celui de Fastify', () => {
+  it('adds no dependency: the logger is the one from Fastify', () => {
     const { dependencies, devDependencies } = factory.buildModule(propertiesFixture()).packageJson;
 
     expect({ ...dependencies, ...devDependencies }).toEqual({});
   });
 
-  it('configure le logger et l’identifiant de requête dans buildApp', () => {
+  it('configures the logger and the request id in buildApp', () => {
     assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithServer() }))).hasFileContaining(
       'src/server/app.ts',
       "import { echoRequestId, genReqId, loggerOptions } from './logger.js';",

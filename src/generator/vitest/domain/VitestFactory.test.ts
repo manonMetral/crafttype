@@ -7,7 +7,7 @@ import { VitestFactory } from './VitestFactory.js';
 describe('VitestFactory', () => {
   const factory = new VitestFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
-  it('ajoute la configuration Vitest, la dépendance et les scripts de test', () => {
+  it('adds the Vitest configuration, the dependency and the test scripts', () => {
     const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining(
       'vitest.config.ts',
       'src/**/*.test.ts',

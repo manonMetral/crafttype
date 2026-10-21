@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build et tests (Node ${{ matrix.node }})
+    name: Build and tests (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -33,7 +33,7 @@ jobs:
       - run: npm run build
 
   generate:
-    name: Application complète générée
+    name: Full generated application
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -43,5 +43,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # Génère une application avec tous les modules, puis l'installe, la type-check, la teste et la compile.
+      # Generates an application with all modules, then installs it, type-checks it, tests it and builds it.
       - run: npm run ci:generate

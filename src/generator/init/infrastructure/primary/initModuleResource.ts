@@ -10,7 +10,7 @@ export const createInitModuleResource = (): ModuleResource => {
   return moduleResource()
     .slug(initSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().addProjectName().build())
-    .apiDoc('Init', 'Initialise le projet (package.json, .gitignore, README)')
+    .apiDoc('Init', 'Initializes the project (package.json, .gitignore, README)')
     .standalone()
     .tags('setup')
     .factory((properties) => modules.buildModule(properties));

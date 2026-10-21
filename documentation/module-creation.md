@@ -1,24 +1,24 @@
-# Créer un module
+# Creating a module
 
-Même démarche que Seed4J : un module se décrit par deux objets.
+Same approach as Seed4J: a module is described by two objects.
 
-- `CraftModule` : les modifications apportées au projet généré (fichiers, dépendances npm, scripts).
-- `ModuleResource` : la place du module dans le catalogue (slug, propriétés demandées, dépendances, tags).
+- `CraftModule`: the changes made to the generated project (files, npm dependencies, scripts).
+- `ModuleResource`: the module's place in the catalog (slug, requested properties, dependencies, tags).
 
-Comme un `CraftModule` dépend des propriétés choisies, une **fabrique** le construit à partir d'elles.
+Since a `CraftModule` depends on the chosen properties, a **factory** builds it from them.
 
-Exemple : un module `eslint`.
+Example: an `eslint` module.
 
-## 1. La fabrique et son test (`src/generator/eslint/domain/`)
+## 1. The factory and its test (`src/generator/eslint/domain/`)
 
-Écrire d'abord le test. `assertThatModule` applique réellement le module sur un dossier temporaire, le retour est immédiat.
+Write the test first. `assertThatModule` really applies the module to a temporary folder, and the result is immediate.
 
 ```ts
 const module = factory.buildModule(propertiesFixture());
 assertThatModule(module).hasFiles('eslint.config.js');
 ```
 
-Puis la fabrique :
+Then the factory:
 
 ```ts
 const SOURCE = from('eslint'); // resources/generator/eslint/
@@ -28,7 +28,7 @@ export class EslintFactory {
 
   buildModule(properties: ModuleProperties): CraftModule {
     return moduleBuilder(properties)
-      .addFile(SOURCE.template('eslint.config.js'), 'eslint.config.js') // rendu par mustache
+      .addFile(SOURCE.template('eslint.config.js'), 'eslint.config.js') // rendered by mustache
       .addDevDependency('eslint', this.versions.get())
       .addScript('lint', 'eslint .')
       .build();
@@ -36,79 +36,79 @@ export class EslintFactory {
 }
 ```
 
-- `SOURCE.template('x')` lit `x.mustache` et le rend avec les propriétés. `SOURCE.file('x')` copie sans rendre : à utiliser dès que le fichier contient des `{{ }}` (templates Vue).
-- Un même fichier de destination ne peut être déclaré qu'une fois : un second `addFile` vers le même chemin (`./src/a.txt` et `src/a.txt` comptent pour le même) lève `DuplicateDestinationError` dès la construction du module.
-- Une dépendance sans version dans `resources/generator/dependencies/` fait échouer la construction. C'est voulu.
+- `SOURCE.template('x')` reads `x.mustache` and renders it with the properties. `SOURCE.file('x')` copies without rendering: use it whenever the file contains `{{ }}` (Vue templates).
+- A destination file can be declared only once: a second `addFile` to the same path (`./src/a.txt` and `src/a.txt` count as the same) throws `DuplicateDestinationError` as soon as the module is built.
+- A dependency with no version in `resources/generator/dependencies/` makes the build fail. This is intended.
 
-## 2. Les versions
+## 2. The versions
 
-Ajouter le paquet dans `resources/generator/dependencies/common/package.json`, ou dans `<framework>/package.json` pour un module propre à un framework.
+Add the package to `resources/generator/dependencies/common/package.json`, or to `<framework>/package.json` for a framework-specific module.
 
-## 3. Le service d'application et la ressource
+## 3. The application service and the resource
 
-- `application/EslintApplicationService.ts` : instancie la fabrique et expose `buildModule`. L'adaptateur primaire passe par lui et n'appelle jamais le domaine directement, même quand il ne fait que relayer : c'est là que viendra l'orchestration d'un module plus riche.
-- `infrastructure/primary/eslintModuleResource.ts` décrit la place du module dans le catalogue :
+- `application/EslintApplicationService.ts`: instantiates the factory and exposes `buildModule`. The primary adapter goes through it and never calls the domain directly, even when it only relays: this is where the orchestration of a richer module will go.
+- `infrastructure/primary/eslintModuleResource.ts` describes the module's place in the catalog:
 
 ```ts
 moduleResource()
   .slug('eslint')
   .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-  .apiDoc('Qualité', 'Ajoute ESLint')
-  .dependsOn('typescript')   // ou .standalone()
+  .apiDoc('Quality', 'Adds ESLint')
+  .dependsOn('typescript')   // or .standalone()
   .tags('quality')
   .factory((properties) => modules.buildModule(properties)); // const modules = new EslintApplicationService(versions)
 ```
 
-`apiDoc` (groupe et libellé) et `tags` sont des métadonnées de catalogue : `list` n'affiche que le libellé, le reste est réservé à un futur filtrage ou à une API.
+`apiDoc` (group and label) and `tags` are catalog metadata: `list` only prints the label, the rest is reserved for future filtering or an API.
 
-Les étapes sont ordonnées par le compilateur, comme dans le builder de Seed4J.
+The compiler enforces the order of the steps, as in Seed4J's builder.
 
-### Propriétés
+### Properties
 
-`propertiesDefinition` déclare les propriétés que le module accepte. Une propriété non déclarée est refusée. Deux sont prêtes à l'emploi (`addProjectName()`, `addServerPort()`) ; pour les autres, on les décrit avec `addString`, `addNumber` ou `addBoolean` :
+`propertiesDefinition` declares the properties the module accepts. An undeclared property is rejected. Two are ready to use (`addProjectName()`, `addServerPort()`); the others are described with `addString`, `addNumber` or `addBoolean`:
 
 ```ts
 ModulePropertiesDefinition.builder()
-  .addString('databaseName', { description: 'Nom de la base', mandatory: true })
+  .addString('databaseName', { description: 'Database name', mandatory: true })
   .addNumber('poolSize', {
-    description: 'Taille du pool de connexions',
+    description: 'Connection pool size',
     defaultValue: 10,
-    validate: (size) => (Number(size) >= 1 ? undefined : 'la taille doit valoir au moins 1'),
+    validate: (size) => (Number(size) >= 1 ? undefined : 'the size must be at least 1'),
   })
-  .addBoolean('migrations', { description: 'Active les migrations', defaultValue: true })
+  .addBoolean('migrations', { description: 'Enables migrations', defaultValue: true })
   .build();
 ```
 
-- La clé est en camelCase. La ligne de commande en tire l'option : `databaseName` donne `--database-name`, et une propriété booléenne s'active avec `--migrations` et se coupe avec `--no-migrations`. `crafttype apply <module> --help` liste les options du module.
-- `defaultValue` est une valeur fixe, ou une fonction du dossier du projet (c'est ainsi que `projectName` en dérive son nom). Sans valeur par défaut, une propriété non obligatoire reste absente.
-- `validate` reçoit la valeur déjà convertie au bon type et renvoie le motif du refus, ou `undefined`. Le texte apparaît dans `Option --pool-size invalide : ...`.
-- La fabrique lit les valeurs avec `properties.string('databaseName')`, `properties.number('poolSize')` et `properties.boolean('migrations')`. Lire une propriété que le module ne déclare pas, ou avec le mauvais type, lève `PropertyAccessError`.
-- Les valeurs déclarées sont aussi disponibles dans les templates mustache (`{{databaseName}}`).
-- **Mustache n'échappe rien** (`MustacheTemplateRenderer`) : `{{databaseName}}` est inséré tel quel, que le fichier soit du TypeScript, du JSON ou du HTML. Une propriété de texte libre doit donc être restreinte avec `validate` au format des fichiers où elle sera rendue (par exemple refuser `"`, `<` et `\` pour un fichier JSON ou HTML), ou n'être lue que dans une fabrique (`properties.string(...)`) pour une valeur que le moteur sérialise lui-même, comme une entrée du `package.json`. `projectName` est sûr parce qu'il est limité à un nom de paquet npm, et `serverPort` parce que c'est un entier.
-- Les clés `projectFolder`, `force`, `skipConflicts`, `dryRun` et `help` sont réservées, et une clé ne peut pas être déclarée deux fois.
+- The key is in camelCase. The command line derives the option from it: `databaseName` gives `--database-name`, and a boolean property is enabled with `--migrations` and disabled with `--no-migrations`. `crafttype apply <module> --help` lists the module's options.
+- `defaultValue` is a fixed value, or a function of the project folder (this is how `projectName` derives its name). Without a default value, a non-mandatory property stays absent.
+- `validate` receives the value already converted to the right type and returns the reason for the refusal, or `undefined`. The text appears in the invalid option error for `--pool-size` (for example `Invalid option --pool-size: ...`).
+- The factory reads the values with `properties.string('databaseName')`, `properties.number('poolSize')` and `properties.boolean('migrations')`. Reading a property the module does not declare, or with the wrong type, throws `PropertyAccessError`.
+- The declared values are also available in the mustache templates (`{{databaseName}}`).
+- **Mustache escapes nothing** (`MustacheTemplateRenderer`): `{{databaseName}}` is inserted as is, whether the file is TypeScript, JSON or HTML. A free-text property must therefore be restricted with `validate` to the format of the files where it will be rendered (for example by rejecting `"`, `<` and `\` for a JSON or HTML file), or be read only in a factory (`properties.string(...)`) for a value that the engine serializes itself, such as a `package.json` entry. `projectName` is safe because it is limited to an npm package name, and `serverPort` because it is an integer.
+- The keys `projectFolder`, `force`, `skipConflicts`, `dryRun` and `help` are reserved, and a key cannot be declared twice.
 
-Pour chaque propriété, la valeur explicite l'emporte, puis la valeur que l'historique du projet a déjà enregistrée pour un module précédent (par une propriété de même clé), puis la valeur par défaut. Une propriété obligatoire déjà posée par un module précédent n'est donc pas redemandée.
-Ainsi `vue-app` relit le port posé par `fastify-server` et le nom posé par `init`. L'historique ne garde que les propriétés déclarées par chaque module.
+For each property, the explicit value wins, then the value that the project's history already recorded for a previous module (through a property with the same key), then the default value. A mandatory property already set by a previous module is therefore not asked for again.
+This is how `vue-app` reads back the port set by `fastify-server` and the name set by `init`. The history only keeps the properties declared by each module.
 
-### Fichiers existants
+### Existing files
 
-Un module ne remplace jamais un fichier ou une entrée du `package.json` (champ, script, version) dont le contenu diffère : il échoue en listant les conflits, sans rien écrire. Réappliquer un module à l'identique ne change rien.
+A module never replaces a file or a `package.json` entry (field, script, version) whose content differs: it fails by listing the conflicts, without writing anything. Reapplying a module identically changes nothing.
 
-Le moteur calcule d'abord un plan (`ChangePlan`) : chaque fichier ou entrée du `package.json` est créé, inchangé ou en conflit. Une politique tranche ensuite les conflits :
+The engine first computes a plan (`ChangePlan`): each file or `package.json` entry is created, unchanged or in conflict. A policy then settles the conflicts:
 
-- `fail` (défaut) : le module est refusé, rien n'est écrit ni enregistré dans l'historique ;
-- `overwrite` (`--force`) : l'existant est remplacé ;
-- `skip` (`--skip-conflicts`) : l'existant est gardé, le reste est appliqué.
+- `fail` (default): the module is refused, nothing is written or recorded in the history;
+- `overwrite` (`--force`): the existing element is replaced;
+- `skip` (`--skip-conflicts`): the existing element is kept, the rest is applied.
 
-Cas particulier des versions de dépendances : si le projet a déjà la dépendance dans une version égale, plus récente ou compatible avec celle du catalogue (comparaison `semver`, derrière le port `VersionComparator`), le plan la marque `keep`. Ce n'est pas un conflit et aucune politique ne la remplace, pour qu'un module ne fasse jamais reculer une version montée par Renovate. Une version plus ancienne ou non comparable (tag, URL, workspace) reste un conflit.
+Special case of dependency versions: if the project already has the dependency in a version equal to, newer than or compatible with the catalog one (`semver` comparison, behind the `VersionComparator` port), the plan marks it `keep`. This is not a conflict and no policy replaces it, so that a module never sets back a version bumped by Renovate. An older or non-comparable version (tag, URL, workspace) remains a conflict.
 
-`--dry-run` affiche le plan sans rien écrire. Un module n'a rien à faire pour en profiter : tout passe par `moduleBuilder`.
+`--dry-run` prints the plan without writing anything. A module has nothing to do to benefit from it: everything goes through `moduleBuilder`.
 
-### Modifier un fichier créé par un autre module
+### Modifying a file created by another module
 
-Un module qui complète un fichier existant (Pinia dans `main.ts`, un plugin Fastify dans `app.ts`) n'écrase rien : il insère son code à un **repère**, une ligne que le module propriétaire du fichier y a posée.
+A module that completes an existing file (Pinia in `main.ts`, a Fastify plugin in `app.ts`) overwrites nothing: it inserts its code at a **needle**, a line that the module owning the file placed there.
 
-1. Le module qui crée le fichier pose les repères, dans le commentaire de son langage. Le nom suit `crafttype-needle-<nom>` :
+1. The module that creates the file places the needles, in the comment syntax of its language. The name follows `crafttype-needle-<name>`:
 
 ```ts
 // resources/generator/vue-app/main.ts
@@ -120,7 +120,7 @@ const app = createApp(App);
 app.mount('#app');
 ```
 
-2. Le module qui complète le fichier déclare ses insertions dans sa fabrique et dépend du module propriétaire :
+2. The module that completes the file declares its insertions in its factory and depends on the owning module:
 
 ```ts
 moduleBuilder(properties)
@@ -130,35 +130,35 @@ moduleBuilder(properties)
   .build();
 ```
 
-Le contrat entre les deux modules est le chemin du fichier et le nom des repères : le test de la fabrique du propriétaire vérifie que ses repères sont bien dans le fichier généré (voir `VueAppFactory.test.ts`).
+The contract between the two modules is the file path and the needle names: the owner's factory test checks that its needles are in the generated file (see `VueAppFactory.test.ts`).
 
-Comportement du moteur :
-- Le bloc est inséré juste avant la ligne du repère, avec l'indentation de cette ligne. Le repère reste en place pour les modules suivants, qui s'insèrent après les précédents.
-- Idempotent : si les lignes du bloc sont déjà dans le fichier (à l'indentation près), rien n'est changé. Le code ajouté par l'équipe n'est jamais touché.
-- Ce n'est pas un conflit : aucune politique (`--force`, `--skip-conflicts`) n'intervient. Le plan marque le fichier `edit` (« modifier » en simulation, « modifiés : n » dans le compte rendu).
-- Si le fichier est introuvable, ou si le repère manque ou apparaît plusieurs fois, le module échoue avec une `NeedleError` qui nomme le fichier et le repère, sans rien écrire ni enregistrer, y compris en `--dry-run`. L'équipe a modifié le fichier à la main : le moteur ne devine pas où insérer. La correction est de remettre la ligne du repère à l'endroit voulu.
-- Un module ne peut pas à la fois créer (`addFile`) et modifier (`insertAtNeedle`) le même fichier.
+Engine behavior:
+- The block is inserted just before the needle line, with that line's indentation. The needle stays in place for the following modules, which insert after the previous ones.
+- Idempotent: if the block's lines are already in the file (ignoring indentation), nothing is changed. Code added by the team is never touched.
+- This is not a conflict: no policy (`--force`, `--skip-conflicts`) comes into play. The plan marks the file `edit` (shown as `modify` in a dry run, and listed as modified files in the report).
+- If the file cannot be found, or if the needle is missing or appears several times, the module fails with a `NeedleError` that names the file and the needle, without writing or recording anything, including with `--dry-run`. The team edited the file by hand: the engine does not guess where to insert. The fix is to put the needle line back where it belongs.
+- A module cannot both create (`addFile`) and modify (`insertAtNeedle`) the same file.
 
-Repères posés aujourd'hui par le catalogue :
+Needles placed by the catalog today:
 
-| Fichier | Repère | Usage |
+| File | Needle | Use |
 |---|---|---|
-| `src/webapp/main.ts` | `main-imports` | imports du point d'entrée (Pinia, routeur...) |
-| `src/webapp/main.ts` | `main-plugins` | `app.use(...)` avant `app.mount` |
-| `src/webapp/App.vue` | `app-template` | contenu du `<main>` de l'application (`<RouterView />`...) |
-| `src/server/app.ts` | `app-imports` | imports de `buildApp` |
-| `src/server/app.ts` | `app-server-options` | complète `serverOptions` avant `Fastify(serverOptions)` (logger, génération des identifiants de requête...) |
-| `src/server/app.ts` | `app-plugins` | hooks et plugins, juste après la création de l'application |
-| `src/server/main.ts` | `main-imports` | imports du point d'entrée |
-| `src/server/main.ts` | `main-settings` | début du `try` de démarrage : code qui ajuste `settings` (port, adresse) ou prépare le serveur. Ses erreurs s'affichent comme message, sans stack trace |
+| `src/webapp/main.ts` | `main-imports` | entry point imports (Pinia, router...) |
+| `src/webapp/main.ts` | `main-plugins` | `app.use(...)` before `app.mount` |
+| `src/webapp/App.vue` | `app-template` | content of the application's `<main>` (`<RouterView />`...) |
+| `src/server/app.ts` | `app-imports` | imports of `buildApp` |
+| `src/server/app.ts` | `app-server-options` | completes `serverOptions` before `Fastify(serverOptions)` (logger, request id generation...) |
+| `src/server/app.ts` | `app-plugins` | hooks and plugins, right after the application is created |
+| `src/server/main.ts` | `main-imports` | entry point imports |
+| `src/server/main.ts` | `main-settings` | start of the startup `try`: code that adjusts `settings` (port, address) or prepares the server. Its errors are printed as a message, without a stack trace |
 
-Les repères sont des commentaires qui restent dans le code généré. Le moteur n'analyse pas le code (pas d'AST) : il convient aux ajouts à des endroits prévus d'avance, pas à la réécriture d'un code arbitraire.
+Needles are comments that stay in the generated code. The engine does not parse the code (no AST): it suits additions at places planned in advance, not the rewriting of arbitrary code.
 
-## 4. Le catalogue
+## 4. The catalog
 
-Ajouter le module dans `src/generator/modules.ts`, après les modules dont il dépend (un test le vérifie).
+Add the module to `src/generator/modules.ts`, after the modules it depends on (a test checks this).
 
-## 5. Test d'acceptation et CI
+## 5. Acceptance test and CI
 
-- Un test d'acceptation ne duplique pas le test de fabrique : il vérifie seulement que le module est joignable par la CLI (`src/test/acceptance/`).
-- Rien à faire dans `tests-ci/generate.sh` : le script applique tous les modules de `crafttype list`, dans l'ordre du catalogue. Si le module a une option obligatoire, ajoutez-la dans ce script.
+- An acceptance test does not duplicate the factory test: it only checks that the module can be reached through the CLI (`src/test/acceptance/`).
+- Nothing to do in `tests-ci/generate.sh`: the script applies all the modules of `crafttype list`, in catalog order. If the module has a mandatory option, add it to that script.

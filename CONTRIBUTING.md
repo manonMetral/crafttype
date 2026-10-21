@@ -1,16 +1,16 @@
-# Contribuer à CraftType
+# Contributing to CraftType
 
-Merci de votre intérêt. Les contributions sont bienvenues : corrections, nouveaux modules, documentation, retours d'usage.
-En participant, vous acceptez le [code de conduite](CODE_OF_CONDUCT.md). Vos contributions sont publiées sous [licence Apache-2.0](LICENSE), comme le reste du projet.
+Thank you for your interest. Contributions are welcome: fixes, new modules, documentation, feedback from real use.
+By participating, you agree to the [code of conduct](CODE_OF_CONDUCT.md). Your contributions are published under the [Apache-2.0 license](LICENSE), like the rest of the project.
 
-## Signaler un problème ou proposer une idée
+## Reporting a problem or suggesting an idea
 
-Ouvrez une [issue](https://github.com/manonMetral/crafttype/issues). Pour un bogue, indiquez la commande lancée, la version de Node, le résultat attendu et le résultat obtenu.
-Pour un nouveau module, décrivez ce qu'il ajoute au projet généré et de quels modules il dépend, avant de coder : cela évite un travail qui ne rentrerait pas dans le catalogue.
+Open an [issue](https://github.com/manonMetral/crafttype/issues). For a bug, give the command you ran, the Node version, the expected result and the actual result.
+For a new module, describe what it adds to the generated project and which modules it depends on before writing code: this avoids work that would not fit in the catalog.
 
-## Préparer son poste
+## Setting up your machine
 
-Prérequis : Node.js 22.12 ou plus récent, et npm.
+Requirements: Node.js 22.12 or newer, and npm.
 
 ```bash
 git clone git@github.com:manonMetral/crafttype.git
@@ -18,37 +18,37 @@ cd crafttype
 npm ci
 ```
 
-## Vérifier ses changements
+## Checking your changes
 
 ```bash
-npm run format        # met le code en forme (Prettier) ; format:check le vérifie, la CI aussi
+npm run format        # formats the code (Prettier); format:check verifies it, and so does the CI
 npm run lint:types    # typecheck
-npm test              # tests unitaires et d'acceptation
-npm run test:coverage # mêmes tests avec le coverage ; la CI exige 99 % d'instructions, de fonctions et de lignes, et 95 % de branches
-npm run build         # compilation vers dist/
-npm run ci:generate   # génère une application complète avec tous les modules, puis l'installe, la type-check, la teste et la compile
+npm test              # unit and acceptance tests
+npm run test:coverage # same tests with coverage; the CI requires 99% of statements, functions and lines, and 95% of branches
+npm run build         # compilation to dist/
+npm run ci:generate   # generates a complete application with all the modules, then installs, type-checks, tests and compiles it
 ```
 
-La CI GitHub exécute les mêmes commandes sur Node 22 et 24. Une pull request doit être verte pour être fusionnée.
+The GitHub CI runs the same commands on Node 22 and 24. A pull request must be green to be merged.
 
-## Ajouter ou modifier un module
+## Adding or changing a module
 
-Suivez [documentation/module-creation.md](documentation/module-creation.md). En résumé :
+Follow [documentation/module-creation.md](documentation/module-creation.md). In short:
 
-1. Écrire d'abord le test de la fabrique avec `assertThatModule`.
-2. Écrire la fabrique, les templates dans `resources/generator/<module>/` et, si besoin, les versions dans `resources/generator/dependencies/`.
-3. Déclarer la ressource de module, puis l'ajouter dans `src/generator/modules.ts` après les modules dont elle dépend. `tests-ci/generate.sh` l'inclut alors automatiquement dans l'application complète.
+1. Write the factory test first, with `assertThatModule`.
+2. Write the factory, the templates in `resources/generator/<module>/` and, if needed, the versions in `resources/generator/dependencies/`.
+3. Declare the module resource, then add it to `src/generator/modules.ts` after the modules it depends on. `tests-ci/generate.sh` then includes it automatically in the complete application.
 
-Respectez l'architecture hexagonale du dépôt : le domaine ne dépend d'aucun adaptateur, les accès au disque et à mustache restent dans `infrastructure/secondary`. Une bibliothèque tierce utilisée par le domaine passe par un port (voir `VersionComparator` et son adaptateur `SemverVersionComparator`). `src/test/architecture/HexagonalArch.test.ts` ([arch-unit-ts](https://github.com/arch-unit-ts/arch-unit-ts)) vérifie ces règles dans `npm test` : un nouveau module qui les enfreint fait échouer les tests en nommant le fichier fautif.
+Respect the repository's hexagonal architecture: the domain depends on no adapter, and disk and mustache access stay in `infrastructure/secondary`. A third-party library used by the domain goes through a port (see `VersionComparator` and its adapter `SemverVersionComparator`). `src/test/architecture/HexagonalArch.test.ts` ([arch-unit-ts](https://github.com/arch-unit-ts/arch-unit-ts)) checks these rules in `npm test`: a new module that breaks them fails the tests and names the offending file.
 
-## Versions des dépendances
+## Dependency versions
 
-Les versions injectées dans les projets générés vivent dans `resources/generator/dependencies/`. Elles sont exactes (sans `^`) et mises à jour par Renovate, dans une seule pull request groupée. Ne les modifiez à la main que pour ajouter un paquet.
+The versions injected into generated projects live in `resources/generator/dependencies/`. They are exact (no `^`) and updated by Renovate, in a single grouped pull request. Edit them by hand only to add a package.
 
-## Proposer une pull request
+## Submitting a pull request
 
-- Partez de `main`, avec une branche par sujet.
-- Un commit = un changement cohérent, avec un message de la forme `type: description` (`feat`, `fix`, `docs`, `test`, `chore`, `refactor`), comme dans l'historique.
-- Ajoutez ou adaptez les tests, et la documentation si le comportement change.
-- Décrivez dans la pull request ce qui change et comment vous l'avez vérifié.
-- `main` est protégée : la CI doit être verte et une personne listée dans [`.github/CODEOWNERS`](.github/CODEOWNERS) doit approuver la pull request avant la fusion.
+- Start from `main`, with one branch per topic.
+- One commit = one coherent change, with a message of the form `type: description` (`feat`, `fix`, `docs`, `test`, `chore`, `refactor`), as in the history.
+- Add or adapt the tests, and the documentation if the behavior changes.
+- In the pull request, describe what changes and how you verified it.
+- `main` is protected: the CI must be green and a person listed in [`.github/CODEOWNERS`](.github/CODEOWNERS) must approve the pull request before it is merged.

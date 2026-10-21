@@ -1,5 +1,5 @@
-// Exception assumée à l'isolation du domaine : `posix.normalize` est une fonction pure (aucune entrée-sortie), elle ne
-// justifie pas un port. arch-unit-ts ignore les imports `node:*` ; toute bibliothèque tierce passe, elle, par un port.
+// Deliberate exception to domain isolation: `posix.normalize` is a pure function (no I/O), it does not justify a
+// port. arch-unit-ts ignores `node:*` imports; any third-party library goes through a port.
 import { posix } from 'node:path';
 import { DuplicateDestinationError, NeedleError } from './errors.js';
 import { isValidNeedleName, type FileEdit } from './needles.js';
@@ -7,16 +7,16 @@ import type { ModuleProperties } from './ModuleProperties.js';
 import type { PackageVersions } from './PackageVersions.js';
 
 export interface FileToAdd {
-  /** Module propriétaire du dossier `resources/generator/<module>/`. */
+  /** Module that owns the `resources/generator/<module>/` folder. */
   readonly module: string;
   readonly path: string;
-  /** `true` pour un template mustache, `false` pour une copie brute. */
+  /** `true` for a mustache template, `false` for a raw copy. */
   readonly rendered: boolean;
   readonly destination: string;
 }
 
 export interface PackageJsonChanges {
-  /** Champs posés tels quels (`name`, `type`, `engines`...). Réservé aux modules propriétaires, comme `init`. */
+  /** Fields set as is (`name`, `type`, `engines`...). Reserved for owner modules, like `init`. */
   readonly fields: Readonly<Record<string, unknown>>;
   readonly dependencies: Readonly<Record<string, string>>;
   readonly devDependencies: Readonly<Record<string, string>>;
@@ -25,17 +25,17 @@ export interface PackageJsonChanges {
 
 export type TemplateContext = Readonly<Record<string, string | number | boolean>>;
 
-/** Décrit les modifications qu'un module apporte au projet généré (équivalent de Seed4JModule). */
+/** Describes the changes a module makes to the generated project (equivalent of Seed4JModule). */
 export interface CraftModule {
   readonly projectFolder: string;
   readonly files: readonly FileToAdd[];
-  /** Insertions dans des fichiers qui existent déjà dans le projet (créés par un autre module). */
+  /** Insertions into files that already exist in the project (created by another module). */
   readonly edits: readonly FileEdit[];
   readonly packageJson: PackageJsonChanges;
   readonly context: TemplateContext;
 }
 
-/** Désigne les fichiers sources d'un module : `from('fastify-server').template('app.ts')`. */
+/** Designates the source files of a module: `from('fastify-server').template('app.ts')`. */
 export class ModuleSource {
   constructor(readonly module: string) {}
 
@@ -76,13 +76,13 @@ export class CraftModuleBuilder {
   }
 
   /**
-   * Ajoute `content` dans un fichier déjà présent, juste avant la ligne qui contient `crafttype-needle-<needle>`.
-   * Le module qui crée ce fichier doit y poser le repère (voir `documentation/module-creation.md`).
+   * Adds `content` to a file that is already present, just before the line that contains `crafttype-needle-<needle>`.
+   * The module that creates this file must place the needle in it (see `documentation/module-creation.md`).
    */
   insertAtNeedle(path: string, needle: string, content: string): this {
     const normalized = posix.normalize(path);
     if (!isValidNeedleName(needle)) {
-      throw new NeedleError(normalized, needle, 'nom de repère invalide (minuscules, chiffres et tirets)');
+      throw new NeedleError(normalized, needle, 'invalid needle name (lowercase letters, digits and hyphens)');
     }
     if (this.files.some((file) => file.destination === normalized)) {
       throw new DuplicateDestinationError(normalized);

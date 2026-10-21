@@ -1,7 +1,7 @@
 import { gte, minVersion, satisfies, validRange } from 'semver';
 import type { VersionComparator } from '../../domain/ports.js';
 
-/** Adaptateur du port `VersionComparator` : la comparaison de versions et d'intervalles est déléguée à `semver`. */
+/** Adapter of the `VersionComparator` port: comparing versions and ranges is delegated to `semver`. */
 export class SemverVersionComparator implements VersionComparator {
   keepsExistingVersion(existing: string, wanted: string): boolean {
     if (validRange(existing) === null || validRange(wanted) === null) {

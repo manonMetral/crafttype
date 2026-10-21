@@ -11,7 +11,7 @@ export const createPrettierModuleResource = (versions: NodePackagesVersionsReade
   return moduleResource()
     .slug(prettierSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-    .apiDoc('Qualité', 'Ajoute Prettier')
+    .apiDoc('Quality', 'Adds Prettier')
     .dependsOn('init')
     .tags('format')
     .factory((properties) => modules.buildModule(properties));

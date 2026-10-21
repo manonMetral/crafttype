@@ -11,7 +11,7 @@ import { createVitestModuleResource } from './vitest/infrastructure/primary/vite
 import { createVueRouterModuleResource } from './vue-router/infrastructure/primary/vueRouterModuleResource.js';
 import { createVueAppModuleResource } from './vue-app/infrastructure/primary/vueAppModuleResource.js';
 
-/** Catalogue des modules : ajouter une ligne ici pour exposer un nouveau module. */
+/** Module catalog: add a line here to expose a new module. */
 export const allModuleResources = (versions: NodePackagesVersionsReader): readonly ModuleResource[] => [
   createInitModuleResource(),
   createTypescriptModuleResource(versions),

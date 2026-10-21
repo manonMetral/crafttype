@@ -1,5 +1,5 @@
-# Les modèles de resources/generator sont mis en forme par le Prettier du projet généré (80 colonnes), pas par celui-ci :
-# tests-ci/generate.sh en vérifie le résultat avec `format:check`.
+# The templates in resources/generator are formatted by the generated project's Prettier (80 columns), not by this one:
+# tests-ci/generate.sh checks the result with `format:check`.
 resources/
 dist/
 node_modules/

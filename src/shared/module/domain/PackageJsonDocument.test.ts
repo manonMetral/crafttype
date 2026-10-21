@@ -10,16 +10,16 @@ const changes = {
 };
 
 describe('PackageJsonDocument', () => {
-  describe('lecture', () => {
-    it('traite un fichier absent comme un document vide', () => {
+  describe('reading', () => {
+    it('treats a missing file as an empty document', () => {
       expect(PackageJsonDocument.parse(undefined).serialize()).toBe('{}\n');
     });
 
-    it.each(['{', '[]', '"texte"', 'null'])('refuse %j', (raw) => {
+    it.each(['{', '[]', '"text"', 'null'])('rejects %j', (raw) => {
       expect(() => PackageJsonDocument.parse(raw)).toThrow(InvalidProjectFileError);
     });
 
-    it('donne la valeur actuelle de chaque sorte d’entrée, sérialisée en JSON', () => {
+    it('gives the current value of each kind of entry, serialized as JSON', () => {
       const document = PackageJsonDocument.parse(
         JSON.stringify({
           name: 'shop',
@@ -37,8 +37,8 @@ describe('PackageJsonDocument', () => {
       expect(document.entry('devDependency', 'vite')).toBe('"8.0.0"');
     });
 
-    it('renvoie undefined pour une entrée absente, même quand sa section est absente ou n’est pas un objet', () => {
-      const document = PackageJsonDocument.parse('{"scripts":"cassé"}');
+    it('returns undefined for a missing entry, even when its section is missing or is not an object', () => {
+      const document = PackageJsonDocument.parse('{"scripts":"broken"}');
 
       expect(document.entry('script', 'test')).toBeUndefined();
       expect(document.entry('dependency', 'vue')).toBeUndefined();
@@ -46,8 +46,8 @@ describe('PackageJsonDocument', () => {
     });
   });
 
-  describe('entrées voulues par un module', () => {
-    it('suivent l’ordre champs, scripts, dépendances, dépendances de développement', () => {
+  describe('entries wanted by a module', () => {
+    it('follow the order fields, scripts, dependencies, development dependencies', () => {
       expect(PackageJsonDocument.wantedBy(changes)).toEqual([
         { kind: 'field', target: 'name', value: '"shop"' },
         { kind: 'script', target: 'test', value: '"vitest run"' },
@@ -56,16 +56,16 @@ describe('PackageJsonDocument', () => {
       ]);
     });
 
-    it('sont vides quand le module ne touche pas au package.json', () => {
+    it('are empty when the module does not touch the package.json', () => {
       expect(PackageJsonDocument.wantedBy({ fields: {}, scripts: {}, dependencies: {}, devDependencies: {} })).toEqual(
         [],
       );
     });
   });
 
-  describe('écriture', () => {
-    it('pose chaque sorte d’entrée dans sa section et garde le reste', () => {
-      const document = PackageJsonDocument.parse('{"name":"vieux","private":true,"scripts":{"lint":"x"}}');
+  describe('writing', () => {
+    it('puts each kind of entry in its section and keeps the rest', () => {
+      const document = PackageJsonDocument.parse('{"name":"old","private":true,"scripts":{"lint":"x"}}');
 
       const result = JSON.parse(document.with(PackageJsonDocument.wantedBy(changes)).serialize());
 
@@ -78,7 +78,7 @@ describe('PackageJsonDocument', () => {
       });
     });
 
-    it('ne modifie pas le document d’origine', () => {
+    it('does not modify the original document', () => {
       const document = PackageJsonDocument.parse('{"scripts":{"a":"1"}}');
 
       document.with(PackageJsonDocument.wantedBy(changes));
@@ -86,7 +86,7 @@ describe('PackageJsonDocument', () => {
       expect(document.serialize()).toBe('{\n  "scripts": {\n    "a": "1"\n  }\n}\n');
     });
 
-    it('trie les dépendances touchées, et seulement elles', () => {
+    it('sorts the touched dependencies, and only them', () => {
       const document = PackageJsonDocument.parse(
         '{"scripts":{"z":"1","a":"2"},"devDependencies":{"vite":"1","@types/node":"2"}}',
       );
@@ -105,8 +105,8 @@ describe('PackageJsonDocument', () => {
       expect(Object.keys(result.devDependencies)).toEqual(['vite', '@types/node']);
     });
 
-    // La locale par défaut de la machine ne doit pas jouer : en tchèque, « ch » se range après « h ».
-    it('trie avec une locale fixe, donc de la même façon sur toutes les machines', () => {
+    // The default locale of the machine must not matter: in Czech, "ch" sorts after "h".
+    it('sorts with a fixed locale, hence the same way on every machine', () => {
       const names = ['vue', '@vitejs/plugin-vue', 'hono', 'chalk', '@types/node', 'vue-router'];
       const entries = names.map((target) => ({ kind: 'dependency' as const, target, value: '"1"' }));
 
@@ -122,15 +122,15 @@ describe('PackageJsonDocument', () => {
       ]);
     });
 
-    it('remplace une section qui n’est pas un objet', () => {
-      const document = PackageJsonDocument.parse('{"scripts":"cassé"}');
+    it('replaces a section that is not an object', () => {
+      const document = PackageJsonDocument.parse('{"scripts":"broken"}');
 
       const result = JSON.parse(document.with([{ kind: 'script', target: 'test', value: '"vitest run"' }]).serialize());
 
       expect(result.scripts).toEqual({ test: 'vitest run' });
     });
 
-    it('termine le fichier par un retour à la ligne, indenté de deux espaces', () => {
+    it('ends the file with a line break, indented with two spaces', () => {
       expect(
         PackageJsonDocument.parse('{}')
           .with([{ kind: 'field', target: 'type', value: '"module"' }])
@@ -139,10 +139,10 @@ describe('PackageJsonDocument', () => {
     });
   });
 
-  it('nomme une entrée avec sa section', () => {
-    expect(describePackageJsonEntry('field', 'name')).toBe('package.json : name');
-    expect(describePackageJsonEntry('script', 'test')).toBe('package.json : scripts.test');
-    expect(describePackageJsonEntry('dependency', 'vue')).toBe('package.json : dependencies.vue');
-    expect(describePackageJsonEntry('devDependency', 'vite')).toBe('package.json : devDependencies.vite');
+  it('names an entry with its section', () => {
+    expect(describePackageJsonEntry('field', 'name')).toBe('package.json: name');
+    expect(describePackageJsonEntry('script', 'test')).toBe('package.json: scripts.test');
+    expect(describePackageJsonEntry('dependency', 'vue')).toBe('package.json: dependencies.vue');
+    expect(describePackageJsonEntry('devDependency', 'vite')).toBe('package.json: devDependencies.vite');
   });
 });

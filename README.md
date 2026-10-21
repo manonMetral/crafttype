@@ -1,80 +1,80 @@
 # CraftType
 
-Générateur modulaire de projets **Node.js (Fastify)** et **Vue.js**, inspiré de [Seed4J](https://github.com/seed4j/seed4j).
-Chaque module ajoute une seule chose à un projet (TypeScript, Vitest, un serveur Fastify, une application Vue...) et s'applique à la demande, dans l'ordre voulu.
+Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
+Each module adds one single thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
-> État : prototype de la phase 0. Le noyau et dix modules fonctionnent, la CLI est minimale.
+> Status: end of phase 1. The core and ten modules work, the CLI is minimal. ESLint (blocked, see below) and npm publication are still to come.
 
-## Utilisation
+## Usage
 
 ```bash
 npm install
 npm run cli -- list
-npm run cli -- apply init --project-folder ../mon-app --project-name mon-app
-npm run cli -- apply typescript --project-folder ../mon-app
-npm run cli -- apply vitest --project-folder ../mon-app
-npm run cli -- apply prettier --project-folder ../mon-app
-npm run cli -- apply fastify-server --project-folder ../mon-app --server-port 3000
-npm run cli -- apply config --project-folder ../mon-app
-npm run cli -- apply logs --project-folder ../mon-app
-npm run cli -- apply vue-app --project-folder ../mon-app
-npm run cli -- apply pinia --project-folder ../mon-app
-npm run cli -- apply vue-router --project-folder ../mon-app
+npm run cli -- apply init --project-folder ../my-app --project-name my-app
+npm run cli -- apply typescript --project-folder ../my-app
+npm run cli -- apply vitest --project-folder ../my-app
+npm run cli -- apply prettier --project-folder ../my-app
+npm run cli -- apply fastify-server --project-folder ../my-app --server-port 3000
+npm run cli -- apply config --project-folder ../my-app
+npm run cli -- apply logs --project-folder ../my-app
+npm run cli -- apply vue-app --project-folder ../my-app
+npm run cli -- apply pinia --project-folder ../my-app
+npm run cli -- apply vue-router --project-folder ../my-app
 ```
 
-Les modules appliqués sont notés dans `.crafttype/modules/history.json` du projet généré, avec les propriétés qu'ils déclarent. Un module refuse de s'appliquer si les modules dont il dépend ne sont pas dans cet historique.
-Les options déjà données à un module précédent (`--project-name` pour `init`, `--server-port` pour `fastify-server`) sont reprises par les suivants : `vue-app` proxifie vers le port choisi pour le serveur.
-Chaque module déclare ses propres options : `npm run cli -- apply <module> --help` les liste.
+Applied modules are recorded in the generated project's `.crafttype/modules/history.json`, together with the properties they declare. A module refuses to apply if the modules it depends on are not in that history.
+Options already given to a previous module (`--project-name` for `init`, `--server-port` for `fastify-server`) are reused by the following ones: `vue-app` proxies to the port chosen for the server.
+Each module declares its own options: `npm run cli -- apply <module> --help` lists them.
 
-Un module ne remplace jamais un fichier ou une entrée du `package.json` dont le contenu diffère : par défaut il liste les conflits et s'arrête, sans rien écrire. Trois options changent ce comportement :
+A module never replaces a file or a `package.json` entry whose content differs: by default it lists the conflicts and stops, without writing anything. Three options change this behavior:
 
-| Option | Effet |
+| Option | Effect |
 |---|---|
-| `--skip-conflicts` | applique le module en gardant les éléments existants qui diffèrent, et les liste |
-| `--force` | remplace les éléments existants qui diffèrent |
-| `--dry-run` | affiche ce que le module créerait, laisserait inchangé ou trouverait en conflit, sans rien écrire (code de sortie 1 s'il reste un conflit) |
+| `--skip-conflicts` | applies the module, keeps the existing elements that differ, and lists them |
+| `--force` | replaces the existing elements that differ |
+| `--dry-run` | prints what the module would create, leave unchanged or find in conflict, without writing anything (exit code 1 if a conflict remains) |
 
-`--force` et `--skip-conflicts` sont incompatibles ; `--dry-run` se combine avec l'un ou l'autre pour voir leur effet.
+`--force` and `--skip-conflicts` are mutually exclusive; `--dry-run` combines with either one to preview its effect.
 
-**Typage du front.** `vue-app` ajoute `npm run webapp:typecheck` (`tsc` sur `src/webapp`) : il vérifie les fichiers `.ts` (`main.ts`, `router.ts`...) mais pas le `<script>` des fichiers `.vue`. `vue-tsc`, qui le ferait, ne fonctionne pas encore avec TypeScript 7 (testé avec la version 3.3.13) ; il remplacera ce script dès qu'il le supportera. `vite build` ne vérifie aucun type.
+**Front-end typing.** `vue-app` adds `npm run webapp:typecheck` (`tsc` on `src/webapp`): it checks the `.ts` files (`main.ts`, `router.ts`...) but not the `<script>` of `.vue` files. `vue-tsc`, which would do it, does not work with TypeScript 7 yet (tested with version 3.3.13); it will replace this script as soon as it supports it. `vite build` does not check any type.
 
-**Modules qui complètent un fichier.** `pinia` et `vue-router` (fichiers de `vue-app`), `config` et `logs` (fichiers de `fastify-server`) n'écrasent rien : ils y insèrent son code à des repères (`// crafttype-needle-main-imports`...) que `vue-app` y a posés, dans l'ordre où vous les appliquez. Ce n'est pas un conflit, et la commande affiche le fichier modifié. Si un repère a été supprimé à la main, le module échoue en le nommant, sans rien écrire (voir `documentation/module-creation.md`).
+**Modules that complete a file.** `pinia` and `vue-router` (files of `vue-app`), `config` and `logs` (files of `fastify-server`) overwrite nothing: they insert their code into the file at needles (`// crafttype-needle-main-imports`...) that the owning module placed there, in the order you apply them. This is not a conflict, and the command prints the modified file. If a needle was removed by hand, the module fails and names it, without writing anything (see `documentation/module-creation.md`).
 
-**Versions de dépendances.** Une dépendance déjà présente dans le `package.json` avec une version égale, plus récente ou compatible avec celle du catalogue (`^5.0.0` pour `5.12.7`) n'est pas un conflit : elle est conservée, même avec `--force`, pour ne jamais faire reculer un projet mis à jour par Renovate. Une version plus ancienne, un tag (`latest`), une URL ou une référence de workspace restent des conflits.
+**Dependency versions.** A dependency already present in `package.json` with a version equal to, newer than or compatible with the catalog one (`^5.0.0` for `5.12.7`) is not a conflict: it is kept, even with `--force`, so that a project updated by Renovate never goes backwards. An older version, a tag (`latest`), a URL or a workspace reference remains a conflict.
 
-## Vérifier que ça marche
+## Checking that it works
 
 ```bash
-npm test               # tests unitaires et d'acceptation (CLI)
-npm run ci:generate    # génère une application complète puis l'installe, la compile et la teste
+npm test               # unit and acceptance tests (CLI)
+npm run ci:generate    # generates a complete application, then installs, compiles and tests it
 ```
 
-## Organisation du code
+## Code organization
 
-Chaque module est un « hexagone », comme dans Seed4J (voir `documentation/hexagonal-architecture.md` de leur dépôt) :
+Each module is a "hexagon", as in Seed4J (see `documentation/hexagonal-architecture.md` in their repository):
 
 ```
 src/
-  shared/module/            noyau : modèle de module, moteur d'application, adaptateurs (fichiers, mustache, CLI)
+  shared/module/            core: module model, application engine, adapters (files, mustache, CLI)
   generator/<module>/
-    application/            service d'orchestration
-    domain/                 fabrique : construit le CraftModule à partir des propriétés
-    infrastructure/primary/ ressource de module (slug, propriétés, dépendances, tags)
-  generator/modules.ts      catalogue des modules
-  composition.ts            racine de composition
+    application/            orchestration service
+    domain/                 factory: builds the CraftModule from the properties
+    infrastructure/primary/ module resource (slug, properties, dependencies, tags)
+  generator/modules.ts      module catalog
+  composition.ts            composition root
 resources/generator/
-  <module>/                 templates (.mustache) et fichiers copiés tels quels
-  dependencies/             versions des paquets npm (common, vue), à faire suivre par Renovate
+  <module>/                 templates (.mustache) and files copied as is
+  dependencies/             npm package versions (common, vue), kept up to date by Renovate
 ```
 
-Ces règles sont vérifiées par `src/test/architecture/HexagonalArch.test.ts` (arch-unit-ts) : contextes étanches entre eux, domaine sans dépendance vers l'application ou l'infrastructure, couches hexagonales dans chaque contexte.
+These rules are checked by `src/test/architecture/HexagonalArch.test.ts` (arch-unit-ts): contexts are sealed from each other, the domain has no dependency on the application or infrastructure layers, and each context has its hexagonal layers.
 
-Créer un module : voir [documentation/module-creation.md](documentation/module-creation.md).
+Creating a module: see [documentation/module-creation.md](documentation/module-creation.md).
 
-## Contribuer
+## Contributing
 
-Voir [CONTRIBUTING.md](CONTRIBUTING.md) et le [code de conduite](CODE_OF_CONDUCT.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
 
-## Licence
+## License
 
-Apache-2.0, voir [LICENSE](LICENSE). CraftType s'inspire du fonctionnement de Seed4J (également Apache-2.0) sans en reprendre le code.
+Apache-2.0, see [LICENSE](LICENSE). CraftType is inspired by how Seed4J works (also Apache-2.0) without reusing its code.

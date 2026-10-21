@@ -5,18 +5,18 @@ import { TypeScriptProject } from 'arch-unit-ts/dist/arch-unit/core/domain/TypeS
 import { Architectures } from 'arch-unit-ts/dist/arch-unit/library/Architectures.js';
 import { classes, noClasses } from 'arch-unit-ts/dist/main.js';
 
-// Équivalent du `HexagonalArchTest` de Seed4J et de JHipster Lite, avec arch-unit-ts.
+// Equivalent of the `HexagonalArchTest` of Seed4J and JHipster Lite, with arch-unit-ts.
 //
-// Contextes : le noyau partagé (`shared.module`) et un contexte par générateur (`generator.<slug>`).
-// Les noms de package commencent par `src.` car l'analyse part de `src/`.
+// Contexts: the shared kernel (`shared.module`) and one context per generator (`generator.<slug>`).
+// Package names start with `src.` because the analysis starts from `src/`.
 //
-// Hors du périmètre analysé :
-// - les tests (`*.test.ts`) et les aides de test (`shared/test`, `src/test`) ;
-// - `composition.ts` et `generator/modules.ts`, qui assemblent les contextes et les connaissent donc tous ;
-// - les imports `node:*` et ceux des bibliothèques, que arch-unit-ts ne résout pas. Le domaine importe `node:path`
-//   (`posix.normalize` dans `CraftModule.ts`) : c'est une exception assumée, la fonction est pure. Une dépendance
-//   à une bibliothèque tierce, elle, doit passer par un port du domaine (voir `VersionComparator`) ; la règle ci-dessous
-//   ne la détecte que si la bibliothèque fournit ses types dans `node_modules`, ce qui est le cas de `semver`.
+// Outside the analyzed scope:
+// - tests (`*.test.ts`) and test helpers (`shared/test`, `src/test`);
+// - `composition.ts` and `generator/modules.ts`, which assemble the contexts and therefore know all of them;
+// - `node:*` imports and library imports, which arch-unit-ts does not resolve. The domain imports `node:path`
+//   (`posix.normalize` in `CraftModule.ts`): this is a deliberate exception, the function is pure. A dependency
+//   on a third-party library, on the other hand, must go through a domain port (see `VersionComparator`); the rule below
+//   only detects it if the library ships its types in `node_modules`, which is the case of `semver`.
 const sources = new TypeScriptProject(RelativePath.of('src'), '**/*.test.ts', '**/shared/test/**', '**/src/test/**');
 
 const SHARED_KERNEL = 'src.shared.module';
@@ -25,11 +25,11 @@ const generators = readdirSync('src/generator', { withFileTypes: true })
   .map((entry) => `src.generator.${entry.name}`);
 const contexts = [SHARED_KERNEL, ...generators];
 
-describe('architecture hexagonale', () => {
-  // Une règle qui ne contrôle aucune classe passe toujours. `arch-unit-ts.json` autorise les règles à vide
-  // (une couche absente d'un contexte est normale) : ces deux tests garantissent que l'analyse voit bien le projet.
-  describe('garde-fous de l’analyse', () => {
-    it.each(contexts)('%s : l’analyse voit son domaine', (context) => {
+describe('hexagonal architecture', () => {
+  // A rule that checks no class always passes. `arch-unit-ts.json` allows empty rules
+  // (a layer missing from a context is normal): these two tests guarantee that the analysis does see the project.
+  describe('analysis safeguards', () => {
+    it.each(contexts)('%s: the analysis sees its domain', (context) => {
       classes()
         .that()
         .resideInAnyPackage(`${context}.domain..`)
@@ -40,7 +40,7 @@ describe('architecture hexagonale', () => {
         .check(sources.allClasses());
     });
 
-    it('résout les imports entre fichiers (l’application dépend du domaine)', () => {
+    it('resolves imports between files (the application depends on the domain)', () => {
       classes()
         .that()
         .resideInAPackage('..application..')
@@ -52,8 +52,8 @@ describe('architecture hexagonale', () => {
     });
   });
 
-  describe('contextes', () => {
-    it.each(contexts)('%s ne dépend d’aucun autre générateur', (context) => {
+  describe('contexts', () => {
+    it.each(contexts)('%s does not depend on any other generator', (context) => {
       const others = generators.filter((generator) => generator !== context).map((generator) => `${generator}..`);
 
       noClasses()
@@ -62,35 +62,35 @@ describe('architecture hexagonale', () => {
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage(...others)
-        .because('un contexte ne dépend que de lui-même et du noyau partagé')
+        .because('a context depends only on itself and on the shared kernel')
         .check(sources.allClasses());
     });
 
-    it.each(generators)('%s ne dépend du noyau que par son domaine', (context) => {
+    it.each(generators)('%s depends on the kernel only through its domain', (context) => {
       noClasses()
         .that()
         .resideInAnyPackage(`${context}..`)
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage(`${SHARED_KERNEL}.application..`, `${SHARED_KERNEL}.infrastructure..`)
-        .because('le noyau expose ses modèles et ses ports par son domaine, jamais son application ni ses adaptateurs')
+        .because('the kernel exposes its models and ports through its domain, never its application or its adapters')
         .check(sources.allClasses());
     });
 
-    it('le noyau ne dépend d’aucun générateur', () => {
+    it('the kernel does not depend on any generator', () => {
       noClasses()
         .that()
         .resideInAnyPackage(`${SHARED_KERNEL}..`)
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage('src.generator..')
-        .because('le noyau ignore les modules du catalogue')
+        .because('the kernel ignores the modules of the catalog')
         .check(sources.allClasses());
     });
   });
 
-  describe('domaine', () => {
-    it('ne dépend que du domaine', () => {
+  describe('domain', () => {
+    it('depends only on the domain', () => {
       classes()
         .that()
         .resideInAPackage('..domain..')
@@ -98,50 +98,50 @@ describe('architecture hexagonale', () => {
         .onlyDependOnClassesThat()
         .resideInAnyPackage('..domain..')
         .because(
-          'le domaine ne connaît ni l’application ni l’infrastructure, et passe par un port pour toute bibliothèque tierce',
+          'the domain knows neither the application nor the infrastructure, and goes through a port for any third-party library',
         )
         .check(sources.allClasses());
     });
   });
 
   describe('application', () => {
-    it('ne dépend pas de l’infrastructure', () => {
+    it('does not depend on the infrastructure', () => {
       noClasses()
         .that()
         .resideInAPackage('..application..')
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage('..infrastructure..')
-        .because('l’application dépend du domaine et de ses ports, pas de leurs adaptateurs')
+        .because('the application depends on the domain and its ports, not on their adapters')
         .check(sources.allClasses());
     });
   });
 
-  describe('adaptateurs', () => {
-    it('primaires ne dépendent pas des secondaires', () => {
+  describe('adapters', () => {
+    it('primary adapters do not depend on secondary ones', () => {
       noClasses()
         .that()
         .resideInAPackage('..primary..')
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage('..secondary..')
-        .because('l’assemblage des deux se fait dans composition.ts')
+        .because('both are assembled in composition.ts')
         .check(sources.allClasses());
     });
 
-    it('secondaires ne dépendent pas de l’application', () => {
+    it('secondary adapters do not depend on the application', () => {
       noClasses()
         .that()
         .resideInAPackage('..infrastructure.secondary..')
         .should()
         .dependOnClassesThat()
         .resideInAPackage('..application..')
-        .because('un adaptateur secondaire implémente un port du domaine, il n’appelle pas l’application')
+        .because('a secondary adapter implements a domain port, it does not call the application')
         .check(sources.allClasses());
     });
 
     it.each(generators)(
-      'primaires de %s passent par l’application et n’appellent pas le domaine du contexte',
+      'primary adapters of %s go through the application and do not call the context domain',
       (context) => {
         noClasses()
           .that()
@@ -149,28 +149,28 @@ describe('architecture hexagonale', () => {
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage(`${context}.domain..`)
-          .because('documentation/module-creation.md : l’adaptateur primaire passe par le service d’application')
+          .because('documentation/module-creation.md: the primary adapter goes through the application service')
           .check(sources.allClasses());
       },
     );
   });
 
-  describe('couches', () => {
-    it.each(contexts)('%s respecte les couches hexagonales', (context) => {
+  describe('layers', () => {
+    it.each(contexts)('%s respects the hexagonal layers', (context) => {
       Architectures.layeredArchitecture()
         .consideringOnlyDependenciesInAnyPackage(`${context}..`)
         .withOptionalLayers(true)
-        .layer('domaine', `${context}.domain..`)
+        .layer('domain', `${context}.domain..`)
         .layer('application', `${context}.application..`)
-        .layer('adaptateurs primaires', `${context}.infrastructure.primary..`)
-        .layer('adaptateurs secondaires', `${context}.infrastructure.secondary..`)
+        .layer('primary adapters', `${context}.infrastructure.primary..`)
+        .layer('secondary adapters', `${context}.infrastructure.secondary..`)
         .whereLayer('application')
-        .mayOnlyBeAccessedByLayers('adaptateurs primaires')
-        .whereLayer('adaptateurs primaires')
+        .mayOnlyBeAccessedByLayers('primary adapters')
+        .whereLayer('primary adapters')
         .mayNotBeAccessedByAnyLayer()
-        .whereLayer('adaptateurs secondaires')
+        .whereLayer('secondary adapters')
         .mayNotBeAccessedByAnyLayer()
-        .because('chaque contexte est une architecture hexagonale')
+        .because('each context is a hexagonal architecture')
         .check(sources.allClasses());
     });
   });

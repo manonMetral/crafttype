@@ -9,21 +9,21 @@ import {
 } from '../../domain/errors.js';
 import type { ModulePropertiesDefinition, PropertyDefinition, PropertyValue } from '../../domain/ModuleProperties.js';
 
-const USAGE = `Usage :
+const USAGE = `Usage:
   crafttype list
-  crafttype apply <module> --project-folder <dossier> [--<propriété> <valeur> ...]
+  crafttype apply <module> --project-folder <folder> [--<property> <value> ...]
                   [--force | --skip-conflicts] [--dry-run]
   crafttype apply <module> --help
   crafttype --help
 
-Le module vient juste après « apply ». Les propriétés qu'il accepte (nom du projet, port...) sont listées par --help.
+The module comes right after "apply". The properties it accepts (project name, port...) are listed by --help.
 
-Un module ne remplace jamais un fichier ou une entrée du package.json dont le contenu diffère : par défaut il refuse.
-  --force           remplace les éléments existants qui diffèrent
-  --skip-conflicts  applique le module en gardant les éléments existants qui diffèrent
-  --dry-run         affiche ce que le module ferait, sans rien écrire`;
+A module never replaces a file or a package.json entry whose content differs: by default it refuses.
+  --force           replaces the existing items that differ
+  --skip-conflicts  applies the module and keeps the existing items that differ
+  --dry-run         prints what the module would do, without writing anything`;
 
-/** Adaptateur primaire : traduit la ligne de commande en appels au service d'application. */
+/** Primary adapter: translates the command line into calls to the application service. */
 export const runCli = (
   argv: readonly string[],
   service: ModulesApplicationService,
@@ -35,7 +35,7 @@ export const runCli = (
     switch (command) {
       case 'list':
         for (const { slug, apiDoc, dependsOn } of service.list()) {
-          const requires = dependsOn.length > 0 ? ` (après : ${dependsOn.join(', ')})` : '';
+          const requires = dependsOn.length > 0 ? ` (after: ${dependsOn.join(', ')})` : '';
           out(`${slug.padEnd(16)} ${apiDoc.operation}${requires}`);
         }
         return 0;
@@ -53,11 +53,11 @@ export const runCli = (
     }
   } catch (error) {
     if (error instanceof CraftTypeError) {
-      out(`Erreur : ${describe(error)}`);
+      out(`Error: ${describe(error)}`);
       return 1;
     }
     if (isUsageError(error)) {
-      out(`Erreur : ${describeUsageError(error)}`);
+      out(`Error: ${describeUsageError(error)}`);
       out(USAGE);
       return 1;
     }
@@ -114,7 +114,7 @@ const apply = (args: readonly string[], service: ModulesApplicationService, out:
   }
 
   if (values.force === true && values['skip-conflicts'] === true) {
-    out('Erreur : --force et --skip-conflicts sont incompatibles');
+    out('Error: --force and --skip-conflicts are incompatible');
     out(USAGE);
     return 1;
   }
@@ -131,8 +131,8 @@ const describeModule = (
   definition: ModulePropertiesDefinition,
   out: (line: string) => void,
 ): void => {
-  out(`Module ${slug} : ${service.find(slug).apiDoc.operation}`);
-  out('Options :');
+  out(`Module ${slug}: ${service.find(slug).apiDoc.operation}`);
+  out('Options:');
   const lines = definition.properties.map(
     (property) => [`--${toOption(property.key)} ${valueHint(property)}`.trimEnd(), summary(property)] as const,
   );
@@ -143,54 +143,54 @@ const describeModule = (
 };
 
 const valueHint = ({ type }: PropertyDefinition): string =>
-  type === 'boolean' ? '' : type === 'number' ? '<nombre>' : '<texte>';
+  type === 'boolean' ? '' : type === 'number' ? '<number>' : '<text>';
 
 const summary = ({ mandatory, defaultValue, description }: PropertyDefinition): string => {
   const constraint = mandatory
-    ? '(obligatoire) '
+    ? '(required) '
     : typeof defaultValue === 'function' || defaultValue === undefined
       ? ''
-      : `(défaut : ${String(defaultValue)}) `;
+      : `(default: ${String(defaultValue)}) `;
   return `${constraint}${description}`;
 };
 
 const LABELS: Record<DecidedChange['decision'], string> = {
-  create: 'créer',
-  edit: 'modifier',
-  unchanged: 'inchangé',
-  keep: 'conserver',
-  overwrite: 'remplacer',
-  skip: 'ignorer',
-  conflict: 'conflit',
+  create: 'create',
+  edit: 'modify',
+  unchanged: 'unchanged',
+  keep: 'keep',
+  overwrite: 'replace',
+  skip: 'skip',
+  conflict: 'conflict',
 };
 
 const report = (result: ApplyResult, projectFolder: string, out: (line: string) => void): number => {
   const { slug, dryRun, changes, report: counts } = result;
-  const kept = counts.kept > 0 ? `, versions conservées : ${counts.kept}` : '';
-  const edited = counts.edited > 0 ? `, modifiés : ${counts.edited}` : '';
+  const kept = counts.kept > 0 ? `, kept versions: ${counts.kept}` : '';
+  const edited = counts.edited > 0 ? `, modified: ${counts.edited}` : '';
   const summary =
-    `créés : ${counts.created}${edited}, remplacés : ${counts.replaced}, ` +
-    `inchangés : ${counts.unchanged}, ignorés : ${counts.skipped}${kept}`;
+    `created: ${counts.created}${edited}, replaced: ${counts.replaced}, ` +
+    `unchanged: ${counts.unchanged}, skipped: ${counts.skipped}${kept}`;
 
   if (dryRun) {
-    out(`Simulation du module ${slug} dans ${projectFolder} (rien n'est écrit) :`);
+    out(`Dry run of module ${slug} in ${projectFolder} (nothing is written):`);
     for (const change of changes) {
       out(
         `  ${LABELS[change.decision].padEnd(10)} ${hasConflictingContent(change) ? describeConflict(change) : describeChange(change)}`,
       );
     }
-    out(counts.conflicts > 0 ? `${summary}, conflits : ${counts.conflicts}\n${CONFLICT_HINT}` : summary);
+    out(counts.conflicts > 0 ? `${summary}, conflicts: ${counts.conflicts}\n${CONFLICT_HINT}` : summary);
     return counts.conflicts > 0 ? 1 : 0;
   }
 
-  out(`Module ${slug} appliqué dans ${projectFolder} (${summary})`);
+  out(`Module ${slug} applied in ${projectFolder} (${summary})`);
   for (const change of changes.filter(
     ({ decision }) => decision === 'edit' || decision === 'overwrite' || decision === 'skip',
   )) {
-    const label = { edit: 'modifié', overwrite: 'remplacé', skip: 'ignoré' }[
+    const label = { edit: 'modified', overwrite: 'replaced', skip: 'skipped' }[
       change.decision as 'edit' | 'overwrite' | 'skip'
     ];
-    out(`  ${label} : ${describeConflict(change)}`);
+    out(`  ${label}: ${describeConflict(change)}`);
   }
   return 0;
 };
@@ -198,16 +198,15 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
 const hasConflictingContent = ({ decision }: DecidedChange): boolean =>
   decision === 'conflict' || decision === 'overwrite' || decision === 'skip' || decision === 'keep';
 
-const CONFLICT_HINT =
-  'Relancez avec --skip-conflicts pour garder les éléments existants ou --force pour les remplacer.';
+const CONFLICT_HINT = 'Run again with --skip-conflicts to keep the existing items or --force to replace them.';
 
-/** Nomme les erreurs métier avec les options de la ligne de commande plutôt qu'avec les clés internes. */
+/** Names business errors with command line options rather than internal keys. */
 const describe = (error: CraftTypeError): string => {
   if (error instanceof MissingPropertyError) {
-    return `Option obligatoire manquante : ${toFlag(error.key)}`;
+    return `Missing required option: ${toFlag(error.key)}`;
   }
   if (error instanceof InvalidPropertyError) {
-    return `Option ${toFlag(error.key)} invalide : ${error.reason}`;
+    return `Invalid option ${toFlag(error.key)}: ${error.reason}`;
   }
   if (error instanceof ModuleConflictError) {
     return `${error.message}\n${CONFLICT_HINT}`;
@@ -219,7 +218,7 @@ const toOption = (key: string): string => key.replace(/[A-Z]/g, (letter) => `-${
 
 const toFlag = (key: string): string => `--${toOption(key)}`;
 
-/** Erreurs de `parseArgs` : option inconnue, valeur manquante... */
+/** `parseArgs` errors: unknown option, missing value... */
 const isUsageError = (error: unknown): error is TypeError & { code: string } =>
   error instanceof TypeError &&
   'code' in error &&
@@ -230,9 +229,9 @@ const describeUsageError = (error: TypeError & { code: string }): string => {
   const option = /'(--?[^']+)'/.exec(error.message)?.[1];
   switch (error.code) {
     case 'ERR_PARSE_ARGS_UNKNOWN_OPTION':
-      return `option inconnue : ${option ?? '?'}`;
+      return `unknown option: ${option ?? '?'}`;
     case 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE':
-      return `valeur manquante ou invalide pour l'option ${option ?? '?'}`;
+      return `missing or invalid value for option ${option ?? '?'}`;
     default:
       return error.message.split('\n')[0] ?? error.message;
   }

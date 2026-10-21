@@ -2,14 +2,14 @@ import { ModuleConflictError } from './errors.js';
 import { describePackageJsonEntry, type PackageJsonEntryKind } from './PackageJsonDocument.js';
 import type { VersionComparator } from './ports.js';
 
-/** Que faire quand un module veut poser un contenu différent de celui qui existe déjà. */
+/** What to do when a module wants to put content that differs from what already exists. */
 export type ConflictPolicy = 'fail' | 'overwrite' | 'skip';
 
 export type ChangeKind = 'file' | 'edit' | PackageJsonEntryKind;
 
 /**
- * Un changement que le module voudrait apporter au projet.
- * `current` et `next` sont le contenu brut pour un fichier, une valeur JSON sérialisée pour une entrée du package.json.
+ * A change the module would like to make to the project.
+ * `current` and `next` are the raw content for a file, a serialized JSON value for a package.json entry.
  */
 export interface PlannedChange {
   readonly kind: ChangeKind;
@@ -19,11 +19,11 @@ export interface PlannedChange {
 }
 
 /**
- * `edit` : le module insère du code dans un fichier existant, à l'endroit qu'un repère désigne. Ce n'est pas un conflit : la
- * politique n'y change rien, et un repère introuvable est une erreur du module (voir `NeedleError`), pas une décision.
- * `keep` : une dépendance est déjà présente dans une version égale, plus récente ou compatible avec celle du catalogue.
- * Ce n'est pas un conflit et aucune politique ne la remplace, pour ne jamais faire reculer une version.
- * `conflict` : le conflit n'est pas tranché (politique `fail`), le module ne peut pas être appliqué.
+ * `edit`: the module inserts code into an existing file, where a needle points. This is not a conflict: the policy
+ * changes nothing about it, and a missing needle is an error of the module (see `NeedleError`), not a decision.
+ * `keep`: a dependency is already present in a version equal to, newer than or compatible with the catalog's.
+ * This is not a conflict and no policy replaces it, so that a version never goes backwards.
+ * `conflict`: the conflict is not settled (`fail` policy), the module cannot be applied.
  */
 export type Decision = 'create' | 'edit' | 'unchanged' | 'keep' | 'overwrite' | 'skip' | 'conflict';
 
@@ -41,29 +41,29 @@ export interface ApplyReport {
   readonly conflicts: number;
 }
 
-/** Nom lisible de l'élément concerné : le chemin d'un fichier, ou l'entrée du package.json. */
+/** Readable name of the element concerned: the path of a file, or the package.json entry. */
 export const describeChange = ({ kind, target }: PlannedChange): string =>
   kind === 'file' || kind === 'edit' ? target : describePackageJsonEntry(kind, target);
 
-/** Description d'un conflit : l'élément, et pour le package.json la valeur existante face à celle du module. */
+/** Description of a conflict: the element, and for package.json the existing value against the module's. */
 export const describeConflict = (change: PlannedChange): string =>
   change.kind === 'file' || change.kind === 'edit'
     ? describeChange(change)
-    : `${describeChange(change)} (existant : ${change.current}, module : ${change.next})`;
+    : `${describeChange(change)} (existing: ${change.current}, module: ${change.next})`;
 
-/** Ce qu'un module changerait dans un projet, avant toute écriture. */
+/** What a module would change in a project, before anything is written. */
 export class ChangePlan {
   constructor(
     readonly changes: readonly PlannedChange[],
     private readonly versions: VersionComparator,
   ) {}
 
-  /** Tranche chaque changement selon la politique, sans jamais échouer : sert à la simulation. */
+  /** Settles each change according to the policy, without ever failing: used by the dry run. */
   decide(policy: ConflictPolicy): readonly DecidedChange[] {
     return this.changes.map((change) => ({ ...change, decision: decisionFor(change, policy, this.versions) }));
   }
 
-  /** Comme `decide`, mais refuse le plan s'il reste un conflit non tranché. */
+  /** Like `decide`, but rejects the plan if an unsettled conflict remains. */
   resolve(policy: ConflictPolicy): readonly DecidedChange[] {
     const decided = this.decide(policy);
     const conflicts = decided.filter(({ decision }) => decision === 'conflict');
@@ -77,7 +77,7 @@ export class ChangePlan {
 const isDependency = ({ kind, current, next }: PlannedChange): boolean =>
   (kind === 'dependency' || kind === 'devDependency') && isJsonString(current) && isJsonString(next);
 
-/** Une version dans un package.json est une chaîne ; toute autre forme est comparée telle quelle, donc en conflit. */
+/** A version in a package.json is a string; any other shape is compared as is, hence in conflict. */
 const isJsonString = (value: string | undefined): boolean => value !== undefined && value.startsWith('"');
 
 const decisionFor = (change: PlannedChange, policy: ConflictPolicy, versions: VersionComparator): Decision => {

@@ -8,7 +8,7 @@ const WEBAPP = 'src/webapp';
 export class VueRouterFactory {
   constructor(private readonly versions: NodePackagesVersionsReader) {}
 
-  /** Branche le routeur dans les fichiers de vue-app (`main.ts` et `App.vue`) par les repères que ce module y a posés. */
+  /** Wires the router into the vue-app files (`main.ts` and `App.vue`) through the needles that module placed there. */
   buildModule(properties: ModuleProperties): CraftModule {
     return moduleBuilder(properties)
       .addFile(SOURCE.file('router.ts'), `${WEBAPP}/router.ts`)

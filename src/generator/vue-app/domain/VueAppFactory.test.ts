@@ -7,21 +7,21 @@ import { VueAppFactory } from './VueAppFactory.js';
 describe('VueAppFactory', () => {
   const factory = new VueAppFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
-  it('crée l’application Vue et proxifie /api vers le serveur', () => {
+  it('creates the Vue application and proxies /api to the server', () => {
     const module = factory.buildModule(propertiesFixture({ serverPort: 4321 }));
 
     const result = assertThatModule(module)
       .hasFiles('src/webapp/main.ts', 'src/webapp/env.d.ts')
-      // Contrat avec les modules qui modifient main.ts (pinia...) : si un repère disparaît, ils échouent.
+      // Contract with the modules that modify main.ts (pinia...): if a needle disappears, they fail.
       .hasFileContaining('src/webapp/main.ts', 'crafttype-needle-main-imports', 'crafttype-needle-main-plugins')
       .hasFileContaining('vite.config.ts', 'http://127.0.0.1:4321')
-      // App.vue est copié tel quel : ses {{ }} ne doivent pas être interprétés par mustache.
+      // App.vue is copied as is: its {{ }} must not be interpreted by mustache.
       .hasFileContaining('src/webapp/App.vue', '{{ status }}', 'crafttype-needle-app-template');
 
     expect(result.hasPackageJson().devDependencies).toHaveProperty('vite');
   });
 
-  it('ajoute le typage du front : tsc sur src/webapp, avec la bibliothèque DOM et sans les types de Node', () => {
+  it('adds front-end typing: tsc on src/webapp, with the DOM library and without Node types', () => {
     const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining(
       'tsconfig.webapp.json',
       '"include": ["src/webapp"]',

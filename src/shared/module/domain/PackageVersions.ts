@@ -12,8 +12,8 @@ export class PackageVersions {
   }
 }
 
-/** Port : lit le catalogue de versions (dossier resources/generator/dependencies). */
+/** Port: reads the version catalog (resources/generator/dependencies folder). */
 export interface NodePackagesVersionsReader {
-  /** `common` pour les versions partagées, ou le nom d'un framework (`vue`). */
+  /** `common` for the shared versions, or the name of a framework (`vue`). */
   get(source?: string): PackageVersions;
 }

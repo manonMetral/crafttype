@@ -6,8 +6,8 @@ import { runCli } from '../../shared/module/infrastructure/primary/cli.js';
 import { databaseModuleResources } from '../../shared/test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../shared/test/ModuleAssertions.js';
 
-// Équivalent des tests Cucumber de Seed4J : on passe par la porte d'entrée (ici la CLI) et on vérifie
-// seulement qu'un module est bien branché de bout en bout, sans dupliquer les tests de fabrique.
+// Equivalent of Seed4J's Cucumber tests: we go through the entry point (here the CLI) and only check
+// that a module is wired end to end, without duplicating the factory tests.
 const run = (...argv: string[]) => {
   const lines: string[] = [];
   const code = runCli(argv, createModulesApplicationService(), (line) => lines.push(line));
@@ -15,7 +15,7 @@ const run = (...argv: string[]) => {
 };
 
 describe('CLI', () => {
-  it('liste les modules du catalogue', () => {
+  it('lists the modules of the catalog', () => {
     const { code, output } = run('list');
 
     expect(code).toBe(0);
@@ -23,7 +23,7 @@ describe('CLI', () => {
     expect(output).toContain('vue-app');
   });
 
-  it('applique un module dans un dossier', () => {
+  it('applies a module in a folder', () => {
     const projectFolder = tmpDirForTest();
 
     const { code } = run('apply', 'init', '--project-folder', projectFolder);
@@ -32,21 +32,21 @@ describe('CLI', () => {
     expect(existsSync(join(projectFolder, 'package.json'))).toBe(true);
   });
 
-  it('explique ce qui manque quand l’ordre n’est pas respecté', () => {
+  it('explains what is missing when the order is not respected', () => {
     const { code, output } = run('apply', 'vitest', '--project-folder', tmpDirForTest());
 
     expect(code).toBe(1);
-    expect(output).toBe("Erreur : Le module vitest requiert d'abord : typescript");
+    expect(output).toBe('Error: Module vitest requires first: typescript');
   });
 
-  it('nomme l’option manquante avec son flag', () => {
+  it('names the missing option with its flag', () => {
     const { code, output } = run('apply', 'init');
 
     expect(code).toBe(1);
-    expect(output).toBe('Erreur : Option obligatoire manquante : --project-folder');
+    expect(output).toBe('Error: Missing required option: --project-folder');
   });
 
-  it('refuse un port invalide en citant l’option', () => {
+  it('refuses an invalid port by naming the option', () => {
     const projectFolder = tmpDirForTest();
     for (const module of ['init', 'typescript', 'vitest']) {
       run('apply', module, '--project-folder', projectFolder);
@@ -55,29 +55,29 @@ describe('CLI', () => {
     const { code, output } = run('apply', 'fastify-server', '--project-folder', projectFolder, '--server-port', 'abc');
 
     expect(code).toBe(1);
-    expect(output).toContain('Erreur : Option --server-port invalide');
+    expect(output).toContain('Error: Invalid option --server-port');
     expect(existsSync(join(projectFolder, 'src/server'))).toBe(false);
   });
 
-  it('refuse un nom de projet invalide', () => {
-    const { code, output } = run('apply', 'init', '--project-folder', tmpDirForTest(), '--project-name', 'Mon App');
+  it('refuses an invalid project name', () => {
+    const { code, output } = run('apply', 'init', '--project-folder', tmpDirForTest(), '--project-name', 'My App');
 
     expect(code).toBe(1);
-    expect(output).toContain('Erreur : Option --project-name invalide');
+    expect(output).toContain('Error: Invalid option --project-name');
   });
 
-  describe('aide', () => {
+  describe('help', () => {
     it.each([[[]], [['help']], [['--help']], [['-h']], [['apply', '--help']], [['apply', '-h']]])(
-      'affiche l’usage et réussit avec %j',
+      'prints the usage and succeeds with %j',
       (argv) => {
         const { code, output } = run(...argv);
 
         expect(code).toBe(0);
-        expect(output).toContain('Usage :');
+        expect(output).toContain('Usage:');
       },
     );
 
-    it('affiche les options d’un module avec -h comme avec --help', () => {
+    it('prints the options of a module with -h as with --help', () => {
       const long = run('apply', 'fastify-server', '--help');
       const short = run('apply', 'fastify-server', '-h');
 
@@ -85,61 +85,61 @@ describe('CLI', () => {
       expect(short.output).toContain('--server-port');
     });
 
-    it('refuse une commande inconnue avec l’usage et un code d’erreur', () => {
-      const { code, output } = run('inconnue');
+    it('refuses an unknown command with the usage and an error code', () => {
+      const { code, output } = run('unknown');
 
       expect(code).toBe(1);
-      expect(output).toContain('Usage :');
+      expect(output).toContain('Usage:');
     });
 
-    it('refuse apply sans module', () => {
+    it('refuses apply without a module', () => {
       expect(run('apply').code).toBe(1);
     });
   });
 
-  it('signale une option inconnue sans stack trace', () => {
+  it('reports an unknown option without a stack trace', () => {
     const { code, output } = run('apply', 'init', '--foo');
 
     expect(code).toBe(1);
-    expect(output).toContain('Erreur : option inconnue : --foo');
-    expect(output).toContain('Usage :');
+    expect(output).toContain('Error: unknown option: --foo');
+    expect(output).toContain('Usage:');
   });
 
-  it('signale une option sans valeur sans stack trace', () => {
+  it('reports an option without a value without a stack trace', () => {
     const { code, output } = run('apply', 'init', '--project-folder');
 
     expect(code).toBe(1);
-    expect(output).toContain("Erreur : valeur manquante ou invalide pour l'option --project-folder");
-    expect(output).toContain('Usage :');
+    expect(output).toContain('Error: missing or invalid value for option --project-folder');
+    expect(output).toContain('Usage:');
   });
 
-  it('signale un argument en trop avec la première ligne de l’erreur', () => {
-    const { code, output } = run('apply', 'init', 'en-trop', '--project-folder', tmpDirForTest());
+  it('reports an extra argument with the first line of the error', () => {
+    const { code, output } = run('apply', 'init', 'extra', '--project-folder', tmpDirForTest());
 
     expect(code).toBe(1);
-    expect(output).toMatch(/^Erreur : /);
-    expect(output).toContain('Usage :');
+    expect(output).toMatch(/^Error: /);
+    expect(output).toContain('Usage:');
   });
 
-  it('refuse d’écraser un fichier modifié, sauf avec --force', () => {
+  it('refuses to overwrite a modified file, except with --force', () => {
     const projectFolder = tmpDirForTest();
     run('apply', 'init', '--project-folder', projectFolder);
-    writeFileSync(join(projectFolder, 'README.md'), 'mon readme');
+    writeFileSync(join(projectFolder, 'README.md'), 'my readme');
 
     const refused = run('apply', 'init', '--project-folder', projectFolder);
 
     expect(refused.code).toBe(1);
     expect(refused.output).toContain('README.md');
     expect(refused.output).toContain('--force');
-    expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('mon readme');
+    expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('my readme');
 
     const forced = run('apply', 'init', '--project-folder', projectFolder, '--force');
 
     expect(forced.code).toBe(0);
-    expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toContain('Projet généré avec crafttype');
+    expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toContain('Project generated with crafttype');
   });
 
-  it('signale un package.json invalide sans stack trace', () => {
+  it('reports an invalid package.json without a stack trace', () => {
     const projectFolder = tmpDirForTest();
     for (const module of ['init', 'typescript']) {
       run('apply', module, '--project-folder', projectFolder);
@@ -149,18 +149,18 @@ describe('CLI', () => {
     const { code, output } = run('apply', 'vitest', '--project-folder', projectFolder);
 
     expect(code).toBe(1);
-    expect(output).toContain('Erreur : Fichier package.json invalide');
+    expect(output).toContain('Error: Invalid file package.json');
   });
 
-  describe('conflits', () => {
+  describe('conflicts', () => {
     const initialized = () => {
       const projectFolder = tmpDirForTest();
       run('apply', 'init', '--project-folder', projectFolder);
-      writeFileSync(join(projectFolder, 'README.md'), 'mon readme');
+      writeFileSync(join(projectFolder, 'README.md'), 'my readme');
       return projectFolder;
     };
 
-    it('garde l’existant avec --skip-conflicts et le dit', () => {
+    it('keeps the existing items with --skip-conflicts and says so', () => {
       const projectFolder = initialized();
 
       const { code, output } = run(
@@ -169,17 +169,17 @@ describe('CLI', () => {
         '--project-folder',
         projectFolder,
         '--project-name',
-        'autre',
+        'other',
         '--skip-conflicts',
       );
 
       expect(code).toBe(0);
-      expect(output).toContain('ignorés : ');
-      expect(output).toContain('ignoré : README.md');
-      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('mon readme');
+      expect(output).toContain('skipped: ');
+      expect(output).toContain('skipped: README.md');
+      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('my readme');
     });
 
-    it('indique les deux issues quand un conflit bloque', () => {
+    it('indicates both ways out when a conflict blocks', () => {
       const { code, output } = run('apply', 'init', '--project-folder', initialized());
 
       expect(code).toBe(1);
@@ -187,44 +187,44 @@ describe('CLI', () => {
       expect(output).toContain('--force');
     });
 
-    it('refuse --force avec --skip-conflicts', () => {
+    it('refuses --force with --skip-conflicts', () => {
       const { code, output } = run('apply', 'init', '--project-folder', initialized(), '--force', '--skip-conflicts');
 
       expect(code).toBe(1);
-      expect(output).toContain('--force et --skip-conflicts sont incompatibles');
+      expect(output).toContain('--force and --skip-conflicts are incompatible');
     });
 
-    it('simule sans écrire avec --dry-run', () => {
+    it('simulates without writing with --dry-run', () => {
       const projectFolder = tmpDirForTest();
 
       const { code, output } = run('apply', 'init', '--project-folder', projectFolder, '--dry-run');
 
       expect(code).toBe(0);
-      expect(output).toContain('Simulation du module init');
-      expect(output).toMatch(/créer\s+README\.md/);
+      expect(output).toContain('Dry run of module init');
+      expect(output).toMatch(/create\s+README\.md/);
       expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
       expect(existsSync(join(projectFolder, '.crafttype'))).toBe(false);
     });
 
-    it('signale les conflits en simulation avec un code de sortie 1', () => {
+    it('reports the conflicts in a dry run with exit code 1', () => {
       const projectFolder = initialized();
 
       const { code, output } = run('apply', 'init', '--project-folder', projectFolder, '--dry-run');
 
       expect(code).toBe(1);
-      expect(output).toMatch(/conflit\s+README\.md/);
+      expect(output).toMatch(/conflict\s+README\.md/);
       expect(output).toContain('--skip-conflicts');
-      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('mon readme');
+      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('my readme');
     });
 
-    it('simule le remplacement avec --dry-run --force', () => {
+    it('simulates the replacement with --dry-run --force', () => {
       const { code, output } = run('apply', 'init', '--project-folder', initialized(), '--dry-run', '--force');
 
       expect(code).toBe(0);
-      expect(output).toMatch(/remplacer\s+README\.md/);
+      expect(output).toMatch(/replace\s+README\.md/);
     });
 
-    it('conserve une version plus récente et le dit, sans conflit', () => {
+    it('keeps a newer version and says so, without a conflict', () => {
       const projectFolder = tmpDirForTest();
       for (const module of ['init', 'typescript']) {
         run('apply', module, '--project-folder', projectFolder);
@@ -237,15 +237,15 @@ describe('CLI', () => {
       const real = run('apply', 'typescript', '--project-folder', projectFolder, '--force');
 
       expect(dryRun.code).toBe(0);
-      expect(dryRun.output).toMatch(/conserver\s+package\.json : devDependencies\.typescript \(existant : "99\.0\.0"/);
+      expect(dryRun.output).toMatch(/keep\s+package\.json: devDependencies\.typescript \(existing: "99\.0\.0"/);
       expect(real.code).toBe(0);
-      expect(real.output).toContain('versions conservées : 1');
+      expect(real.output).toContain('kept versions: 1');
       expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).devDependencies.typescript).toBe(
         '99.0.0',
       );
     });
   });
-  describe('propriétés propres à un module', () => {
+  describe('properties specific to a module', () => {
     const runDatabase = (...argv: string[]) => {
       const lines: string[] = [];
       const code = runCli(argv, createModulesApplicationService({ extraResources: databaseModuleResources }), (line) =>
@@ -254,7 +254,7 @@ describe('CLI', () => {
       return { code, output: lines.join('\n') };
     };
 
-    it('dérive les options de la définition du module', () => {
+    it('derives the options from the module definition', () => {
       const projectFolder = tmpDirForTest();
 
       const { code } = runDatabase(
@@ -274,7 +274,7 @@ describe('CLI', () => {
       expect(scripts).toEqual({ 'db:info': 'echo shop:25' });
     });
 
-    it('active une propriété booléenne avec son option seule', () => {
+    it('enables a boolean property with its option alone', () => {
       const projectFolder = tmpDirForTest();
 
       runDatabase('apply', 'database', '--project-folder', projectFolder, '--database-name', 'shop', '--migrations');
@@ -284,11 +284,11 @@ describe('CLI', () => {
       );
     });
 
-    it('nomme l’option manquante ou invalide avec son flag', () => {
+    it('names the missing or invalid option with its flag', () => {
       const projectFolder = tmpDirForTest();
 
       expect(runDatabase('apply', 'database', '--project-folder', projectFolder).output).toBe(
-        'Erreur : Option obligatoire manquante : --database-name',
+        'Error: Missing required option: --database-name',
       );
       expect(
         runDatabase(
@@ -301,10 +301,10 @@ describe('CLI', () => {
           '--pool-size',
           '0',
         ).output,
-      ).toBe('Erreur : Option --pool-size invalide : la taille doit valoir au moins 1');
+      ).toBe('Error: Invalid option --pool-size: the size must be at least 1');
     });
 
-    it('refuse l’option d’un autre module', () => {
+    it('refuses the option of another module', () => {
       const { code, output } = runDatabase(
         'apply',
         'database-seed',
@@ -315,10 +315,10 @@ describe('CLI', () => {
       );
 
       expect(code).toBe(1);
-      expect(output).toContain('Erreur : option inconnue : --pool-size');
+      expect(output).toContain('Error: unknown option: --pool-size');
     });
 
-    it('décrit les options du module avec --help, sans rien écrire', () => {
+    it('describes the module options with --help, without writing anything', () => {
       const projectFolder = tmpDirForTest();
 
       const { code, output } = runDatabase('apply', 'database', '--help', '--project-folder', projectFolder);
@@ -326,32 +326,32 @@ describe('CLI', () => {
       expect(code).toBe(0);
       expect(output).toBe(
         [
-          'Module database : Configure la base de données',
-          'Options :',
-          '  --project-folder <texte>  (obligatoire) Dossier du projet à générer ou à enrichir',
-          '  --database-name <texte>   (obligatoire) Nom de la base',
-          '  --pool-size <nombre>      (défaut : 10) Taille du pool de connexions',
-          '  --migrations              (défaut : true) Active les migrations',
+          'Module database: Configures the database',
+          'Options:',
+          '  --project-folder <text>  (required) Folder of the project to generate or extend',
+          '  --database-name <text>   (required) Database name',
+          '  --pool-size <number>     (default: 10) Connection pool size',
+          '  --migrations             (default: true) Enables migrations',
         ].join('\n'),
       );
       expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
     });
   });
 
-  it('refuse un module inconnu avant de lire ses options', () => {
+  it('refuses an unknown module before reading its options', () => {
     const { code, output } = run('apply', 'nope', '--project-folder', tmpDirForTest());
 
     expect(code).toBe(1);
-    expect(output).toBe('Erreur : Module inconnu : nope');
+    expect(output).toBe('Error: Unknown module: nope');
   });
 
-  it('demande le module juste après apply', () => {
+  it('expects the module right after apply', () => {
     const { code, output } = run('apply', '--project-folder', tmpDirForTest(), 'init');
 
     expect(code).toBe(1);
-    expect(output).toContain('Usage :');
+    expect(output).toContain('Usage:');
   });
-  describe('modification d’un fichier existant', () => {
+  describe('modification of an existing file', () => {
     const withVueApp = () => {
       const projectFolder = tmpDirForTest();
       for (const module of ['init', 'typescript', 'vue-app']) {
@@ -360,31 +360,31 @@ describe('CLI', () => {
       return projectFolder;
     };
 
-    it('branche pinia dans le main.ts et le dit dans le compte rendu', () => {
+    it('wires pinia in main.ts and says so in the report', () => {
       const projectFolder = withVueApp();
 
       const { code, output } = run('apply', 'pinia', '--project-folder', projectFolder);
 
       expect(code).toBe(0);
-      expect(output).toContain('(créés : 1, modifiés : 1, remplacés : 0, inchangés : 0, ignorés : 0)');
-      expect(output).toContain('  modifié : src/webapp/main.ts');
+      expect(output).toContain('(created: 1, modified: 1, replaced: 0, unchanged: 0, skipped: 0)');
+      expect(output).toContain('  modified: src/webapp/main.ts');
       expect(readFileSync(join(projectFolder, 'src/webapp/main.ts'), 'utf8')).toContain(
         "import { createPinia } from 'pinia';",
       );
     });
 
-    it('ajoute le routeur : fichiers créés, main.ts et App.vue modifiés', () => {
+    it('adds the router: files created, main.ts and App.vue modified', () => {
       const projectFolder = withVueApp();
 
       const { code, output } = run('apply', 'vue-router', '--project-folder', projectFolder);
 
       expect(code).toBe(0);
-      expect(output).toContain('(créés : 3, modifiés : 2, remplacés : 0, inchangés : 0, ignorés : 0)');
-      expect(output).toContain('  modifié : src/webapp/App.vue');
+      expect(output).toContain('(created: 3, modified: 2, replaced: 0, unchanged: 0, skipped: 0)');
+      expect(output).toContain('  modified: src/webapp/App.vue');
       expect(existsSync(join(projectFolder, 'src/webapp/router.ts'))).toBe(true);
     });
 
-    it('branche config et logs dans le serveur et le dit dans le compte rendu', () => {
+    it('wires config and logs in the server and says so in the report', () => {
       const projectFolder = tmpDirForTest();
       for (const module of ['init', 'typescript', 'vitest', 'fastify-server']) {
         run('apply', module, '--project-folder', projectFolder);
@@ -393,20 +393,20 @@ describe('CLI', () => {
       const config = run('apply', 'config', '--project-folder', projectFolder);
       const logs = run('apply', 'logs', '--project-folder', projectFolder);
 
-      expect(config.output).toContain('(créés : 2, modifiés : 1, remplacés : 0, inchangés : 0, ignorés : 0)');
-      expect(config.output).toContain('  modifié : src/server/main.ts');
-      expect(logs.output).toContain('(créés : 2, modifiés : 1, remplacés : 0, inchangés : 0, ignorés : 0)');
-      expect(logs.output).toContain('  modifié : src/server/app.ts');
+      expect(config.output).toContain('(created: 2, modified: 1, replaced: 0, unchanged: 0, skipped: 0)');
+      expect(config.output).toContain('  modified: src/server/main.ts');
+      expect(logs.output).toContain('(created: 2, modified: 1, replaced: 0, unchanged: 0, skipped: 0)');
+      expect(logs.output).toContain('  modified: src/server/app.ts');
     });
 
-    it('annonce la modification en simulation', () => {
+    it('announces the modification in a dry run', () => {
       const { code, output } = run('apply', 'pinia', '--project-folder', withVueApp(), '--dry-run');
 
       expect(code).toBe(0);
-      expect(output).toContain('  modifier   src/webapp/main.ts');
+      expect(output).toContain('  modify     src/webapp/main.ts');
     });
 
-    it('refuse proprement quand le repère manque', () => {
+    it('refuses cleanly when the needle is missing', () => {
       const projectFolder = withVueApp();
       const main = join(projectFolder, 'src/webapp/main.ts');
       writeFileSync(main, readFileSync(main, 'utf8').replace('// crafttype-needle-main-imports\n', ''));
@@ -414,7 +414,7 @@ describe('CLI', () => {
       const { code, output } = run('apply', 'pinia', '--project-folder', projectFolder);
 
       expect(code).toBe(1);
-      expect(output).toContain('Erreur : Impossible de modifier src/webapp/main.ts : repère introuvable');
+      expect(output).toContain('Error: Cannot modify src/webapp/main.ts: needle not found');
       expect(output).toContain('crafttype-needle-main-imports');
     });
   });

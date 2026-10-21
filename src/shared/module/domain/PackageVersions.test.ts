@@ -5,12 +5,12 @@ import { PackageVersions } from './PackageVersions.js';
 describe('PackageVersions', () => {
   const versions = new PackageVersions({ fastify: '5.12.7' });
 
-  it('rend la version du catalogue', () => {
+  it('returns the catalog version', () => {
     expect(versions.get('fastify')).toBe('5.12.7');
   });
 
-  it('refuse un paquet absent du catalogue en le nommant', () => {
-    expect(() => versions.get('inconnu')).toThrow(UnknownPackageVersionError);
-    expect(() => versions.get('inconnu')).toThrow(/inconnu/);
+  it('rejects a package missing from the catalog, naming it', () => {
+    expect(() => versions.get('unknown')).toThrow(UnknownPackageVersionError);
+    expect(() => versions.get('unknown')).toThrow(/unknown/);
   });
 });

@@ -10,7 +10,7 @@ export const createLogsModuleResource = (): ModuleResource => {
   return moduleResource()
     .slug(logsSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-    .apiDoc('Serveur', 'Ajoute des logs structurés (niveau par LOG_LEVEL, identifiant de requête validé)')
+    .apiDoc('Server', 'Adds structured logs (level from LOG_LEVEL, validated request id)')
     .dependsOn('fastify-server')
     .tags('server', 'logging')
     .factory((properties) => modules.buildModule(properties));

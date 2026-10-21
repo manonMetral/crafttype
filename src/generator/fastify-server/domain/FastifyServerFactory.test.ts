@@ -7,13 +7,13 @@ import { FastifyServerFactory } from './FastifyServerFactory.js';
 describe('FastifyServerFactory', () => {
   const factory = new FastifyServerFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
-  it('crée le serveur sur le port demandé', () => {
+  it('creates the server on the requested port', () => {
     const module = factory.buildModule(propertiesFixture({ serverPort: 4321 }));
 
     const result = assertThatModule(module)
       .hasFiles('src/server/app.ts', 'src/server/app.test.ts', 'tsconfig.build.json')
       .hasFileContaining('src/server/main.ts', 'port: 4321')
-      // Contrat avec les modules qui modifient app.ts et main.ts (config, logs...) : si un repère disparaît, ils échouent.
+      // Contract with the modules that modify app.ts and main.ts (config, logs...): if a needle disappears, they fail.
       .hasFileContaining(
         'src/server/app.ts',
         'crafttype-needle-app-imports',

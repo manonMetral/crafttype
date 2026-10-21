@@ -7,7 +7,7 @@ import { PrettierFactory } from './PrettierFactory.js';
 describe('PrettierFactory', () => {
   const factory = new PrettierFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
-  it('ajoute la configuration Prettier, la dépendance et les scripts de formatage', () => {
+  it('adds the Prettier configuration, the dependency and the formatting scripts', () => {
     const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining(
       '.prettierrc.json',
       '"singleQuote": true',

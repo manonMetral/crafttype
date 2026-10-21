@@ -11,7 +11,7 @@ export const createFastifyServerModuleResource = (versions: NodePackagesVersions
   return moduleResource()
     .slug(fastifyServerSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().addServerPort().build())
-    .apiDoc('Serveur', 'Ajoute un serveur Fastify avec un endpoint de santé')
+    .apiDoc('Server', 'Adds a Fastify server with a health endpoint')
     .dependsOn('typescript', 'vitest')
     .tags('server')
     .factory((properties) => modules.buildModule(properties));

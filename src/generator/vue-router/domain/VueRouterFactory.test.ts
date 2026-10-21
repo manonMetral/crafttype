@@ -9,7 +9,7 @@ import { VueRouterFactory } from './VueRouterFactory.js';
 describe('VueRouterFactory', () => {
   const factory = new VueRouterFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
-  // Ce que vue-app a déjà créé : seuls les repères comptent pour ce module.
+  // What vue-app has already created: only the needles matter to this module.
   const projectWithVueApp = (): string => {
     const projectFolder = tmpDirForTest();
     mkdirSync(join(projectFolder, 'src/webapp'), { recursive: true });
@@ -24,15 +24,15 @@ describe('VueRouterFactory', () => {
     return projectFolder;
   };
 
-  it('crée le routeur et sa page d’accueil, copiés tels quels', () => {
+  it('creates the router and its home page, copied as is', () => {
     const result = assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithVueApp() })))
       .hasFileContaining('src/webapp/router.ts', "from 'vue-router'", "path: '/'")
-      .hasFileContaining('src/webapp/views/HomeView.vue', '<h2>Accueil</h2>');
+      .hasFileContaining('src/webapp/views/HomeView.vue', '<h2>Home</h2>');
 
     expect(result.hasPackageJson().dependencies).toHaveProperty('vue-router');
   });
 
-  it('branche le routeur dans main.ts et affiche la vue courante dans App.vue', () => {
+  it('wires the router into main.ts and displays the current view in App.vue', () => {
     assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithVueApp() })))
       .hasFileContaining('src/webapp/main.ts', "import { router } from './router.js';", 'app.use(router);')
       .hasFileContaining('src/webapp/App.vue', '    <RouterView />\n    <!-- crafttype-needle-app-template -->');
