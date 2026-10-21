@@ -26,6 +26,11 @@ Applied modules are recorded in the generated project's `.crafttype/modules/hist
 Options already given to a previous module (`--project-name` for `init`, `--server-port` for `fastify-server`) are reused by the following ones: `vue-app` proxies to the port chosen for the server.
 Each module declares its own options: `npm run cli -- apply <module> --help` lists them.
 
+**Server port.** The port is written when the files are generated: in `src/server/main.ts` (`fastify-server`) and in the dev proxy of `vite.config.ts` (`vue-app`). Nothing keeps them in sync afterwards:
+
+- With the `config` module, the `PORT` environment variable overrides the port of `main.ts`. `webapp:dev` still proxies to the generated port: run both with the same port, or edit `server.proxy` in `vite.config.ts`.
+- To change the port of an existing project, edit `src/server/main.ts` and the proxy in `vite.config.ts` by hand. Applying `vue-app` again with `--server-port` does not help: without an option it stops on the files that differ, `--skip-conflicts` keeps the old proxy, and `--force` also replaces `src/webapp/main.ts` and `src/webapp/App.vue`, which loses the code that `pinia` and `vue-router` inserted.
+
 A module never replaces a file or a `package.json` entry whose content differs: by default it lists the conflicts and stops, without writing anything. Three options change this behavior:
 
 | Option | Effect |

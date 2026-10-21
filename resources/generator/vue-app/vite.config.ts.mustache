@@ -5,6 +5,8 @@ export default defineConfig({
   root: 'src/webapp',
   plugins: [vue()],
   server: {
+    // Port written when the project was generated: update it if the server
+    // listens elsewhere (src/server/main.ts, PORT variable).
     proxy: { '/api': 'http://127.0.0.1:{{serverPort}}' },
   },
   build: {
