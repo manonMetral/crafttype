@@ -8,6 +8,7 @@ import { from, moduleBuilder } from '../domain/CraftModule.js';
 import { ModulePropertiesDefinition } from '../domain/ModuleProperties.js';
 import {
   DuplicateDestinationError,
+  InvalidDestinationError,
   InvalidProjectFileError,
   InvalidPropertyError,
   MissingModuleDependenciesError,
@@ -673,6 +674,20 @@ describe('ModulesApplicationService', () => {
   });
 
   describe('destinations of a module', () => {
+    it.each(['../outside.txt', 'src/../../outside.txt'])(
+      'refuses %j, which leaves the project folder, and writes nothing',
+      (path) => {
+        const parent = tmpDirForTest();
+        const projectFolder = join(parent, 'app');
+        const module = moduleBuilder(ModulePropertiesDefinition.builder().build().resolve({ projectFolder }))
+          .addFile(from('init').template('editorconfig'), path)
+          .build();
+
+        expect(() => createModulesApplicationService().applyModule(module)).toThrow(InvalidDestinationError);
+        expect(existsSync(join(parent, 'outside.txt'))).toBe(false);
+      },
+    );
+
     it('refuses a module that declares the same file under two spellings, and writes nothing', () => {
       const projectFolder = tmpDirForTest();
       const module = moduleBuilder(ModulePropertiesDefinition.builder().build().resolve({ projectFolder }))

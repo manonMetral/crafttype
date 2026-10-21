@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { from, moduleBuilder } from './CraftModule.js';
 import { normalizeDestinations } from './destinations.js';
-import { DuplicateDestinationError } from './errors.js';
+import { DuplicateDestinationError, InvalidDestinationError } from './errors.js';
 import { ModulePropertiesDefinition } from './ModuleProperties.js';
 import type { PathNormalizer } from './ports.js';
 
@@ -65,5 +65,28 @@ describe('normalizeDestinations', () => {
 
     expect(() => normalizeDestinations(created.build(), paths)).toThrow(DuplicateDestinationError);
     expect(() => normalizeDestinations(edited.build(), paths)).toThrow(DuplicateDestinationError);
+  });
+
+  describe('invalid destinations', () => {
+    it.each([
+      ['../x.ts', 'leaves the project folder'],
+      ['..', 'leaves the project folder'],
+      ['/etc/x', 'relative to the project folder'],
+      ['C:/x.ts', 'relative to the project folder'],
+      ['src\\a.ts', 'not a backslash'],
+      ['src/', 'not a folder'],
+      ['.', 'not a folder'],
+    ])('refuses the file %j (%s)', (destination, reason) => {
+      const module = demo().addFile(from('demo').file('a.txt'), destination).build();
+
+      expect(() => normalizeDestinations(module, paths)).toThrow(InvalidDestinationError);
+      expect(() => normalizeDestinations(module, paths)).toThrow(reason);
+    });
+
+    it('applies the same rules to a file that is modified, and names the declared path', () => {
+      const module = demo().insertAtNeedle('../main.ts', 'imports', 'x').build();
+
+      expect(() => normalizeDestinations(module, paths)).toThrow('Invalid destination "../main.ts"');
+    });
   });
 });
