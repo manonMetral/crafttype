@@ -8,6 +8,15 @@ export interface ProjectFiles {
   write(projectFolder: string, path: string, content: string): void;
 }
 
+/**
+ * Port: normalizes the destination path a module declares for a file (`./src//a.ts` and `src/x/../a.ts` become
+ * `src/a.ts`), so that two spellings of the same file are recognized as one. Paths use `/` and are relative to the
+ * project folder.
+ */
+export interface PathNormalizer {
+  normalize(path: string): string;
+}
+
 /** Port: reads the source files of a module (resources/generator/<module>/). */
 export interface ModuleResourcesReader {
   read(module: string, path: string): string;

@@ -1,5 +1,5 @@
-import { readdirSync } from 'node:fs';
-import { describe, it } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
 import { RelativePath } from 'arch-unit-ts/dist/arch-unit/core/domain/RelativePath.js';
 import { TypeScriptProject } from 'arch-unit-ts/dist/arch-unit/core/domain/TypeScriptProject.js';
 import { Architectures } from 'arch-unit-ts/dist/arch-unit/library/Architectures.js';
@@ -13,10 +13,10 @@ import { classes, noClasses } from 'arch-unit-ts/dist/main.js';
 // Outside the analyzed scope:
 // - tests (`*.test.ts`) and test helpers (`shared/test`, `src/test`);
 // - `composition.ts` and `generator/modules.ts`, which assemble the contexts and therefore know all of them;
-// - `node:*` imports and library imports, which arch-unit-ts does not resolve. The domain imports `node:path`
-//   (`posix.normalize` in `CraftModule.ts`): this is a deliberate exception, the function is pure. A dependency
-//   on a third-party library, on the other hand, must go through a domain port (see `VersionComparator`); the rule below
-//   only detects it if the library ships its types in `node_modules`, which is the case of `semver`.
+// - `node:*` imports and library imports, which arch-unit-ts does not resolve. Anything external goes through a
+//   domain port (see `VersionComparator`, `PathNormalizer`). The rules below only detect a library if it ships its types
+//   in `node_modules`, which is the case of `semver`; the `node:*` imports are covered by a plain source scan
+//   ("no node: import in domain or application").
 const sources = new TypeScriptProject(RelativePath.of('src'), '**/*.test.ts', '**/shared/test/**', '**/src/test/**');
 
 const SHARED_KERNEL = 'src.shared.module';
@@ -24,6 +24,12 @@ const generators = readdirSync('src/generator', { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => `src.generator.${entry.name}`);
 const contexts = [SHARED_KERNEL, ...generators];
+
+const sourceFiles = (folder: string): string[] =>
+  readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
+    const path = `${folder}/${entry.name}`;
+    return entry.isDirectory() ? sourceFiles(path) : [path];
+  });
 
 describe('hexagonal architecture', () => {
   // A rule that checks no class always passes. `arch-unit-ts.json` allows empty rules
@@ -153,6 +159,22 @@ describe('hexagonal architecture', () => {
           .check(sources.allClasses());
       },
     );
+  });
+
+  describe('node built-ins', () => {
+    const inner = sourceFiles('src').filter(
+      (path) => /\/(domain|application)\//.test(path) && path.endsWith('.ts') && !path.endsWith('.test.ts'),
+    );
+
+    it('finds the domain and application files to scan', () => {
+      expect(inner.length).toBeGreaterThan(20);
+    });
+
+    it('no domain or application file imports a node: module', () => {
+      const offenders = inner.filter((path) => /from\s+['"]node:/.test(readFileSync(path, 'utf8')));
+
+      expect(offenders).toEqual([]);
+    });
   });
 
   describe('layers', () => {

@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../../composition.js';
 import { databaseModuleResources } from '../../test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../test/ModuleAssertions.js';
+import { from, moduleBuilder } from '../domain/CraftModule.js';
+import { ModulePropertiesDefinition } from '../domain/ModuleProperties.js';
 import {
+  DuplicateDestinationError,
   InvalidProjectFileError,
   InvalidPropertyError,
   MissingModuleDependenciesError,
@@ -666,6 +669,19 @@ describe('ModulesApplicationService', () => {
       rmSync(join(projectFolder, MAIN));
 
       expect(() => service.apply('pinia', { projectFolder })).toThrow(/src\/webapp\/main\.ts: file not found/);
+    });
+  });
+
+  describe('destinations of a module', () => {
+    it('refuses a module that declares the same file under two spellings, and writes nothing', () => {
+      const projectFolder = tmpDirForTest();
+      const module = moduleBuilder(ModulePropertiesDefinition.builder().build().resolve({ projectFolder }))
+        .addFile(from('init').template('editorconfig'), 'src/a.txt')
+        .addFile(from('init').template('editorconfig'), 'src/x/../a.txt')
+        .build();
+
+      expect(() => createModulesApplicationService().applyModule(module)).toThrow(DuplicateDestinationError);
+      expect(existsSync(join(projectFolder, 'src'))).toBe(false);
     });
   });
 });

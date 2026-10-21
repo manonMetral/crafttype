@@ -1,7 +1,4 @@
-// Deliberate exception to domain isolation: `posix.normalize` is a pure function (no I/O), it does not justify a
-// port. arch-unit-ts ignores `node:*` imports; any third-party library goes through a port.
-import { posix } from 'node:path';
-import { DuplicateDestinationError, NeedleError } from './errors.js';
+import { NeedleError } from './errors.js';
 import { isValidNeedleName, type FileEdit } from './needles.js';
 import type { ModuleProperties } from './ModuleProperties.js';
 import type { PackageVersions } from './PackageVersions.js';
@@ -63,14 +60,7 @@ export class CraftModuleBuilder {
   constructor(private readonly properties: ModuleProperties) {}
 
   addFile(source: Source, destination: string): this {
-    const normalized = posix.normalize(destination);
-    if (
-      this.files.some((file) => file.destination === normalized) ||
-      this.edits.some((edit) => edit.path === normalized)
-    ) {
-      throw new DuplicateDestinationError(normalized);
-    }
-    this.files.push({ ...source, destination: normalized });
+    this.files.push({ ...source, destination });
     return this;
   }
 
@@ -79,14 +69,10 @@ export class CraftModuleBuilder {
    * The module that creates this file must place the needle in it (see `documentation/module-creation.md`).
    */
   insertAtNeedle(path: string, needle: string, content: string): this {
-    const normalized = posix.normalize(path);
     if (!isValidNeedleName(needle)) {
-      throw new NeedleError(normalized, needle, 'invalid needle name (lowercase letters, digits and hyphens)');
+      throw new NeedleError(path, needle, 'invalid needle name (lowercase letters, digits and hyphens)');
     }
-    if (this.files.some((file) => file.destination === normalized)) {
-      throw new DuplicateDestinationError(normalized);
-    }
-    this.edits.push({ path: normalized, needle, content });
+    this.edits.push({ path, needle, content });
     return this;
   }
 
