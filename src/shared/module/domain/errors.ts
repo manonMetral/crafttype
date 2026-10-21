@@ -44,7 +44,10 @@ export class InvalidPropertyDefinitionError extends CraftTypeError {
 }
 
 export class MissingModuleDependenciesError extends CraftTypeError {
-  constructor(slug: string, missing: readonly string[]) {
+  constructor(
+    slug: string,
+    readonly missing: readonly string[],
+  ) {
     super(`Module ${slug} requires these modules to be applied first: ${missing.join(', ')}`);
   }
 }

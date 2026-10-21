@@ -1,9 +1,11 @@
+import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { ApplyResult, ModulesApplicationService } from '../../application/ModulesApplicationService.js';
 import { describeConflict, describeChange, type ConflictPolicy, type DecidedChange } from '../../domain/ChangePlan.js';
 import {
   CraftTypeError,
   InvalidPropertyError,
+  MissingModuleDependenciesError,
   MissingPropertyError,
   ModuleConflictError,
 } from '../../domain/errors.js';
@@ -15,6 +17,7 @@ const USAGE = `Usage:
                   [--force | --skip-conflicts] [--dry-run]
   crafttype apply <module> --help
   crafttype --help
+  crafttype --version
 
 The module comes right after "apply". The properties it accepts (project name, port...) are listed by --help.
 
@@ -23,12 +26,16 @@ A module never replaces a file or a package.json entry whose content differs: by
   --skip-conflicts  applies the module and keeps the existing items that differ
   --dry-run         prints what the module would do, without writing anything`;
 
+/** Where the CLI writes (results on `out`, errors and usage-on-error on `err`) and the version `--version` prints. */
+export interface CliIo {
+  readonly out: (line: string) => void;
+  readonly err: (line: string) => void;
+  readonly version: string;
+}
+
 /** Primary adapter: translates the command line into calls to the application service. */
-export const runCli = (
-  argv: readonly string[],
-  service: ModulesApplicationService,
-  out: (line: string) => void,
-): number => {
+export const runCli = (argv: readonly string[], service: ModulesApplicationService, io: CliIo): number => {
+  const { out, err } = io;
   const [command, ...rest] = argv;
 
   try {
@@ -40,25 +47,30 @@ export const runCli = (
         }
         return 0;
       case 'apply':
-        return apply(rest, service, out);
+        return apply(rest, service, io);
       case undefined:
       case 'help':
       case '--help':
       case '-h':
         out(USAGE);
         return 0;
+      case '--version':
+      case '-v':
+        out(io.version);
+        return 0;
       default:
-        out(USAGE);
+        err(`Error: Unknown command: ${command}`);
+        err(USAGE);
         return 1;
     }
   } catch (error) {
     if (error instanceof CraftTypeError) {
-      out(`Error: ${describe(error)}`);
+      err(`Error: ${describe(error)}`);
       return 1;
     }
     if (isUsageError(error)) {
-      out(`Error: ${describeUsageError(error)}`);
-      out(USAGE);
+      err(`Error: ${describeUsageError(error)}`);
+      err(USAGE);
       return 1;
     }
     throw error;
@@ -73,14 +85,14 @@ const COMMON_OPTIONS = {
   help: { type: 'boolean', short: 'h' },
 } as const;
 
-const apply = (args: readonly string[], service: ModulesApplicationService, out: (line: string) => void): number => {
+const apply = (args: readonly string[], service: ModulesApplicationService, { out, err }: CliIo): number => {
   const [slug, ...options] = args;
   if (slug === '--help' || slug === '-h') {
     out(USAGE);
     return 0;
   }
   if (slug === undefined || slug.startsWith('-')) {
-    out(USAGE);
+    err(USAGE);
     return 1;
   }
 
@@ -107,23 +119,37 @@ const apply = (args: readonly string[], service: ModulesApplicationService, out:
 
   const parsed: Readonly<Record<string, string | boolean | undefined>> = values;
   const raw: Record<string, PropertyValue> = {};
-  if (values['project-folder'] !== undefined) raw['projectFolder'] = values['project-folder'];
+  // Resolved here, not in the domain: `.` and `..` must name the project after the real folder.
+  if (values['project-folder'] !== undefined) raw['projectFolder'] = resolve(values['project-folder']);
   for (const { key } of definition.custom) {
     const value = parsed[toOption(key)];
     if (value !== undefined) raw[key] = value;
   }
 
   if (values.force === true && values['skip-conflicts'] === true) {
-    out('Error: --force and --skip-conflicts are incompatible');
-    out(USAGE);
+    err('Error: --force and --skip-conflicts are incompatible');
+    err(USAGE);
     return 1;
   }
   const onConflict: ConflictPolicy =
     values.force === true ? 'overwrite' : values['skip-conflicts'] === true ? 'skip' : 'fail';
 
-  const result = service.apply(slug, raw, { onConflict, dryRun: values['dry-run'] === true });
-  return report(result, String(raw['projectFolder']), out);
+  try {
+    const result = service.apply(slug, raw, { onConflict, dryRun: values['dry-run'] === true });
+    return report(result, String(raw['projectFolder']), out);
+  } catch (error) {
+    if (error instanceof MissingModuleDependenciesError) {
+      err(`Error: ${error.message}`);
+      err(
+        `Apply them first, for example: crafttype apply ${error.missing[0]} --project-folder ${shellQuote(String(raw['projectFolder']))}`,
+      );
+      return 1;
+    }
+    throw error;
+  }
 };
+
+const shellQuote = (text: string): string => (/\s/.test(text) ? `"${text}"` : text);
 
 const describeModule = (
   slug: string,
@@ -226,12 +252,19 @@ const isUsageError = (error: unknown): error is TypeError & { code: string } =>
   error.code.startsWith('ERR_PARSE_ARGS_');
 
 const describeUsageError = (error: TypeError & { code: string }): string => {
-  const option = /'(--?[^']+)'/.exec(error.message)?.[1];
+  // parseArgs writes `'--server-port <value>'` when the value is missing: keep the option name only.
+  const option = /'(--?[^'\s]+)/.exec(error.message)?.[1] ?? '?';
   switch (error.code) {
     case 'ERR_PARSE_ARGS_UNKNOWN_OPTION':
-      return `unknown option: ${option ?? '?'}`;
+      return `unknown option: ${option}`;
     case 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE':
-      return `missing or invalid value for option ${option ?? '?'}`;
+      if (error.message.includes('does not take an argument')) {
+        return `option ${option} does not take a value`;
+      }
+      if (error.message.includes('ambiguous')) {
+        return `value of option ${option} is missing or starts with a dash (write ${option}=<value>)`;
+      }
+      return `missing value for option ${option}`;
     default:
       return error.message.split('\n')[0] ?? error.message;
   }
