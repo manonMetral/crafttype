@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # Generates a complete application with all modules, then installs it, builds it and runs its tests.
 # Usage: tests-ci/generate.sh [output-folder]
+# By default the CLI runs from the sources (tsx). With CRAFTTYPE_BIN=/path/to/crafttype it runs that installed binary
+# instead (used by the CI to test the packed tarball).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="${1:-$(mktemp -d)/fullapp}"
-CRAFTTYPE=(npx --prefix "$ROOT" tsx "$ROOT/src/shared/module/infrastructure/primary/main.ts")
+if [ -n "${CRAFTTYPE_BIN:-}" ]; then
+  CRAFTTYPE=("$CRAFTTYPE_BIN")
+else
+  CRAFTTYPE=(npx --prefix "$ROOT" tsx "$ROOT/src/shared/module/infrastructure/primary/main.ts")
+fi
 
 # All catalog modules, in the order of `crafttype list` (dependencies come first).
 # Only `init` takes the project name: the other modules read it back from the history.

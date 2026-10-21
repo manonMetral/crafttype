@@ -2,6 +2,19 @@
   "name": "crafttype",
   "version": "0.1.0",
   "description": "Modular generator of Node.js (Fastify) and Vue.js projects, inspired by Seed4J",
+  "keywords": [
+    "generator",
+    "scaffolding",
+    "project-generator",
+    "cli",
+    "fastify",
+    "vue",
+    "vite",
+    "typescript",
+    "modular",
+    "seed4j"
+  ],
+  "author": "manonMetral (https://github.com/manonMetral)",
   "type": "module",
   "bin": {
     "crafttype": "./dist/shared/module/infrastructure/primary/main.js"
