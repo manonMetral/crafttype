@@ -12,10 +12,12 @@ import { insertAtNeedle, needleToken, type FileEdit } from '../domain/needles.js
 import type { KnownProperties, ModuleProperties, PropertyValue, RawProperties } from '../domain/ModuleProperties.js';
 import type { ModuleResource, ModuleSlug } from '../domain/ModuleResource.js';
 import type { CraftModule } from '../domain/CraftModule.js';
+import { normalizeDestinations } from '../domain/destinations.js';
 import type {
   AppliedModule,
   ModulesHistory,
   ModuleResourcesReader,
+  PathNormalizer,
   ProjectFiles,
   TemplateRenderer,
   VersionComparator,
@@ -28,6 +30,7 @@ export interface ModulesApplicationServiceDependencies {
   readonly renderer: TemplateRenderer;
   readonly history: ModulesHistory;
   readonly versions: VersionComparator;
+  readonly paths: PathNormalizer;
   readonly clock: () => Date;
 }
 
@@ -72,7 +75,9 @@ export class ModulesApplicationService {
   }
 
   apply(slug: ModuleSlug, raw: RawProperties, { onConflict = 'fail', dryRun = false }: ApplyOptions = {}): ApplyResult {
-    const { resource, properties, module } = this.buildModule(slug, raw, this.knownProperties(raw.projectFolder));
+    const built = this.buildModule(slug, raw, this.knownProperties(raw.projectFolder));
+    const { resource, properties } = built;
+    const module = normalizeDestinations(built.module, this.dependencies.paths);
 
     this.checkDependencies(resource, properties);
     const plan = this.plan(module);
@@ -98,7 +103,8 @@ export class ModulesApplicationService {
    * Nothing is written if an existing file or package.json entry would be overwritten by different content,
    * unless the policy allows it. Applying the same module again changes nothing.
    */
-  applyModule(module: CraftModule, { onConflict = 'fail' }: Pick<ApplyOptions, 'onConflict'> = {}): ApplyReport {
+  applyModule(declared: CraftModule, { onConflict = 'fail' }: Pick<ApplyOptions, 'onConflict'> = {}): ApplyReport {
+    const module = normalizeDestinations(declared, this.dependencies.paths);
     const changes = this.plan(module).resolve(onConflict);
     this.write(module, changes);
     return reportOf(changes);

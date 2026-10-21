@@ -37,7 +37,7 @@ export class EslintFactory {
 ```
 
 - `SOURCE.template('x')` reads `x.mustache` and renders it with the properties. `SOURCE.file('x')` copies without rendering: use it whenever the file contains `{{ }}` (Vue templates).
-- A destination file can be declared only once: a second `addFile` to the same path (`./src/a.txt` and `src/a.txt` count as the same) throws `DuplicateDestinationError` as soon as the module is built.
+- Destinations are checked when the module is applied, after normalization through the `PathNormalizer` port (`./src/a.txt`, `src//a.txt` and `src/x/../a.txt` all become `src/a.txt`). A destination must be a relative file path with `/` separators, inside the project folder: `../x.ts`, `/etc/x`, `C:/x.ts`, `src\a.ts` and `src/` are refused with an `InvalidDestinationError`. A file declared twice, even under two spellings, throws a `DuplicateDestinationError`; nothing is written in either case.
 - A dependency with no version in `resources/generator/dependencies/` makes the build fail. This is intended.
 
 ## 2. The versions

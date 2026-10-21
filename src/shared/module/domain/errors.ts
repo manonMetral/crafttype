@@ -62,6 +62,16 @@ export class DuplicateDestinationError extends CraftTypeError {
   }
 }
 
+/** A module declares a destination that is not a file path inside the project folder: a defect in the module definition. */
+export class InvalidDestinationError extends CraftTypeError {
+  constructor(
+    readonly destination: string,
+    reason: string,
+  ) {
+    super(`Invalid destination "${destination}": ${reason}`);
+  }
+}
+
 /** A module wants to modify an existing file, but the file or its insertion needle is missing or ambiguous. */
 export class NeedleError extends CraftTypeError {
   constructor(
