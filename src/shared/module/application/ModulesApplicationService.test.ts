@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../../composition.js';
@@ -10,6 +10,7 @@ import {
   MissingModuleDependenciesError,
   MissingPropertyError,
   ModuleConflictError,
+  NeedleError,
   UnknownModuleError,
 } from '../domain/errors.js';
 
@@ -223,7 +224,7 @@ describe('ModulesApplicationService', () => {
 
       expect(first.report).toMatchObject({ replaced: 0, unchanged: 0, skipped: 0, conflicts: 0 });
       expect(first.report.created).toBeGreaterThan(0);
-      expect(second.report).toEqual({ created: 0, replaced: 0, unchanged: first.report.created, kept: 0, skipped: 0, conflicts: 0 });
+      expect(second.report).toEqual({ created: 0, edited: 0, replaced: 0, unchanged: first.report.created, kept: 0, skipped: 0, conflicts: 0 });
     });
 
     it('garde l’existant et applique le reste avec skip', () => {
@@ -442,6 +443,93 @@ describe('ModulesApplicationService', () => {
       expect(() => service.apply('database', { projectFolder, databaseName: 'shop', poolSize: 0 })).toThrow(InvalidPropertyError);
       expect(() => service.apply('database', { projectFolder, databaseName: 'shop', serverPort: 4000 })).toThrow(InvalidPropertyError);
       expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
+    });
+  });
+  describe('modification de fichiers existants', () => {
+    const MAIN = 'src/webapp/main.ts';
+    const withVueApp = () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+      for (const module of ['init', 'typescript', 'vue-app']) {
+        service.apply(module, { projectFolder });
+      }
+      return { service, projectFolder };
+    };
+    const lines = (folder: string) => readFileSync(join(folder, MAIN), 'utf8').split('\n');
+
+    it('insère le code avant les repères et garde ce que l’équipe a ajouté', () => {
+      const { service, projectFolder } = withVueApp();
+      writeFileSync(join(projectFolder, MAIN), `${readFileSync(join(projectFolder, MAIN), 'utf8')}console.info('perso');\n`);
+
+      const { report } = service.apply('pinia', { projectFolder });
+
+      expect(report).toMatchObject({ created: 1, edited: 1, conflicts: 0 });
+      expect(lines(projectFolder)).toEqual([
+        "import { createApp } from 'vue';",
+        "import App from './App.vue';",
+        "import { createPinia } from 'pinia';",
+        '// crafttype-needle-main-imports',
+        '',
+        'const app = createApp(App);',
+        'app.use(createPinia());',
+        '// crafttype-needle-main-plugins',
+        "app.mount('#app');",
+        "console.info('perso');",
+        '',
+      ]);
+      expect(readJson(projectFolder, 'package.json').dependencies).toHaveProperty('pinia');
+    });
+
+    it('ne change plus rien en réappliquant le module', () => {
+      const { service, projectFolder } = withVueApp();
+      service.apply('pinia', { projectFolder });
+      const before = readFileSync(join(projectFolder, MAIN), 'utf8');
+
+      const { report } = service.apply('pinia', { projectFolder });
+
+      expect(report).toMatchObject({ created: 0, edited: 0, unchanged: 2 });
+      expect(readFileSync(join(projectFolder, MAIN), 'utf8')).toBe(before);
+    });
+
+    it('applique la modification quelle que soit la politique de conflit', () => {
+      for (const onConflict of ['fail', 'skip', 'overwrite'] as const) {
+        const { service, projectFolder } = withVueApp();
+
+        expect(service.apply('pinia', { projectFolder }, { onConflict }).report.edited).toBe(1);
+        expect(readFileSync(join(projectFolder, MAIN), 'utf8')).toContain('app.use(createPinia());');
+      }
+    });
+
+    it('montre la modification en simulation sans toucher au fichier ni à l’historique', () => {
+      const { service, projectFolder } = withVueApp();
+      const before = readFileSync(join(projectFolder, MAIN), 'utf8');
+
+      const { changes } = service.apply('pinia', { projectFolder }, { dryRun: true });
+
+      expect(changes.find(({ target }) => target === MAIN)).toMatchObject({ kind: 'edit', decision: 'edit' });
+      expect(readFileSync(join(projectFolder, MAIN), 'utf8')).toBe(before);
+      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug)).not.toContain('pinia');
+    });
+
+    it('n’écrit rien quand un repère a été supprimé', () => {
+      const { service, projectFolder } = withVueApp();
+      const withoutNeedle = readFileSync(join(projectFolder, MAIN), 'utf8').replace('// crafttype-needle-main-plugins\n', '');
+      writeFileSync(join(projectFolder, MAIN), withoutNeedle);
+      const packageJson = readFileSync(join(projectFolder, 'package.json'), 'utf8');
+
+      expect(() => service.apply('pinia', { projectFolder })).toThrow(NeedleError);
+      expect(() => service.apply('pinia', { projectFolder }, { dryRun: true })).toThrow(NeedleError);
+
+      expect(readFileSync(join(projectFolder, MAIN), 'utf8')).toBe(withoutNeedle);
+      expect(readFileSync(join(projectFolder, 'package.json'), 'utf8')).toBe(packageJson);
+      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug)).not.toContain('pinia');
+    });
+
+    it('explique que le fichier à modifier est introuvable', () => {
+      const { service, projectFolder } = withVueApp();
+      rmSync(join(projectFolder, MAIN));
+
+      expect(() => service.apply('pinia', { projectFolder })).toThrow(/src\/webapp\/main\.ts : fichier introuvable/);
     });
   });
 });

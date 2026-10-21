@@ -262,4 +262,43 @@ describe('CLI', () => {
     expect(code).toBe(1);
     expect(output).toContain('Usage :');
   });
+  describe('modification d’un fichier existant', () => {
+    const withVueApp = () => {
+      const projectFolder = tmpDirForTest();
+      for (const module of ['init', 'typescript', 'vue-app']) {
+        run('apply', module, '--project-folder', projectFolder);
+      }
+      return projectFolder;
+    };
+
+    it('branche pinia dans le main.ts et le dit dans le compte rendu', () => {
+      const projectFolder = withVueApp();
+
+      const { code, output } = run('apply', 'pinia', '--project-folder', projectFolder);
+
+      expect(code).toBe(0);
+      expect(output).toContain('(créés : 1, modifiés : 1, remplacés : 0, inchangés : 0, ignorés : 0)');
+      expect(output).toContain('  modifié : src/webapp/main.ts');
+      expect(readFileSync(join(projectFolder, 'src/webapp/main.ts'), 'utf8')).toContain("import { createPinia } from 'pinia';");
+    });
+
+    it('annonce la modification en simulation', () => {
+      const { code, output } = run('apply', 'pinia', '--project-folder', withVueApp(), '--dry-run');
+
+      expect(code).toBe(0);
+      expect(output).toContain('  modifier   src/webapp/main.ts');
+    });
+
+    it('refuse proprement quand le repère manque', () => {
+      const projectFolder = withVueApp();
+      const main = join(projectFolder, 'src/webapp/main.ts');
+      writeFileSync(main, readFileSync(main, 'utf8').replace('// crafttype-needle-main-imports\n', ''));
+
+      const { code, output } = run('apply', 'pinia', '--project-folder', projectFolder);
+
+      expect(code).toBe(1);
+      expect(output).toContain('Erreur : Impossible de modifier src/webapp/main.ts : repère introuvable');
+      expect(output).toContain('crafttype-needle-main-imports');
+    });
+  });
 });

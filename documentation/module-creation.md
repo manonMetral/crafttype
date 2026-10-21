@@ -99,9 +99,46 @@ Le moteur calcule d'abord un plan (`ChangePlan`) : chaque fichier ou entrée du 
 - `overwrite` (`--force`) : l'existant est remplacé ;
 - `skip` (`--skip-conflicts`) : l'existant est gardé, le reste est appliqué.
 
-Cas particulier des versions de dépendances : si le projet a déjà la dépendance dans une version égale, plus récente ou compatible avec celle du catalogue (comparaison `semver`, voir `domain/versions.ts`), le plan la marque `keep`. Ce n'est pas un conflit et aucune politique ne la remplace, pour qu'un module ne fasse jamais reculer une version montée par Renovate. Une version plus ancienne ou non comparable (tag, URL, workspace) reste un conflit.
+Cas particulier des versions de dépendances : si le projet a déjà la dépendance dans une version égale, plus récente ou compatible avec celle du catalogue (comparaison `semver`, derrière le port `VersionComparator`), le plan la marque `keep`. Ce n'est pas un conflit et aucune politique ne la remplace, pour qu'un module ne fasse jamais reculer une version montée par Renovate. Une version plus ancienne ou non comparable (tag, URL, workspace) reste un conflit.
 
 `--dry-run` affiche le plan sans rien écrire. Un module n'a rien à faire pour en profiter : tout passe par `moduleBuilder`.
+
+### Modifier un fichier créé par un autre module
+
+Un module qui complète un fichier existant (Pinia dans `main.ts`, un plugin Fastify dans `app.ts`) n'écrase rien : il insère son code à un **repère**, une ligne que le module propriétaire du fichier y a posée.
+
+1. Le module qui crée le fichier pose les repères, dans le commentaire de son langage. Le nom suit `crafttype-needle-<nom>` :
+
+```ts
+// resources/generator/vue-app/main.ts
+import App from './App.vue';
+// crafttype-needle-main-imports
+
+const app = createApp(App);
+// crafttype-needle-main-plugins
+app.mount('#app');
+```
+
+2. Le module qui complète le fichier déclare ses insertions dans sa fabrique et dépend du module propriétaire :
+
+```ts
+moduleBuilder(properties)
+  .addDependency('pinia', this.versions.get('vue'))
+  .insertAtNeedle('src/webapp/main.ts', 'main-imports', "import { createPinia } from 'pinia';")
+  .insertAtNeedle('src/webapp/main.ts', 'main-plugins', 'app.use(createPinia());')
+  .build();
+```
+
+Le contrat entre les deux modules est le chemin du fichier et le nom des repères : le test de la fabrique du propriétaire vérifie que ses repères sont bien dans le fichier généré (voir `VueAppFactory.test.ts`).
+
+Comportement du moteur :
+- Le bloc est inséré juste avant la ligne du repère, avec l'indentation de cette ligne. Le repère reste en place pour les modules suivants, qui s'insèrent après les précédents.
+- Idempotent : si les lignes du bloc sont déjà dans le fichier (à l'indentation près), rien n'est changé. Le code ajouté par l'équipe n'est jamais touché.
+- Ce n'est pas un conflit : aucune politique (`--force`, `--skip-conflicts`) n'intervient. Le plan marque le fichier `edit` (« modifier » en simulation, « modifiés : n » dans le compte rendu).
+- Si le fichier est introuvable, ou si le repère manque ou apparaît plusieurs fois, le module échoue avec une `NeedleError` qui nomme le fichier et le repère, sans rien écrire ni enregistrer, y compris en `--dry-run`. L'équipe a modifié le fichier à la main : le moteur ne devine pas où insérer. La correction est de remettre la ligne du repère à l'endroit voulu.
+- Un module ne peut pas à la fois créer (`addFile`) et modifier (`insertAtNeedle`) le même fichier.
+
+Les repères sont des commentaires qui restent dans le code généré. Le moteur n'analyse pas le code (pas d'AST) : il convient aux ajouts à des endroits prévus d'avance, pas à la réécriture d'un code arbitraire.
 
 ## 4. Le catalogue
 

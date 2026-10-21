@@ -115,6 +115,7 @@ const summary = ({ mandatory, defaultValue, description }: PropertyDefinition): 
 
 const LABELS: Record<DecidedChange['decision'], string> = {
   create: 'créer',
+  edit: 'modifier',
   unchanged: 'inchangé',
   keep: 'conserver',
   overwrite: 'remplacer',
@@ -125,7 +126,8 @@ const LABELS: Record<DecidedChange['decision'], string> = {
 const report = (result: ApplyResult, projectFolder: string, out: (line: string) => void): number => {
   const { slug, dryRun, changes, report: counts } = result;
   const kept = counts.kept > 0 ? `, versions conservées : ${counts.kept}` : '';
-  const summary = `créés : ${counts.created}, remplacés : ${counts.replaced}, inchangés : ${counts.unchanged}, ignorés : ${counts.skipped}${kept}`;
+  const edited = counts.edited > 0 ? `, modifiés : ${counts.edited}` : '';
+  const summary = `créés : ${counts.created}${edited}, remplacés : ${counts.replaced}, inchangés : ${counts.unchanged}, ignorés : ${counts.skipped}${kept}`;
 
   if (dryRun) {
     out(`Simulation du module ${slug} dans ${projectFolder} (rien n'est écrit) :`);
@@ -137,8 +139,9 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
   }
 
   out(`Module ${slug} appliqué dans ${projectFolder} (${summary})`);
-  for (const change of changes.filter(({ decision }) => decision === 'overwrite' || decision === 'skip')) {
-    out(`  ${change.decision === 'overwrite' ? 'remplacé' : 'ignoré'} : ${describeConflict(change)}`);
+  for (const change of changes.filter(({ decision }) => decision === 'edit' || decision === 'overwrite' || decision === 'skip')) {
+    const label = { edit: 'modifié', overwrite: 'remplacé', skip: 'ignoré' }[change.decision as 'edit' | 'overwrite' | 'skip'];
+    out(`  ${label} : ${describeConflict(change)}`);
   }
   return 0;
 };

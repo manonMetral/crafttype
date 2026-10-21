@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { from, moduleBuilder } from './CraftModule.js';
-import { DuplicateDestinationError } from './errors.js';
+import { DuplicateDestinationError, NeedleError } from './errors.js';
 import { ModulePropertiesDefinition } from './ModuleProperties.js';
 
 describe('CraftModuleBuilder', () => {
@@ -38,6 +38,31 @@ describe('CraftModuleBuilder', () => {
       const builder = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
 
       expect(() => builder.addFile(from('demo').file('b.txt'), './src/a.txt')).toThrow('Le module déclare deux fois le fichier src/a.txt');
+    });
+  });
+  describe('insertAtNeedle', () => {
+    it('enregistre les insertions dans l’ordre, avec un chemin normalisé', () => {
+      const module = moduleBuilder(properties)
+        .insertAtNeedle('./src/main.ts', 'imports', 'import a from "a";')
+        .insertAtNeedle('src/main.ts', 'plugins', 'use(a);')
+        .build();
+
+      expect(module.edits).toEqual([
+        { path: 'src/main.ts', needle: 'imports', content: 'import a from "a";' },
+        { path: 'src/main.ts', needle: 'plugins', content: 'use(a);' },
+      ]);
+    });
+
+    it('refuse un nom de repère invalide', () => {
+      expect(() => moduleBuilder(properties).insertAtNeedle('src/main.ts', 'Main_Imports', 'x')).toThrow(NeedleError);
+    });
+
+    it('refuse de modifier un fichier que le même module crée', () => {
+      const created = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
+      expect(() => created.insertAtNeedle('src/a.txt', 'x', 'y')).toThrow(DuplicateDestinationError);
+
+      const edited = moduleBuilder(properties).insertAtNeedle('src/a.txt', 'x', 'y');
+      expect(() => edited.addFile(from('demo').file('a.txt'), './src/a.txt')).toThrow(DuplicateDestinationError);
     });
   });
 });
