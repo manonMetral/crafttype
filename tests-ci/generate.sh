@@ -6,7 +6,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${1:-$(mktemp -d)/fullapp}"
+if [ $# -ge 1 ]; then
+  APP="$1"
+else
+  WORK="$(mktemp -d)"
+  APP="$WORK/fullapp"
+  # The generated application (with node_modules) is only removed on success: after a failure it is kept to investigate.
+  trap '[ $? -eq 0 ] && rm -rf "$WORK" || echo "Kept for investigation: $APP" >&2' EXIT
+fi
 if [ -n "${CRAFTTYPE_BIN:-}" ]; then
   CRAFTTYPE=("$CRAFTTYPE_BIN")
 else
@@ -54,4 +61,8 @@ rm src/webapp/probe.ts
 # An invalid configuration stops the server with an error message, without a stack trace.
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid PORT' PORT=abc
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid LOG_LEVEL' LOG_LEVEL=verbose
-echo "OK : $APP"
+if [ -n "${WORK:-}" ]; then
+  echo "OK (temporary folder removed)"
+else
+  echo "OK : $APP"
+fi

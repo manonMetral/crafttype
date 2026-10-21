@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     testTimeout: 10_000,
+    setupFiles: ['src/shared/test/setup.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

@@ -1,12 +1,12 @@
-import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect } from 'vitest';
 import { createModulesApplicationService } from '../../composition.js';
 import { moduleProperties, type ModuleProperties, type PropertyValue } from '../module/domain/ModuleProperties.js';
 import type { CraftModule } from '../module/domain/CraftModule.js';
+import { tmpDirForTest } from './tmpDirs.js';
 
-export const tmpDirForTest = (): string => mkdtempSync(join(tmpdir(), 'crafttype-test-'));
+export { tmpDirForTest };
 
 /** Properties of a module for a test: all those of the catalog have a value, `overrides` replaces or adds some. */
 export const propertiesFixture = (overrides: Readonly<Record<string, PropertyValue>> = {}): ModuleProperties => {
@@ -46,9 +46,5 @@ export class ModuleAssertions {
     [key: string]: unknown;
   } {
     return JSON.parse(readFileSync(join(this.projectFolder, 'package.json'), 'utf8'));
-  }
-
-  cleanup(): void {
-    rmSync(this.projectFolder, { recursive: true, force: true });
   }
 }
