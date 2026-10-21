@@ -1,2 +1,3 @@
-# Formatting-only commits, ignored by `git blame` (GitHub reads this file automatically; locally: git config blame.ignoreRevsFile .git-blame-ignore-revs)
+# Formatting-only and mass-translation commits, ignored by `git blame` (GitHub reads this file automatically; locally: git config blame.ignoreRevsFile .git-blame-ignore-revs)
 2369d0ccd0d287e945919241715440b1455f6316
+5ce036f65ee9aed8d76ea10ea79e7a198b56589a

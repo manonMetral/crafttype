@@ -36,7 +36,7 @@ describe('CLI', () => {
     const { code, output } = run('apply', 'vitest', '--project-folder', tmpDirForTest());
 
     expect(code).toBe(1);
-    expect(output).toBe('Error: Module vitest requires first: typescript');
+    expect(output).toBe('Error: Module vitest requires these modules to be applied first: typescript');
   });
 
   it('names the missing option with its flag', () => {

@@ -59,7 +59,6 @@ export class CraftModuleBuilder {
   private readonly devDependencies: Record<string, string> = {};
   private readonly scripts: Record<string, string> = {};
   private readonly fields: Record<string, unknown> = {};
-  private readonly extraContext: Record<string, string | number | boolean> = {};
 
   constructor(private readonly properties: ModuleProperties) {}
 
@@ -111,11 +110,6 @@ export class CraftModuleBuilder {
     return this;
   }
 
-  addContext(key: string, value: string | number | boolean): this {
-    this.extraContext[key] = value;
-    return this;
-  }
-
   build(): CraftModule {
     return {
       projectFolder: this.properties.projectFolder,
@@ -127,10 +121,7 @@ export class CraftModuleBuilder {
         devDependencies: { ...this.devDependencies },
         scripts: { ...this.scripts },
       },
-      context: {
-        ...this.properties.values,
-        ...this.extraContext,
-      },
+      context: { ...this.properties.values },
     };
   }
 }

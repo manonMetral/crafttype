@@ -1,7 +1,7 @@
 # CraftType
 
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
-Each module adds one single thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
+Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
 > Status: end of phase 1. The core and ten modules work, the CLI is minimal. ESLint (blocked, see below) and npm publication are still to come.
 
@@ -26,6 +26,11 @@ Applied modules are recorded in the generated project's `.crafttype/modules/hist
 Options already given to a previous module (`--project-name` for `init`, `--server-port` for `fastify-server`) are reused by the following ones: `vue-app` proxies to the port chosen for the server.
 Each module declares its own options: `npm run cli -- apply <module> --help` lists them.
 
+**Server port.** The port is written when the files are generated: in `src/server/main.ts` (`fastify-server`) and in the dev proxy of `vite.config.ts` (`vue-app`). Nothing keeps them in sync afterwards:
+
+- With the `config` module, the `PORT` environment variable overrides the port of `main.ts`. `webapp:dev` still proxies to the generated port: run both with the same port, or edit `server.proxy` in `vite.config.ts`.
+- To change the port of an existing project, edit `src/server/main.ts` and the proxy in `vite.config.ts` by hand. Applying `vue-app` again with `--server-port` does not help: without an option it stops on the files that differ, `--skip-conflicts` keeps the old proxy (and still records the new port in the history, see above), and `--force` also replaces `src/webapp/main.ts` and `src/webapp/App.vue`, which loses the code that `pinia` and `vue-router` inserted.
+
 A module never replaces a file or a `package.json` entry whose content differs: by default it lists the conflicts and stops, without writing anything. Three options change this behavior:
 
 | Option | Effect |
@@ -35,6 +40,8 @@ A module never replaces a file or a `package.json` entry whose content differs: 
 | `--dry-run` | prints what the module would create, leave unchanged or find in conflict, without writing anything (exit code 1 if a conflict remains) |
 
 `--force` and `--skip-conflicts` are mutually exclusive; `--dry-run` combines with either one to preview its effect.
+
+A module applied with `--skip-conflicts` is recorded in the history with the properties you gave, including for the items it skipped. The history can then disagree with the files: `apply vue-app --server-port 4000 --skip-conflicts` records `serverPort: 4000` for `vue-app` while `vite.config.ts` keeps the old port, and `fastify-server` still records the first one. The following modules reuse the most recent value of a property, so check `.crafttype/modules/history.json` after skipping conflicts.
 
 **Front-end typing.** `vue-app` adds `npm run webapp:typecheck` (`tsc` on `src/webapp`): it checks the `.ts` files (`main.ts`, `router.ts`...) but not the `<script>` of `.vue` files. `vue-tsc`, which would do it, does not work with TypeScript 7 yet (tested with version 3.3.13); it will replace this script as soon as it supports it. `vite build` does not check any type.
 
