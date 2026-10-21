@@ -11,7 +11,7 @@ export const createVueRouterModuleResource = (versions: NodePackagesVersionsRead
   return moduleResource()
     .slug(vueRouterSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-    .apiDoc('Front', "Ajoute Vue Router à l'application Vue")
+    .apiDoc('Frontend', 'Adds Vue Router to the Vue application')
     .dependsOn('vue-app')
     .tags('frontend', 'routing')
     .factory((properties) => modules.buildModule(properties));

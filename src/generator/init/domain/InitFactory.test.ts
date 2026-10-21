@@ -5,7 +5,7 @@ import { InitFactory } from './InitFactory.js';
 describe('InitFactory', () => {
   const factory = new InitFactory();
 
-  it('crée les fichiers de base et le package.json', () => {
+  it('creates the base files and the package.json', () => {
     const module = factory.buildModule(propertiesFixture({ projectName: 'shop' }));
 
     const result = assertThatModule(module)

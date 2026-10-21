@@ -8,15 +8,15 @@ onMounted(async () => {
     const response = await fetch('/api/health');
     status.value = (await response.json()).status;
   } catch {
-    status.value = 'indisponible';
+    status.value = 'unavailable';
   }
 });
 </script>
 
 <template>
   <main>
-    <h1>Bienvenue</h1>
-    <p>État du serveur : {{ status }}</p>
+    <h1>Welcome</h1>
+    <p>Server status: {{ status }}</p>
     <!-- crafttype-needle-app-template -->
   </main>
 </template>

@@ -3,10 +3,10 @@ import { isRecord, parseJsonObject } from './jsonFile.js';
 
 export const PACKAGE_JSON_PATH = 'package.json';
 
-/** Les quatre sortes d'entrées qu'un module peut poser dans le package.json. */
+/** The four kinds of entries a module can set in the package.json. */
 export type PackageJsonEntryKind = 'field' | 'script' | 'dependency' | 'devDependency';
 
-/** Une entrée du package.json ; `value` est la valeur sérialisée en JSON. */
+/** A package.json entry; `value` is the JSON-serialized value. */
 export interface PackageJsonEntry {
   readonly kind: PackageJsonEntryKind;
   readonly target: string;
@@ -14,8 +14,8 @@ export interface PackageJsonEntry {
 }
 
 /**
- * Où vit chaque sorte d'entrée dans le package.json. C'est la seule table de correspondance : la lecture, l'écriture,
- * le tri et les libellés s'y réfèrent. `section` vaut `undefined` pour un champ de premier niveau (`name`, `type`...).
+ * Where each kind of entry lives in the package.json. This is the only mapping table: reading, writing,
+ * sorting and labels all refer to it. `section` is `undefined` for a top-level field (`name`, `type`...).
  */
 const KINDS: Readonly<
   Record<
@@ -33,22 +33,22 @@ const KINDS: Readonly<
   devDependency: { section: 'devDependencies', sorted: true, wanted: (changes) => changes.devDependencies },
 };
 
-/** Nom lisible d'une entrée : `package.json : scripts.test`. */
+/** Readable name of an entry: `package.json: scripts.test`. */
 export const describePackageJsonEntry = (kind: PackageJsonEntryKind, target: string): string => {
   const { section } = KINDS[kind];
-  return `${PACKAGE_JSON_PATH} : ${section === undefined ? '' : `${section}.`}${target}`;
+  return `${PACKAGE_JSON_PATH}: ${section === undefined ? '' : `${section}.`}${target}`;
 };
 
-/** Le package.json du projet généré : le lire, y poser des entrées, le réécrire sans perdre ce que l'équipe y a mis. */
+/** The package.json of the generated project: read it, set entries in it, write it back without losing what the team put in it. */
 export class PackageJsonDocument {
   private constructor(private readonly content: Readonly<Record<string, unknown>>) {}
 
-  /** Un fichier absent est un document vide ; un fichier illisible ou qui n'est pas un objet est refusé. */
+  /** A missing file is an empty document; an unreadable file, or one that is not an object, is rejected. */
   static parse(raw: string | undefined): PackageJsonDocument {
     return new PackageJsonDocument(raw === undefined ? {} : parseJsonObject(PACKAGE_JSON_PATH, raw));
   }
 
-  /** Les entrées que le module veut poser, dans l'ordre champs, scripts, dépendances, dépendances de développement. */
+  /** The entries the module wants to set, in the order fields, scripts, dependencies, development dependencies. */
   static wantedBy(changes: PackageJsonChanges): readonly PackageJsonEntry[] {
     return (Object.keys(KINDS) as PackageJsonEntryKind[]).flatMap((kind) =>
       Object.entries(KINDS[kind].wanted(changes)).map(([target, value]) => ({
@@ -59,15 +59,15 @@ export class PackageJsonDocument {
     );
   }
 
-  /** Valeur actuelle de l'entrée, sérialisée en JSON, ou `undefined` si elle n'existe pas. */
+  /** Current value of the entry, serialized as JSON, or `undefined` if it does not exist. */
   entry(kind: PackageJsonEntryKind, target: string): string | undefined {
     const value = this.container(kind)[target];
     return value === undefined ? undefined : JSON.stringify(value);
   }
 
   /**
-   * Un nouveau document avec ces entrées posées. Le reste est conservé tel quel ; seules les listes de dépendances
-   * touchées sont triées.
+   * A new document with these entries set. The rest is kept as is; only the dependency lists that were
+   * touched are sorted.
    */
   with(entries: readonly PackageJsonEntry[]): PackageJsonDocument {
     const content: Record<string, unknown> = { ...this.content };
@@ -101,6 +101,6 @@ export class PackageJsonDocument {
 
 const asRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? { ...value } : {});
 
-// Locale fixée : sans elle, l'ordre dépend de la machine (en tchèque, « chalk » passe après « hono »).
+// Fixed locale: without it, the order depends on the machine (in Czech, "chalk" sorts after "hono").
 const sortKeys = (record: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b, 'en')));

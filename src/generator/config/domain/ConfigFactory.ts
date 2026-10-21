@@ -5,7 +5,7 @@ const SOURCE = from('config');
 const SERVER = 'src/server';
 
 export class ConfigFactory {
-  /** Complète les valeurs par défaut de `settings` (`main.ts` de fastify-server, repère `main-settings`) avec l'environnement, validé. */
+  /** Completes the defaults of `settings` (`main.ts` of fastify-server, needle `main-settings`) with the validated environment. */
   buildModule(properties: ModuleProperties): CraftModule {
     return moduleBuilder(properties)
       .addFile(SOURCE.file('config.ts'), `${SERVER}/config.ts`)

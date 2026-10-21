@@ -15,7 +15,7 @@ export class FileSystemModulesHistory implements ModulesHistory {
 
     const { modules } = parseJsonObject(HISTORY_PATH, content);
     if (!Array.isArray(modules) || !modules.every(isAppliedModule)) {
-      throw new InvalidProjectFileError(HISTORY_PATH, 'une liste « modules » de modules appliqués est attendue');
+      throw new InvalidProjectFileError(HISTORY_PATH, 'a "modules" list of applied modules is expected');
     }
     return modules;
   }

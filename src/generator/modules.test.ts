@@ -4,26 +4,26 @@ import { resourcesRoot } from '../shared/module/infrastructure/secondary/resourc
 import { propertiesFixture } from '../shared/test/ModuleAssertions.js';
 import { allModuleResources } from './modules.js';
 
-describe('catalogue de modules', () => {
+describe('module catalog', () => {
   const resources = allModuleResources(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
-  it('a des slugs uniques', () => {
+  it('has unique slugs', () => {
     const slugs = resources.map(({ slug }) => slug);
     expect(new Set(slugs).size).toBe(slugs.length);
   });
 
-  it('ne dépend que de modules déclarés avant lui, donc existants et sans cycle', () => {
+  it('only depends on modules declared before it, so they exist and there is no cycle', () => {
     const seen = new Set<string>();
     for (const { slug, dependsOn } of resources) {
       for (const dependency of dependsOn) {
-        expect(seen, `${slug} dépend de ${dependency}, qui doit être déclaré avant`).toContain(dependency);
+        expect(seen, `${slug} depends on ${dependency}, which must be declared before it`).toContain(dependency);
       }
       seen.add(slug);
     }
   });
 
   it.each(resources.map((resource) => [resource.slug, resource] as const))(
-    'le module %s se construit avec les propriétés par défaut',
+    'module %s builds with the default properties',
     (_slug, resource) => {
       expect(() => resource.factory(propertiesFixture())).not.toThrow();
     },

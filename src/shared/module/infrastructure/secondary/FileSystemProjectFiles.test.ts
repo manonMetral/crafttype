@@ -7,22 +7,22 @@ import { FileSystemProjectFiles } from './FileSystemProjectFiles.js';
 describe('FileSystemProjectFiles', () => {
   const files = new FileSystemProjectFiles();
 
-  it('écrit un fichier en créant les dossiers manquants, puis le relit', () => {
+  it('writes a file creating the missing folders, then reads it back', () => {
     const folder = tmpDirForTest();
 
-    files.write(folder, 'src/a/b.txt', 'contenu');
+    files.write(folder, 'src/a/b.txt', 'content');
 
-    expect(files.read(folder, 'src/a/b.txt')).toBe('contenu');
+    expect(files.read(folder, 'src/a/b.txt')).toBe('content');
   });
 
-  it('rend undefined pour un fichier absent', () => {
-    expect(files.read(tmpDirForTest(), 'absent.txt')).toBeUndefined();
+  it('returns undefined for a missing file', () => {
+    expect(files.read(tmpDirForTest(), 'missing.txt')).toBeUndefined();
   });
 
-  it('ne masque pas une autre erreur de lecture', () => {
+  it('does not hide another read error', () => {
     const folder = tmpDirForTest();
-    mkdirSync(join(folder, 'dossier'));
+    mkdirSync(join(folder, 'folder'));
 
-    expect(() => files.read(folder, 'dossier')).toThrow(/EISDIR/);
+    expect(() => files.read(folder, 'folder')).toThrow(/EISDIR/);
   });
 });

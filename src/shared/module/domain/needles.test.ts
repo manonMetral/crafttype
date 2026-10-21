@@ -7,13 +7,13 @@ const edit = (content: string, needle = 'imports') => ({ path: 'src/main.ts', ne
 describe('insertAtNeedle', () => {
   const file = ['import a from "a";', '// crafttype-needle-imports', '', 'run();', ''].join('\n');
 
-  it('insère le bloc juste avant le repère et garde le repère pour les modules suivants', () => {
+  it('inserts the block just before the needle and keeps the needle for the following modules', () => {
     expect(insertAtNeedle(file, edit('import b from "b";'))).toBe(
       ['import a from "a";', 'import b from "b";', '// crafttype-needle-imports', '', 'run();', ''].join('\n'),
     );
   });
 
-  it('reprend l’indentation de la ligne du repère, ligne vide comprise', () => {
+  it('reuses the indentation of the needle line, blank line included', () => {
     const indented = ['function f() {', '  // crafttype-needle-body', '}'].join('\n');
 
     expect(insertAtNeedle(indented, edit('a();\n\nb();', 'body'))).toBe(
@@ -21,15 +21,15 @@ describe('insertAtNeedle', () => {
     );
   });
 
-  it('s’appuie sur le repère quel que soit le commentaire qui l’entoure', () => {
+  it('relies on the needle whatever comment surrounds it', () => {
     const html = '<ul>\n  <!-- crafttype-needle-items -->\n</ul>';
 
-    expect(insertAtNeedle(html, edit('<li>un</li>', 'items'))).toBe(
-      '<ul>\n  <li>un</li>\n  <!-- crafttype-needle-items -->\n</ul>',
+    expect(insertAtNeedle(html, edit('<li>one</li>', 'items'))).toBe(
+      '<ul>\n  <li>one</li>\n  <!-- crafttype-needle-items -->\n</ul>',
     );
   });
 
-  it('ne duplique pas un bloc déjà présent, même ré-indenté ailleurs dans le fichier', () => {
+  it('does not duplicate a block that is already present, even re-indented elsewhere in the file', () => {
     const once = insertAtNeedle(file, edit('import b from "b";'));
 
     expect(insertAtNeedle(once, edit('import b from "b";'))).toBe(once);
@@ -38,7 +38,7 @@ describe('insertAtNeedle', () => {
     );
   });
 
-  it('ajoute les blocs de plusieurs modules dans l’ordre d’application', () => {
+  it('adds the blocks of several modules in the order of application', () => {
     const twice = insertAtNeedle(insertAtNeedle(file, edit('import b from "b";')), edit('import c from "c";'));
 
     expect(twice.split('\n').slice(0, 4)).toEqual([
@@ -49,17 +49,17 @@ describe('insertAtNeedle', () => {
     ]);
   });
 
-  it('ignore les retours à la ligne en fin de bloc', () => {
+  it('ignores line breaks at the end of the block', () => {
     expect(insertAtNeedle(file, edit('import b from "b";\n\n'))).toBe(insertAtNeedle(file, edit('import b from "b";')));
   });
 
-  it('respecte les fins de ligne CRLF du fichier', () => {
+  it('respects the CRLF line endings of the file', () => {
     const crlf = ['a', '// crafttype-needle-imports', 'b'].join('\r\n');
 
     expect(insertAtNeedle(crlf, edit('x\ny'))).toBe(['a', 'x', 'y', '// crafttype-needle-imports', 'b'].join('\r\n'));
   });
 
-  it('ne confond pas un repère avec un autre dont le nom commence pareil', () => {
+  it('does not mix up a needle with another whose name starts the same way', () => {
     const two = ['// crafttype-needle-main-imports', '// crafttype-needle-main'].join('\n');
 
     expect(insertAtNeedle(two, edit('x();', 'main'))).toBe(
@@ -67,26 +67,26 @@ describe('insertAtNeedle', () => {
     );
   });
 
-  it('refuse un repère absent, en nommant le fichier et le repère', () => {
-    const error = captured(() => insertAtNeedle('rien ici', edit('x', 'absent')));
+  it('rejects a missing needle, naming the file and the needle', () => {
+    const error = captured(() => insertAtNeedle('nothing here', edit('x', 'absent')));
 
     expect(error).toBeInstanceOf(NeedleError);
     expect(error.message).toContain('src/main.ts');
     expect(error.message).toContain('crafttype-needle-absent');
-    expect(error.message).toContain('introuvable');
-    expect(error.message).toContain('version plus ancienne');
+    expect(error.message).toContain('not found');
+    expect(error.message).toContain('older version');
   });
 
-  it('refuse un repère présent plusieurs fois', () => {
+  it('rejects a needle present several times', () => {
     const twice = ['// crafttype-needle-imports', '// crafttype-needle-imports'].join('\n');
 
     expect(captured(() => insertAtNeedle(twice, edit('x')))).toBeInstanceOf(NeedleError);
-    expect(captured(() => insertAtNeedle(twice, edit('x'))).message).toContain('2 fois');
+    expect(captured(() => insertAtNeedle(twice, edit('x'))).message).toContain('2 times');
   });
 });
 
-describe('noms de repère', () => {
-  it.each(['imports', 'main-imports', 'a1', 'router-2'])('accepte %s', (name) => {
+describe('needle names', () => {
+  it.each(['imports', 'main-imports', 'a1', 'router-2'])('accepts %s', (name) => {
     expect(isValidNeedleName(name)).toBe(true);
   });
 
@@ -94,7 +94,7 @@ describe('noms de repère', () => {
     expect(isValidNeedleName(name)).toBe(false);
   });
 
-  it('préfixe le nom pour former le texte à poser dans le fichier', () => {
+  it('prefixes the name to form the text to place in the file', () => {
     expect(needleToken('main-imports')).toBe('crafttype-needle-main-imports');
   });
 });
@@ -105,5 +105,5 @@ const captured = (action: () => unknown): Error => {
   } catch (error) {
     return error as Error;
   }
-  throw new Error('une erreur était attendue');
+  throw new Error('an error was expected');
 };

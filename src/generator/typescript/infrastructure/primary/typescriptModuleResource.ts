@@ -11,7 +11,7 @@ export const createTypescriptModuleResource = (versions: NodePackagesVersionsRea
   return moduleResource()
     .slug(typescriptSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-    .apiDoc('TypeScript', 'Ajoute TypeScript et sa configuration')
+    .apiDoc('TypeScript', 'Adds TypeScript and its configuration')
     .dependsOn('init')
     .tags('setup')
     .factory((properties) => modules.buildModule(properties));

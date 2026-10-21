@@ -1,7 +1,7 @@
 {
   "name": "crafttype",
   "version": "0.0.0",
-  "description": "Générateur modulaire de projets Node.js (Fastify) et Vue.js, inspiré de Seed4J",
+  "description": "Modular generator of Node.js (Fastify) and Vue.js projects, inspired by Seed4J",
   "type": "module",
   "bin": {
     "crafttype": "./dist/shared/module/infrastructure/primary/main.js"

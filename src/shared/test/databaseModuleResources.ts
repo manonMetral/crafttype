@@ -2,22 +2,22 @@ import { moduleBuilder } from '../module/domain/CraftModule.js';
 import { ModulePropertiesDefinition } from '../module/domain/ModuleProperties.js';
 import { moduleResource, type ModuleResource } from '../module/domain/ModuleResource.js';
 
-/** Modules de test qui portent leurs propres propriétés, sans toucher au catalogue réel. */
+/** Test modules that carry their own properties, without touching the real catalog. */
 export const databaseModuleResources: readonly ModuleResource[] = [
   moduleResource()
     .slug('database')
     .propertiesDefinition(
       ModulePropertiesDefinition.builder()
-        .addString('databaseName', { description: 'Nom de la base', mandatory: true })
+        .addString('databaseName', { description: 'Database name', mandatory: true })
         .addNumber('poolSize', {
-          description: 'Taille du pool de connexions',
+          description: 'Connection pool size',
           defaultValue: 10,
-          validate: (size) => (Number(size) >= 1 ? undefined : 'la taille doit valoir au moins 1'),
+          validate: (size) => (Number(size) >= 1 ? undefined : 'the size must be at least 1'),
         })
-        .addBoolean('migrations', { description: 'Active les migrations', defaultValue: true })
+        .addBoolean('migrations', { description: 'Enables migrations', defaultValue: true })
         .build(),
     )
-    .apiDoc('Données', 'Configure la base de données')
+    .apiDoc('Data', 'Configures the database')
     .standalone()
     .tags('database')
     .factory((properties) => {
@@ -33,10 +33,10 @@ export const databaseModuleResources: readonly ModuleResource[] = [
     .slug('database-seed')
     .propertiesDefinition(
       ModulePropertiesDefinition.builder()
-        .addString('databaseName', { description: 'Nom de la base', mandatory: true })
+        .addString('databaseName', { description: 'Database name', mandatory: true })
         .build(),
     )
-    .apiDoc('Données', 'Charge un jeu de données')
+    .apiDoc('Data', 'Loads a dataset')
     .dependsOn('database')
     .tags('database')
     .factory((properties) =>

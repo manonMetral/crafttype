@@ -19,7 +19,7 @@ const readJson = (folder: string, path: string) => JSON.parse(readFileSync(join(
 describe('ModulesApplicationService', () => {
   const clock = () => new Date('2026-10-20T10:00:00Z');
 
-  it('refuse un module dont les dépendances ne sont pas appliquées', () => {
+  it('refuses a module whose dependencies are not applied', () => {
     const service = createModulesApplicationService({ clock });
 
     expect(() => service.apply('typescript', { projectFolder: tmpDirForTest() })).toThrow(
@@ -27,14 +27,14 @@ describe('ModulesApplicationService', () => {
     );
   });
 
-  it('refuse un module inconnu ou une propriété obligatoire absente', () => {
+  it('refuses an unknown module or a missing mandatory property', () => {
     const service = createModulesApplicationService({ clock });
 
     expect(() => service.apply('nope', { projectFolder: tmpDirForTest() })).toThrow(UnknownModuleError);
     expect(() => service.apply('init', {})).toThrow(MissingPropertyError);
   });
 
-  it('enregistre l’historique et fusionne le package.json sans perdre l’existant', () => {
+  it('records the history and merges package.json without losing existing content', () => {
     const service = createModulesApplicationService({ clock });
     const projectFolder = tmpDirForTest();
 
@@ -52,7 +52,7 @@ describe('ModulesApplicationService', () => {
     expect(history.modules[0].appliedAt).toBe('2026-10-20T10:00:00.000Z');
   });
 
-  it('est idempotent : réappliquer un module ne duplique ni historique ni dépendances', () => {
+  it('is idempotent: applying a module again duplicates neither history nor dependencies', () => {
     const service = createModulesApplicationService({ clock });
     const projectFolder = tmpDirForTest();
 
@@ -62,7 +62,7 @@ describe('ModulesApplicationService', () => {
     expect(readJson(projectFolder, '.crafttype/modules/history.json').modules).toHaveLength(1);
   });
 
-  it('réapplique un module à l’identique sans toucher aux fichiers', () => {
+  it('applies an identical module again without touching the files', () => {
     const service = createModulesApplicationService({ clock });
     const projectFolder = tmpDirForTest();
     service.apply('init', { projectFolder });
@@ -74,8 +74,8 @@ describe('ModulesApplicationService', () => {
     expect(statSync(readme).mtimeMs).toBe(1_000_000);
   });
 
-  describe('propriétés partagées entre modules', () => {
-    it('reprend le port du serveur pour le proxy de l’application Vue', () => {
+  describe('properties shared between modules', () => {
+    it('reuses the server port for the Vue application proxy', () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
       service.apply('init', { projectFolder });
@@ -88,7 +88,7 @@ describe('ModulesApplicationService', () => {
       expect(readFileSync(join(projectFolder, 'vite.config.ts'), 'utf8')).toContain('http://127.0.0.1:4000');
     });
 
-    it('reprend le nom du projet posé par init', () => {
+    it('reuses the project name set by init', () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
       service.apply('init', { projectFolder, projectName: 'shop' });
@@ -99,7 +99,7 @@ describe('ModulesApplicationService', () => {
       expect(readFileSync(join(projectFolder, 'src/webapp/index.html'), 'utf8')).toContain('<title>shop</title>');
     });
 
-    it('n’enregistre dans l’historique que les propriétés que le module déclare', () => {
+    it('records in the history only the properties the module declares', () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
       service.apply('init', { projectFolder, projectName: 'shop' });
@@ -111,7 +111,7 @@ describe('ModulesApplicationService', () => {
       expect(modules[1].properties).toEqual({});
     });
 
-    it('refuse une propriété invalide ou que le module ne prend pas en charge', () => {
+    it('refuses a property that is invalid or that the module does not support', () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
       service.apply('init', { projectFolder });
@@ -120,13 +120,13 @@ describe('ModulesApplicationService', () => {
 
       expect(() => service.apply('fastify-server', { projectFolder, serverPort: 'abc' })).toThrow(InvalidPropertyError);
       expect(() => service.apply('typescript', { projectFolder, serverPort: 4000 })).toThrow(InvalidPropertyError);
-      expect(() => service.apply('init', { projectFolder: tmpDirForTest(), projectName: 'Mon App' })).toThrow(
+      expect(() => service.apply('init', { projectFolder: tmpDirForTest(), projectName: 'My App' })).toThrow(
         InvalidPropertyError,
       );
     });
   });
 
-  describe('fichiers existants', () => {
+  describe('existing files', () => {
     const initialized = () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
@@ -134,40 +134,40 @@ describe('ModulesApplicationService', () => {
       return { service, projectFolder };
     };
 
-    it('refuse d’écraser un fichier modifié et n’écrit rien', () => {
+    it('refuses to overwrite a modified file and writes nothing', () => {
       const { service, projectFolder } = initialized();
-      writeFileSync(join(projectFolder, 'README.md'), 'mon readme');
-      writeFileSync(join(projectFolder, '.gitignore'), 'perso');
+      writeFileSync(join(projectFolder, 'README.md'), 'my readme');
+      writeFileSync(join(projectFolder, '.gitignore'), 'custom');
 
       expect(() => service.apply('init', { projectFolder })).toThrow(ModuleConflictError);
 
-      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('mon readme');
-      expect(readFileSync(join(projectFolder, '.gitignore'), 'utf8')).toBe('perso');
+      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toBe('my readme');
+      expect(readFileSync(join(projectFolder, '.gitignore'), 'utf8')).toBe('custom');
       expect(existsSync(join(projectFolder, '.editorconfig'))).toBe(true);
     });
 
-    it('liste tous les éléments en conflit, fichiers comme entrées du package.json', () => {
+    it('lists all conflicting items, files as well as package.json entries', () => {
       const { service, projectFolder } = initialized();
-      writeFileSync(join(projectFolder, 'README.md'), 'mon readme');
+      writeFileSync(join(projectFolder, 'README.md'), 'my readme');
 
       const error = (() => {
         try {
-          service.apply('init', { projectFolder, projectName: 'autre' });
+          service.apply('init', { projectFolder, projectName: 'other' });
         } catch (caught) {
           return caught as ModuleConflictError;
         }
-        throw new Error('une erreur était attendue');
+        throw new Error('an error was expected');
       })();
 
       expect(error.conflicts).toEqual(
         expect.arrayContaining([
           'README.md',
-          expect.stringContaining('package.json : name (existant : "shop", module : "autre")'),
+          expect.stringContaining('package.json: name (existing: "shop", module: "other")'),
         ]),
       );
     });
 
-    it('refuse de changer un script ou une version déjà présents dans le package.json', () => {
+    it('refuses to change a script or a version already present in package.json', () => {
       const { service, projectFolder } = initialized();
       service.apply('typescript', { projectFolder });
       const packageJson = readJson(projectFolder, 'package.json');
@@ -181,7 +181,7 @@ describe('ModulesApplicationService', () => {
       expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('^6.0.0');
     });
 
-    it('n’enregistre pas le module dans l’historique quand il est refusé', () => {
+    it('does not record the module in the history when it is refused', () => {
       const { service, projectFolder } = initialized();
       writeFileSync(join(projectFolder, 'tsconfig.json'), '{}');
 
@@ -192,27 +192,27 @@ describe('ModulesApplicationService', () => {
       ).toEqual(['init']);
     });
 
-    it('remplace les éléments en conflit avec force', () => {
+    it('replaces the conflicting items with force', () => {
       const { service, projectFolder } = initialized();
-      writeFileSync(join(projectFolder, 'README.md'), 'mon readme');
+      writeFileSync(join(projectFolder, 'README.md'), 'my readme');
 
-      service.apply('init', { projectFolder, projectName: 'autre' }, { onConflict: 'overwrite' });
+      service.apply('init', { projectFolder, projectName: 'other' }, { onConflict: 'overwrite' });
 
-      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toContain('# autre');
-      expect(readJson(projectFolder, 'package.json').name).toBe('autre');
+      expect(readFileSync(join(projectFolder, 'README.md'), 'utf8')).toContain('# other');
+      expect(readJson(projectFolder, 'package.json').name).toBe('other');
     });
 
-    it('refuse d’abord d’écraser un fichier qui existait avant le premier module', () => {
+    it('refuses first to overwrite a file that existed before the first module', () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
-      writeFileSync(join(projectFolder, 'README.md'), 'existant');
+      writeFileSync(join(projectFolder, 'README.md'), 'existing');
 
       expect(() => service.apply('init', { projectFolder })).toThrow(ModuleConflictError);
       expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
     });
   });
 
-  describe('politique de conflit', () => {
+  describe('conflict policy', () => {
     const initialized = () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
@@ -221,14 +221,14 @@ describe('ModulesApplicationService', () => {
       return { service, projectFolder };
     };
     const edit = (projectFolder: string) => {
-      writeFileSync(join(projectFolder, 'tsconfig.json'), '{ "perso": true }');
+      writeFileSync(join(projectFolder, 'tsconfig.json'), '{ "custom": true }');
       const packageJson = readJson(projectFolder, 'package.json');
       packageJson.scripts.typecheck = 'tsc -b';
       delete packageJson.devDependencies['@types/node'];
       writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
     };
 
-    it('compte ce qui est créé quand le projet est neuf, puis tout inchangé en réappliquant', () => {
+    it('counts what is created when the project is new, then everything unchanged when applying again', () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
 
@@ -248,13 +248,13 @@ describe('ModulesApplicationService', () => {
       });
     });
 
-    it('garde l’existant et applique le reste avec skip', () => {
+    it('keeps the existing items and applies the rest with skip', () => {
       const { service, projectFolder } = initialized();
       edit(projectFolder);
 
       const { report, changes } = service.apply('typescript', { projectFolder }, { onConflict: 'skip' });
 
-      expect(readFileSync(join(projectFolder, 'tsconfig.json'), 'utf8')).toBe('{ "perso": true }');
+      expect(readFileSync(join(projectFolder, 'tsconfig.json'), 'utf8')).toBe('{ "custom": true }');
       const packageJson = readJson(projectFolder, 'package.json');
       expect(packageJson.scripts.typecheck).toBe('tsc -b');
       expect(packageJson.devDependencies['@types/node']).toBeDefined();
@@ -265,7 +265,7 @@ describe('ModulesApplicationService', () => {
       ]);
     });
 
-    it('enregistre le module dans l’historique avec skip', () => {
+    it('records the module in the history with skip', () => {
       const { service, projectFolder } = initialized();
       edit(projectFolder);
 
@@ -276,7 +276,7 @@ describe('ModulesApplicationService', () => {
       ).toEqual(['init', 'typescript']);
     });
 
-    it('remplace et compte les remplacements avec overwrite', () => {
+    it('replaces and counts the replacements with overwrite', () => {
       const { service, projectFolder } = initialized();
       edit(projectFolder);
 
@@ -286,7 +286,7 @@ describe('ModulesApplicationService', () => {
       expect(readJson(projectFolder, 'package.json').scripts.typecheck).toBe('tsc --noEmit');
     });
 
-    it('simule sans rien écrire ni enregistrer, y compris en présence de conflits', () => {
+    it('simulates without writing or recording anything, even when there are conflicts', () => {
       const { service, projectFolder } = initialized();
       edit(projectFolder);
       const before = readFileSync(join(projectFolder, 'package.json'), 'utf8');
@@ -298,18 +298,18 @@ describe('ModulesApplicationService', () => {
       expect(report).toMatchObject({ created: 1, conflicts: 2 });
       expect(changes.find(({ target }) => target === 'tsconfig.json')?.decision).toBe('conflict');
       expect(readFileSync(join(projectFolder, 'package.json'), 'utf8')).toBe(before);
-      expect(readFileSync(join(projectFolder, 'tsconfig.json'), 'utf8')).toBe('{ "perso": true }');
+      expect(readFileSync(join(projectFolder, 'tsconfig.json'), 'utf8')).toBe('{ "custom": true }');
       expect(readFileSync(join(projectFolder, '.crafttype/modules/history.json'), 'utf8')).toBe(historyBefore);
     });
 
-    describe('versions de dépendances', () => {
+    describe('dependency versions', () => {
       const setTypescriptVersion = (projectFolder: string, version: string) => {
         const packageJson = readJson(projectFolder, 'package.json');
         packageJson.devDependencies.typescript = version;
         writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
       };
 
-      it('garde une version plus récente que le catalogue sans y voir un conflit', () => {
+      it('keeps a version newer than the catalog without seeing a conflict', () => {
         const { service, projectFolder } = initialized();
         setTypescriptVersion(projectFolder, '99.0.0');
 
@@ -319,7 +319,7 @@ describe('ModulesApplicationService', () => {
         expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('99.0.0');
       });
 
-      it('ne fait jamais reculer une version, même avec overwrite', () => {
+      it('never moves a version backwards, even with overwrite', () => {
         const { service, projectFolder } = initialized();
         setTypescriptVersion(projectFolder, '99.0.0');
 
@@ -329,14 +329,14 @@ describe('ModulesApplicationService', () => {
         expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('99.0.0');
       });
 
-      it('garde un intervalle qui accepte la version du catalogue', () => {
+      it('keeps a range that accepts the catalog version', () => {
         const { service, projectFolder } = initialized();
         setTypescriptVersion(projectFolder, '>=5');
 
         expect(service.apply('typescript', { projectFolder }).report.kept).toBe(1);
       });
 
-      it('refuse une version plus ancienne que le catalogue, et la remplace avec overwrite', () => {
+      it('refuses a version older than the catalog, and replaces it with overwrite', () => {
         const { service, projectFolder } = initialized();
         setTypescriptVersion(projectFolder, '4.0.0');
 
@@ -346,7 +346,7 @@ describe('ModulesApplicationService', () => {
         expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('7.0.2');
       });
 
-      it('applique le reste du module quand seule une version plus récente diffère', () => {
+      it('applies the rest of the module when only a newer version differs', () => {
         const { service, projectFolder } = initialized();
         setTypescriptVersion(projectFolder, '99.0.0');
         const packageJson = readJson(projectFolder, 'package.json');
@@ -361,7 +361,7 @@ describe('ModulesApplicationService', () => {
       });
     });
 
-    it('simule ce que ferait chaque politique', () => {
+    it('simulates what each policy would do', () => {
       const { service, projectFolder } = initialized();
       edit(projectFolder);
 
@@ -375,9 +375,9 @@ describe('ModulesApplicationService', () => {
       expect(decisions('skip')).toContain('skip');
     });
 
-    it('simule sur un dossier qui n’existe pas encore sans le créer', () => {
+    it('simulates on a folder that does not exist yet without creating it', () => {
       const service = createModulesApplicationService({ clock });
-      const projectFolder = join(tmpDirForTest(), 'nouveau');
+      const projectFolder = join(tmpDirForTest(), 'new');
 
       const { report } = service.apply('init', { projectFolder }, { dryRun: true });
 
@@ -385,7 +385,7 @@ describe('ModulesApplicationService', () => {
       expect(existsSync(projectFolder)).toBe(false);
     });
 
-    it('refuse toujours par défaut et sans rien écrire', () => {
+    it('always refuses by default and without writing anything', () => {
       const { service, projectFolder } = initialized();
       edit(projectFolder);
 
@@ -393,7 +393,7 @@ describe('ModulesApplicationService', () => {
     });
   });
 
-  describe('fichiers du projet illisibles', () => {
+  describe('unreadable project files', () => {
     const withTypescriptPrerequisite = () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
@@ -402,7 +402,7 @@ describe('ModulesApplicationService', () => {
       return { service, projectFolder };
     };
 
-    it('signale un package.json invalide comme une erreur métier', () => {
+    it('reports an invalid package.json as a business error', () => {
       const { service, projectFolder } = withTypescriptPrerequisite();
       writeFileSync(join(projectFolder, 'package.json'), '{ oops');
 
@@ -410,7 +410,7 @@ describe('ModulesApplicationService', () => {
       expect(() => service.apply('vitest', { projectFolder })).toThrow(/package\.json/);
     });
 
-    it('refuse un package.json qui n’est pas un objet', () => {
+    it('refuses a package.json that is not an object', () => {
       const { service, projectFolder } = withTypescriptPrerequisite();
       writeFileSync(join(projectFolder, 'package.json'), '[]');
 
@@ -418,20 +418,20 @@ describe('ModulesApplicationService', () => {
     });
 
     it.each([
-      ['JSON invalide', '{ oops'],
-      ['sans liste de modules', '{}'],
-      ['modules mal formés', '{"modules":[{"slug":1}]}'],
-    ])('signale un historique %s comme une erreur métier', (_name, content) => {
+      ['invalid JSON', '{ oops'],
+      ['no module list', '{}'],
+      ['malformed modules', '{"modules":[{"slug":1}]}'],
+    ])('reports a history with %s as a business error', (_name, content) => {
       const { service, projectFolder } = withTypescriptPrerequisite();
       writeFileSync(join(projectFolder, '.crafttype/modules/history.json'), content);
 
       expect(() => service.apply('vitest', { projectFolder })).toThrow(InvalidProjectFileError);
     });
   });
-  describe('propriétés propres à un module', () => {
+  describe('properties specific to a module', () => {
     const database = () => createModulesApplicationService({ clock, extraResources: databaseModuleResources });
 
-    it('transmet les valeurs typées à la fabrique du module', () => {
+    it('passes the typed values to the module factory', () => {
       const service = database();
       const projectFolder = tmpDirForTest();
 
@@ -441,7 +441,7 @@ describe('ModulesApplicationService', () => {
       expect(scripts).toEqual({ 'db:info': 'echo shop:25' });
     });
 
-    it('enregistre ces valeurs dans l’historique et les redonne aux modules suivants', () => {
+    it('records these values in the history and gives them back to the following modules', () => {
       const service = database();
       const projectFolder = tmpDirForTest();
       service.apply('database', { projectFolder, databaseName: 'shop' });
@@ -454,17 +454,17 @@ describe('ModulesApplicationService', () => {
       expect(readJson(projectFolder, 'package.json').scripts['db:seed']).toBe('echo seed shop');
     });
 
-    it('laisse une valeur explicite l’emporter sur celle de l’historique', () => {
+    it('lets an explicit value win over the one from the history', () => {
       const service = database();
       const projectFolder = tmpDirForTest();
       service.apply('database', { projectFolder, databaseName: 'shop' });
 
-      service.apply('database-seed', { projectFolder, databaseName: 'autre' }, { onConflict: 'overwrite' });
+      service.apply('database-seed', { projectFolder, databaseName: 'other' }, { onConflict: 'overwrite' });
 
-      expect(readJson(projectFolder, 'package.json').scripts['db:seed']).toBe('echo seed autre');
+      expect(readJson(projectFolder, 'package.json').scripts['db:seed']).toBe('echo seed other');
     });
 
-    it('refuse une propriété obligatoire absente, invalide, ou que le module ne déclare pas', () => {
+    it('refuses a mandatory property that is missing, invalid, or not declared by the module', () => {
       const service = database();
       const projectFolder = tmpDirForTest();
 
@@ -478,7 +478,7 @@ describe('ModulesApplicationService', () => {
       expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
     });
   });
-  describe('modification de fichiers existants', () => {
+  describe('modification of existing files', () => {
     const MAIN = 'src/webapp/main.ts';
     const withVueApp = () => {
       const service = createModulesApplicationService({ clock });
@@ -490,11 +490,11 @@ describe('ModulesApplicationService', () => {
     };
     const lines = (folder: string) => readFileSync(join(folder, MAIN), 'utf8').split('\n');
 
-    it('insère le code avant les repères et garde ce que l’équipe a ajouté', () => {
+    it('inserts the code before the needles and keeps what the team added', () => {
       const { service, projectFolder } = withVueApp();
       writeFileSync(
         join(projectFolder, MAIN),
-        `${readFileSync(join(projectFolder, MAIN), 'utf8')}console.info('perso');\n`,
+        `${readFileSync(join(projectFolder, MAIN), 'utf8')}console.info('custom');\n`,
       );
 
       const { report } = service.apply('pinia', { projectFolder });
@@ -510,13 +510,13 @@ describe('ModulesApplicationService', () => {
         'app.use(createPinia());',
         '// crafttype-needle-main-plugins',
         "app.mount('#app');",
-        "console.info('perso');",
+        "console.info('custom');",
         '',
       ]);
       expect(readJson(projectFolder, 'package.json').dependencies).toHaveProperty('pinia');
     });
 
-    it('ne change plus rien en réappliquant le module', () => {
+    it('changes nothing more when applying the module again', () => {
       const { service, projectFolder } = withVueApp();
       service.apply('pinia', { projectFolder });
       const before = readFileSync(join(projectFolder, MAIN), 'utf8');
@@ -527,7 +527,7 @@ describe('ModulesApplicationService', () => {
       expect(readFileSync(join(projectFolder, MAIN), 'utf8')).toBe(before);
     });
 
-    it('applique la modification quelle que soit la politique de conflit', () => {
+    it('applies the modification whatever the conflict policy', () => {
       for (const onConflict of ['fail', 'skip', 'overwrite'] as const) {
         const { service, projectFolder } = withVueApp();
 
@@ -536,7 +536,7 @@ describe('ModulesApplicationService', () => {
       }
     });
 
-    it('montre la modification en simulation sans toucher au fichier ni à l’historique', () => {
+    it('shows the modification in a dry run without touching the file or the history', () => {
       const { service, projectFolder } = withVueApp();
       const before = readFileSync(join(projectFolder, MAIN), 'utf8');
 
@@ -549,7 +549,7 @@ describe('ModulesApplicationService', () => {
       ).not.toContain('pinia');
     });
 
-    it('n’écrit rien quand un repère a été supprimé', () => {
+    it('writes nothing when a needle has been removed', () => {
       const { service, projectFolder } = withVueApp();
       const withoutNeedle = readFileSync(join(projectFolder, MAIN), 'utf8').replace(
         '// crafttype-needle-main-plugins\n',
@@ -569,9 +569,9 @@ describe('ModulesApplicationService', () => {
     });
 
     it.each([
-      ['pinia puis vue-router', ['pinia', 'vue-router']],
-      ['vue-router puis pinia', ['vue-router', 'pinia']],
-    ])('combine deux modules sur le même fichier : %s', (_, modules) => {
+      ['pinia then vue-router', ['pinia', 'vue-router']],
+      ['vue-router then pinia', ['vue-router', 'pinia']],
+    ])('combines two modules on the same file: %s', (_, modules) => {
       const { service, projectFolder } = withVueApp();
 
       for (const module of modules) service.apply(module, { projectFolder });
@@ -598,7 +598,7 @@ describe('ModulesApplicationService', () => {
       );
     });
 
-    describe('modules du serveur', () => {
+    describe('server modules', () => {
       const withServer = (serverPort?: number) => {
         const service = createModulesApplicationService({ clock });
         const projectFolder = tmpDirForTest();
@@ -609,9 +609,9 @@ describe('ModulesApplicationService', () => {
       const read = (folder: string, path: string) => readFileSync(join(folder, path), 'utf8');
 
       it.each([
-        ['config puis logs', ['config', 'logs']],
-        ['logs puis config', ['logs', 'config']],
-      ])('config et logs modifient chacun leur fichier : %s', (_, modules) => {
+        ['config then logs', ['config', 'logs']],
+        ['logs then config', ['logs', 'config']],
+      ])('config and logs each modify their file: %s', (_, modules) => {
         const { service, projectFolder } = withServer();
 
         for (const module of modules) service.apply(module, { projectFolder });
@@ -630,7 +630,7 @@ describe('ModulesApplicationService', () => {
         );
       });
 
-      it('config n’a pas de port propre : elle complète celui de fastify-server', () => {
+      it('config has no port of its own: it completes the one from fastify-server', () => {
         const { service, projectFolder } = withServer(4321);
 
         service.apply('config', { projectFolder });
@@ -641,7 +641,7 @@ describe('ModulesApplicationService', () => {
         expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.at(-1).properties).toEqual({});
       });
 
-      it('logs n’enregistre aucune propriété et n’ajoute aucune dépendance', () => {
+      it('logs records no property and adds no dependency', () => {
         const { service, projectFolder } = withServer();
         const before = readJson(projectFolder, 'package.json');
 
@@ -651,7 +651,7 @@ describe('ModulesApplicationService', () => {
         expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.at(-1).properties).toEqual({});
       });
 
-      it('exigent fastify-server', () => {
+      it('require fastify-server', () => {
         const service = createModulesApplicationService({ clock });
         const projectFolder = tmpDirForTest();
         service.apply('init', { projectFolder });
@@ -661,11 +661,11 @@ describe('ModulesApplicationService', () => {
       });
     });
 
-    it('explique que le fichier à modifier est introuvable', () => {
+    it('explains that the file to modify cannot be found', () => {
       const { service, projectFolder } = withVueApp();
       rmSync(join(projectFolder, MAIN));
 
-      expect(() => service.apply('pinia', { projectFolder })).toThrow(/src\/webapp\/main\.ts : fichier introuvable/);
+      expect(() => service.apply('pinia', { projectFolder })).toThrow(/src\/webapp\/main\.ts: file not found/);
     });
   });
 });

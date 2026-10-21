@@ -7,7 +7,7 @@ import { TypescriptFactory } from './TypescriptFactory.js';
 describe('TypescriptFactory', () => {
   const factory = new TypescriptFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
-  it('ajoute la configuration TypeScript, les dépendances et le script de typecheck', () => {
+  it('adds the TypeScript configuration, the dependencies and the typecheck script', () => {
     const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining(
       'tsconfig.json',
       '"strict": true',

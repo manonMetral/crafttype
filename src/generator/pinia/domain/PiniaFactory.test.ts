@@ -7,7 +7,7 @@ import { PiniaFactory } from './PiniaFactory.js';
 describe('PiniaFactory', () => {
   const factory = new PiniaFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
 
-  it('ajoute la dépendance et branche Pinia dans le main.ts de l’application Vue', () => {
+  it('adds the dependency and wires Pinia into the main.ts of the Vue application', () => {
     const module = factory.buildModule(propertiesFixture());
 
     expect(module.packageJson.dependencies).toHaveProperty('pinia');

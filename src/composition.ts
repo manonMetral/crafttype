@@ -10,8 +10,8 @@ import { SemverVersionComparator } from './shared/module/infrastructure/secondar
 import { resourcesRoot } from './shared/module/infrastructure/secondary/resourcesRoot.js';
 
 /**
- * Racine de composition : le seul endroit qui connaît à la fois le domaine et les adaptateurs.
- * `extraResources` ajoute des modules au catalogue (extensions, tests).
+ * Composition root: the only place that knows both the domain and the adapters.
+ * `extraResources` adds modules to the catalog (extensions, tests).
  */
 export const createModulesApplicationService = (
   options: { clock?: () => Date; extraResources?: readonly ModuleResource[] } = {},

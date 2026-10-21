@@ -8,13 +8,13 @@ import type { CraftModule } from '../module/domain/CraftModule.js';
 
 export const tmpDirForTest = (): string => mkdtempSync(join(tmpdir(), 'crafttype-test-'));
 
-/** Propriétés d'un module pour un test : toutes celles du catalogue ont une valeur, `overrides` les remplace ou en ajoute. */
+/** Properties of a module for a test: all those of the catalog have a value, `overrides` replaces or adds some. */
 export const propertiesFixture = (overrides: Readonly<Record<string, PropertyValue>> = {}): ModuleProperties => {
   const { projectFolder = tmpDirForTest(), ...values } = { projectName: 'my-app', serverPort: 3000, ...overrides };
   return moduleProperties(String(projectFolder), values);
 };
 
-/** Applique réellement le module sur un dossier temporaire (même principe que `assertThatModule` de Seed4J). */
+/** Actually applies the module in a temporary folder (same principle as Seed4J's `assertThatModule`). */
 export const assertThatModule = (module: CraftModule): ModuleAssertions => {
   createModulesApplicationService().applyModule(module);
   return new ModuleAssertions(module.projectFolder);
@@ -25,7 +25,7 @@ export class ModuleAssertions {
 
   hasFiles(...paths: string[]): this {
     for (const path of paths) {
-      expect(existsSync(join(this.projectFolder, path)), `fichier attendu : ${path}`).toBe(true);
+      expect(existsSync(join(this.projectFolder, path)), `expected file: ${path}`).toBe(true);
     }
     return this;
   }

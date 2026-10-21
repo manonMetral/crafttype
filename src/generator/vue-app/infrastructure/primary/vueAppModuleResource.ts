@@ -11,7 +11,7 @@ export const createVueAppModuleResource = (versions: NodePackagesVersionsReader)
   return moduleResource()
     .slug(vueAppSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().addProjectName().addServerPort().build())
-    .apiDoc('Frontend', 'Ajoute une application Vue.js avec Vite')
+    .apiDoc('Frontend', 'Adds a Vue.js application with Vite')
     .dependsOn('typescript')
     .tags('webapp')
     .factory((properties) => modules.buildModule(properties));

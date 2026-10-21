@@ -6,8 +6,8 @@ export interface ServerConfig {
 const MAX_PORT = 65_535;
 
 /**
- * Complète les valeurs par défaut de `main.ts` avec l'environnement (PORT, HOST)
- * et refuse au démarrage une valeur invalide.
+ * Completes the defaults from `main.ts` with the environment (PORT, HOST)
+ * and rejects an invalid value at startup.
  */
 export function loadConfig(
   defaults: ServerConfig,
@@ -28,7 +28,7 @@ function parsePort(value: string | undefined, fallback: number): number {
   const port = /^\d+$/.test(text) ? Number(text) : Number.NaN;
   if (!Number.isInteger(port) || port < 1 || port > MAX_PORT) {
     throw new Error(
-      `PORT invalide : « ${text} » (entier de 1 à ${MAX_PORT} attendu)`,
+      `Invalid PORT: "${text}" (expected an integer from 1 to ${MAX_PORT})`,
     );
   }
   return port;

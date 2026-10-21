@@ -7,7 +7,7 @@ describe('CraftModuleBuilder', () => {
   const properties = ModulePropertiesDefinition.builder().build().resolve({ projectFolder: 'app' });
 
   describe('addFile', () => {
-    it('accepte des destinations différentes', () => {
+    it('accepts different destinations', () => {
       const module = moduleBuilder(properties)
         .addFile(from('demo').file('a.txt'), 'a.txt')
         .addFile(from('demo').template('b.txt'), 'src/b.txt')
@@ -16,20 +16,20 @@ describe('CraftModuleBuilder', () => {
       expect(module.files.map((file) => file.destination)).toEqual(['a.txt', 'src/b.txt']);
     });
 
-    it('refuse la même destination déclarée deux fois', () => {
+    it('rejects the same destination declared twice', () => {
       const builder = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
 
-      expect(() => builder.addFile(from('demo').file('autre.txt'), 'src/a.txt')).toThrow(DuplicateDestinationError);
+      expect(() => builder.addFile(from('demo').file('other.txt'), 'src/a.txt')).toThrow(DuplicateDestinationError);
     });
 
-    it('refuse aussi la même source copiée deux fois au même endroit', () => {
+    it('also rejects the same source copied twice to the same place', () => {
       const builder = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'a.txt');
 
       expect(() => builder.addFile(from('demo').file('a.txt'), 'a.txt')).toThrow(DuplicateDestinationError);
     });
 
     it.each(['./src/a.txt', 'src//a.txt', 'src/x/../a.txt'])(
-      'reconnaît %j comme la même destination que src/a.txt',
+      'recognizes %j as the same destination as src/a.txt',
       (variant) => {
         const builder = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
 
@@ -37,16 +37,16 @@ describe('CraftModuleBuilder', () => {
       },
     );
 
-    it('nomme la destination en double dans le message', () => {
+    it('names the duplicated destination in the message', () => {
       const builder = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
 
       expect(() => builder.addFile(from('demo').file('b.txt'), './src/a.txt')).toThrow(
-        'Le module déclare deux fois le fichier src/a.txt',
+        'The module declares the file src/a.txt twice',
       );
     });
   });
   describe('insertAtNeedle', () => {
-    it('enregistre les insertions dans l’ordre, avec un chemin normalisé', () => {
+    it('records the insertions in order, with a normalized path', () => {
       const module = moduleBuilder(properties)
         .insertAtNeedle('./src/main.ts', 'imports', 'import a from "a";')
         .insertAtNeedle('src/main.ts', 'plugins', 'use(a);')
@@ -58,11 +58,11 @@ describe('CraftModuleBuilder', () => {
       ]);
     });
 
-    it('refuse un nom de repère invalide', () => {
+    it('rejects an invalid needle name', () => {
       expect(() => moduleBuilder(properties).insertAtNeedle('src/main.ts', 'Main_Imports', 'x')).toThrow(NeedleError);
     });
 
-    it('refuse de modifier un fichier que le même module crée', () => {
+    it('refuses to modify a file the same module creates', () => {
       const created = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
       expect(() => created.insertAtNeedle('src/a.txt', 'x', 'y')).toThrow(DuplicateDestinationError);
 

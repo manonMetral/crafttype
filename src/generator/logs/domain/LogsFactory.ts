@@ -6,8 +6,8 @@ const SERVER = 'src/server';
 
 export class LogsFactory {
   /**
-   * Configure le logger et l'identifiant de requête de `buildApp` par les repères `app-imports`,
-   * `app-server-options` et `app-plugins` de fastify-server.
+   * Configures the logger and the request id of `buildApp` through the `app-imports`,
+   * `app-server-options` and `app-plugins` needles of fastify-server.
    */
   buildModule(properties: ModuleProperties): CraftModule {
     return moduleBuilder(properties)

@@ -43,5 +43,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # Génère une application avec tous les modules, puis l'installe, la type-check, la teste et la compile.
+      # Generates an application with all modules, then installs it, type-checks it, tests it and builds it.
       - run: npm run ci:generate

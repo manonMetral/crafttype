@@ -11,7 +11,7 @@ export const createVitestModuleResource = (versions: NodePackagesVersionsReader)
   return moduleResource()
     .slug(vitestSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-    .apiDoc('Tests', 'Ajoute Vitest')
+    .apiDoc('Tests', 'Adds Vitest')
     .dependsOn('typescript')
     .tags('test')
     .factory((properties) => modules.buildModule(properties));

@@ -3,18 +3,18 @@ import type { CraftModule } from './CraftModule.js';
 
 export type ModuleSlug = string;
 
-/** Décrit comment un module s'organise dans le catalogue (équivalent de Seed4JModuleResource). */
+/** Describes how a module is organized in the catalog (equivalent of Seed4JModuleResource). */
 export interface ModuleResource {
   readonly slug: ModuleSlug;
   readonly propertiesDefinition: ModulePropertiesDefinition;
   readonly apiDoc: { readonly group: string; readonly operation: string };
-  /** Modules à appliquer avant celui-ci. Vide pour un module autonome (`standalone`). */
+  /** Modules to apply before this one. Empty for a standalone module (`standalone`). */
   readonly dependsOn: readonly ModuleSlug[];
   readonly tags: readonly string[];
   readonly factory: (properties: ModuleProperties) => CraftModule;
 }
 
-/** Builder à étapes ordonnées, comme `Seed4JModuleResource.builder()`. */
+/** Builder with ordered steps, like `Seed4JModuleResource.builder()`. */
 export interface SlugStep {
   slug(slug: ModuleSlug): PropertiesStep;
 }

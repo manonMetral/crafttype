@@ -11,7 +11,7 @@ export const createPiniaModuleResource = (versions: NodePackagesVersionsReader):
   return moduleResource()
     .slug(piniaSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-    .apiDoc('Front', "Ajoute Pinia pour l'état partagé de l'application Vue")
+    .apiDoc('Frontend', 'Adds Pinia for shared state in the Vue application')
     .dependsOn('vue-app')
     .tags('frontend', 'state')
     .factory((properties) => modules.buildModule(properties));

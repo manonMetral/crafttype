@@ -32,9 +32,9 @@ export interface ModulesApplicationServiceDependencies {
 }
 
 export interface ApplyOptions {
-  /** `fail` (défaut) refuse le module s'il y a un conflit, `overwrite` remplace l'existant, `skip` le garde. */
+  /** `fail` (default) refuses the module if there is a conflict, `overwrite` replaces the existing item, `skip` keeps it. */
   readonly onConflict?: ConflictPolicy;
-  /** Calcule et renvoie les changements sans rien écrire, ni dans le projet ni dans l'historique. */
+  /** Computes and returns the changes without writing anything, neither in the project nor in the history. */
   readonly dryRun?: boolean;
 }
 
@@ -45,7 +45,7 @@ export interface ApplyResult {
   readonly report: ApplyReport;
 }
 
-/** Orchestration : aucune règle métier ici, uniquement l'enchaînement des ports. */
+/** Orchestration: no business rule here, only the chaining of ports. */
 export class ModulesApplicationService {
   constructor(private readonly dependencies: ModulesApplicationServiceDependencies) {}
 
@@ -94,9 +94,9 @@ export class ModulesApplicationService {
   }
 
   /**
-   * Applique un module sans passer par le catalogue ni l'historique (utilisé par les tests de module).
-   * Rien n'est écrit si un fichier ou une entrée du package.json existant serait écrasé par un contenu différent,
-   * sauf si la politique l'autorise. Réappliquer un module à l'identique ne change rien.
+   * Applies a module without going through the catalog or the history (used by module tests).
+   * Nothing is written if an existing file or package.json entry would be overwritten by different content,
+   * unless the policy allows it. Applying the same module again changes nothing.
    */
   applyModule(module: CraftModule, { onConflict = 'fail' }: Pick<ApplyOptions, 'onConflict'> = {}): ApplyReport {
     const changes = this.plan(module).resolve(onConflict);
@@ -104,7 +104,7 @@ export class ModulesApplicationService {
     return reportOf(changes);
   }
 
-  /** Ce que le module changerait dans le projet, d'après l'état actuel des fichiers. */
+  /** What the module would change in the project, based on the current state of the files. */
   private plan(module: CraftModule): ChangePlan {
     const { files, resourcesReader, renderer } = this.dependencies;
     const { projectFolder, packageJson } = module;
@@ -137,7 +137,7 @@ export class ModulesApplicationService {
     return new ChangePlan([...fileChanges, ...editChanges, ...packageJsonChanges], this.dependencies.versions);
   }
 
-  /** Un changement par fichier modifié : les insertions d'un même fichier s'enchaînent dans l'ordre où le module les déclare. */
+  /** One change per modified file: the insertions in a same file are chained in the order the module declares them. */
   private planEdits({ projectFolder, edits }: CraftModule): PlannedChange[] {
     const byPath = new Map<string, FileEdit[]>();
     for (const edit of edits) {
@@ -150,14 +150,14 @@ export class ModulesApplicationService {
         throw new NeedleError(
           path,
           needleToken(fileEdits[0]?.needle ?? ''),
-          "fichier introuvable : appliquez d'abord le module qui le crée",
+          'file not found: apply the module that creates it first',
         );
       }
       return { kind: 'edit' as const, target: path, current, next: fileEdits.reduce(insertAtNeedle, current) };
     });
   }
 
-  /** Écrit uniquement ce qui est à créer, à modifier ou à remplacer, pour ne pas toucher aux fichiers déjà à jour. */
+  /** Writes only what is to be created, modified or replaced, so that up-to-date files are left untouched. */
   private write(module: CraftModule, changes: readonly DecidedChange[]): void {
     const { files } = this.dependencies;
     const toWrite = changes.filter(
@@ -181,7 +181,7 @@ export class ModulesApplicationService {
     files.write(module.projectFolder, PACKAGE_JSON_PATH, current.with(entries).serialize());
   }
 
-  /** Propriétés déjà posées par les modules appliqués ; le plus récent l'emporte. */
+  /** Properties already set by the applied modules; the most recent one wins. */
   private knownProperties(projectFolder: PropertyValue | undefined): KnownProperties {
     const folder = String(projectFolder ?? '');
     if (folder.trim() === '') {

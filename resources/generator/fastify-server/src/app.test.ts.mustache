@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from './app.js';
 
 describe('GET /api/health', () => {
-  it('répond UP', async () => {
+  it('responds UP', async () => {
     const app = buildApp({ logger: false });
 
     const response = await app.inject({ method: 'GET', url: '/api/health' });

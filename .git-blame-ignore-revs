@@ -1,2 +1,2 @@
-# Commits de mise en forme seule, ignorés par `git blame` (GitHub le lit automatiquement ; en local : git config blame.ignoreRevsFile .git-blame-ignore-revs)
+# Formatting-only commits, ignored by `git blame` (GitHub reads this file automatically; locally: git config blame.ignoreRevsFile .git-blame-ignore-revs)
 2369d0ccd0d287e945919241715440b1455f6316
