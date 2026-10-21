@@ -5,7 +5,10 @@ const SOURCE = from('logs');
 const SERVER = 'src/server';
 
 export class LogsFactory {
-  /** Configure le logger et l'identifiant de requête de `buildApp` par les repères `app-imports`, `app-server-options` et `app-plugins` de fastify-server. */
+  /**
+   * Configure le logger et l'identifiant de requête de `buildApp` par les repères `app-imports`,
+   * `app-server-options` et `app-plugins` de fastify-server.
+   */
   buildModule(properties: ModuleProperties): CraftModule {
     return moduleBuilder(properties)
       .addFile(SOURCE.file('logger.ts'), `${SERVER}/logger.ts`)

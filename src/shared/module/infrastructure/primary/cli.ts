@@ -168,7 +168,9 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
   const { slug, dryRun, changes, report: counts } = result;
   const kept = counts.kept > 0 ? `, versions conservées : ${counts.kept}` : '';
   const edited = counts.edited > 0 ? `, modifiés : ${counts.edited}` : '';
-  const summary = `créés : ${counts.created}${edited}, remplacés : ${counts.replaced}, inchangés : ${counts.unchanged}, ignorés : ${counts.skipped}${kept}`;
+  const summary =
+    `créés : ${counts.created}${edited}, remplacés : ${counts.replaced}, ` +
+    `inchangés : ${counts.unchanged}, ignorés : ${counts.skipped}${kept}`;
 
   if (dryRun) {
     out(`Simulation du module ${slug} dans ${projectFolder} (rien n'est écrit) :`);

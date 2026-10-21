@@ -37,7 +37,8 @@ export const insertAtNeedle = (fileContent: string, { path, needle, content }: F
     throw new NeedleError(
       path,
       token,
-      'repère introuvable : le fichier a été modifié, ou généré par une version plus ancienne du module qui le crée. Ajoutez à la main une ligne de commentaire contenant ce repère là où le code doit être inséré',
+      'repère introuvable : le fichier a été modifié, ou généré par une version plus ancienne du module qui le crée. ' +
+        'Ajoutez à la main une ligne de commentaire contenant ce repère là où le code doit être inséré',
     );
   }
   if (found.length > 1) {
