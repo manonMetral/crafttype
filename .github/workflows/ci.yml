@@ -29,7 +29,7 @@ jobs:
       - run: npm ci
       - run: npm run format:check
       - run: npm run lint:types
-      - run: npm test
+      - run: npm run test:coverage
       - run: npm run build
 
   generate:

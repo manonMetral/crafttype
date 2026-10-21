@@ -105,6 +105,22 @@ describe('CLI', () => {
     expect(output).toContain('Usage :');
   });
 
+  it('signale une option sans valeur sans stack trace', () => {
+    const { code, output } = run('apply', 'init', '--project-folder');
+
+    expect(code).toBe(1);
+    expect(output).toContain("Erreur : valeur manquante ou invalide pour l'option --project-folder");
+    expect(output).toContain('Usage :');
+  });
+
+  it('signale un argument en trop avec la première ligne de l’erreur', () => {
+    const { code, output } = run('apply', 'init', 'en-trop', '--project-folder', tmpDirForTest());
+
+    expect(code).toBe(1);
+    expect(output).toMatch(/^Erreur : /);
+    expect(output).toContain('Usage :');
+  });
+
   it('refuse d’écraser un fichier modifié, sauf avec --force', () => {
     const projectFolder = tmpDirForTest();
     run('apply', 'init', '--project-folder', projectFolder);

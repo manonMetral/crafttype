@@ -24,6 +24,7 @@ npm ci
 npm run format        # met le code en forme (Prettier) ; format:check le vérifie, la CI aussi
 npm run lint:types    # typecheck
 npm test              # tests unitaires et d'acceptation
+npm run test:coverage # mêmes tests avec le coverage ; la CI exige 99 % d'instructions, de fonctions et de lignes, et 95 % de branches
 npm run build         # compilation vers dist/
 npm run ci:generate   # génère une application complète avec tous les modules, puis l'installe, la type-check, la teste et la compile
 ```

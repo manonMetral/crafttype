@@ -24,6 +24,8 @@ describe('SemverVersionComparator', () => {
     ['github:org/repo', '5.12.7', 'URL'],
     ['workspace:*', '5.12.7', 'référence de workspace'],
     ['file:../fastify', '5.12.7', 'chemin local'],
+    ['<0.0.0', '5.12.7', 'intervalle sans aucune version'],
+    ['5.12.7', '<0.0.0', 'version du catalogue sans minimum'],
   ])('ne garde pas %s face à %s (%s)', (existing, wanted) => {
     expect(comparator.keepsExistingVersion(existing, wanted)).toBe(false);
   });
