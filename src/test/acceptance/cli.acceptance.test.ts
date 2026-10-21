@@ -131,6 +131,20 @@ describe('CLI', () => {
     expect(output).toMatch(/^Error: cannot (write|access) .*not-a-folder.*: not a directory \(ENOTDIR\)$/);
   });
 
+  it('warns when --force replaces a file that another module completed', () => {
+    const projectFolder = tmpDirForTest();
+    for (const module of ['init', 'typescript', 'vitest', 'fastify-server', 'config']) {
+      run('apply', module, '--project-folder', projectFolder);
+    }
+
+    const { code, output } = run('apply', 'fastify-server', '--project-folder', projectFolder, '--force');
+
+    expect(code).toBe(0);
+    expect(output).toContain(
+      'Warning: src/server/main.ts is replaced, and config had inserted code in it: apply config again to restore it',
+    );
+  });
+
   it('refuses to overwrite a modified file, except with --force', () => {
     const projectFolder = tmpDirForTest();
     run('apply', 'init', '--project-folder', projectFolder);

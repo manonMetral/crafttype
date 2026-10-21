@@ -6,7 +6,7 @@ import {
   type DecidedChange,
   type PlannedChange,
 } from '../domain/ChangePlan.js';
-import { MissingModuleDependenciesError, NeedleError, UnknownModuleError } from '../domain/errors.js';
+import { CraftTypeError, MissingModuleDependenciesError, NeedleError, UnknownModuleError } from '../domain/errors.js';
 import { PACKAGE_JSON_PATH, PackageJsonDocument } from '../domain/PackageJsonDocument.js';
 import { insertAtNeedle, needleToken, type FileEdit } from '../domain/needles.js';
 import type { KnownProperties, ModuleProperties, PropertyValue, RawProperties } from '../domain/ModuleProperties.js';
@@ -46,6 +46,8 @@ export interface ApplyResult {
   readonly dryRun: boolean;
   readonly changes: readonly DecidedChange[];
   readonly report: ApplyReport;
+  /** Things the user should know about although the module applies, for example insertions a replacement loses. */
+  readonly warnings: readonly string[];
 }
 
 /** Orchestration: no business rule here, only the chaining of ports. */
@@ -84,7 +86,13 @@ export class ModulesApplicationService {
 
     if (dryRun) {
       const changes = plan.decide(onConflict);
-      return { slug, dryRun, changes, report: reportOf(changes) };
+      return {
+        slug,
+        dryRun,
+        changes,
+        report: reportOf(changes),
+        warnings: this.lostInsertions(slug, properties, changes),
+      };
     }
 
     const changes = plan.resolve(onConflict);
@@ -98,7 +106,13 @@ export class ModulesApplicationService {
         appliedAt: this.dependencies.clock().toISOString(),
       });
     }
-    return { slug, dryRun, changes, report: reportOf(changes) };
+    return {
+      slug,
+      dryRun,
+      changes,
+      report: reportOf(changes),
+      warnings: this.lostInsertions(slug, properties, changes),
+    };
   }
 
   /**
@@ -188,6 +202,48 @@ export class ModulesApplicationService {
 
     const current = PackageJsonDocument.parse(files.read(module.projectFolder, PACKAGE_JSON_PATH));
     files.write(module.projectFolder, PACKAGE_JSON_PATH, current.with(entries).serialize());
+  }
+
+  /**
+   * Replacing a file that another applied module completed at a needle (`config` in the `main.ts` of `fastify-server`)
+   * loses that module's insertions, and the history still lists it. Only a warning: the user asked for the replacement.
+   */
+  private lostInsertions(slug: ModuleSlug, properties: ModuleProperties, changes: readonly DecidedChange[]): string[] {
+    const replaced = changes.filter(({ kind, decision }) => kind === 'file' && decision === 'overwrite');
+    if (replaced.length === 0) {
+      return [];
+    }
+
+    const { history, paths } = this.dependencies;
+    const editors = history
+      .list(properties.projectFolder)
+      .filter((applied) => applied.slug !== slug)
+      .flatMap((applied) => {
+        try {
+          const other = this.buildModule(applied.slug, {
+            ...applied.properties,
+            projectFolder: properties.projectFolder,
+          });
+          return [
+            { slug: applied.slug, edited: normalizeDestinations(other.module, paths).edits.map(({ path }) => path) },
+          ];
+        } catch (error) {
+          // A history entry that can no longer be rebuilt (module removed, property changed) cannot be checked.
+          if (error instanceof CraftTypeError) {
+            return [];
+          }
+          throw error;
+        }
+      });
+
+    return replaced.flatMap(({ target }) => {
+      const lost = editors.filter(({ edited }) => edited.includes(target)).map((editor) => editor.slug);
+      return lost.length === 0
+        ? []
+        : [
+            `${target} is replaced, and ${lost.join(', ')} had inserted code in it: apply ${lost.join(', ')} again to restore it`,
+          ];
+    });
   }
 
   /**

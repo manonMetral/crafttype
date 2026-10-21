@@ -700,6 +700,60 @@ describe('ModulesApplicationService', () => {
     });
   });
 
+  describe('replacing a file that other modules completed', () => {
+    const completedServer = () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+      for (const slug of ['init', 'typescript', 'vitest', 'fastify-server', 'config', 'logs']) {
+        service.apply(slug, slug === 'init' ? { projectFolder, projectName: 'shop' } : { projectFolder });
+      }
+      return { service, projectFolder };
+    };
+
+    it('warns, naming the file and the modules whose insertions are lost', () => {
+      const { service, projectFolder } = completedServer();
+
+      const { warnings, report } = service.apply('fastify-server', { projectFolder }, { onConflict: 'overwrite' });
+
+      expect(report.replaced).toBeGreaterThan(0);
+      expect(warnings).toEqual([
+        'src/server/app.ts is replaced, and logs had inserted code in it: apply logs again to restore it',
+        'src/server/main.ts is replaced, and config had inserted code in it: apply config again to restore it',
+      ]);
+    });
+
+    it('shows the same warnings in a dry run', () => {
+      const { service, projectFolder } = completedServer();
+
+      const { warnings } = service.apply(
+        'fastify-server',
+        { projectFolder },
+        { onConflict: 'overwrite', dryRun: true },
+      );
+
+      expect(warnings).toHaveLength(2);
+    });
+
+    it('ignores a history entry whose module no longer exists, and still warns about the others', () => {
+      const { service, projectFolder } = completedServer();
+      const path = join(projectFolder, '.crafttype/modules/history.json');
+      const history = JSON.parse(readFileSync(path, 'utf8'));
+      history.modules.push({ slug: 'removed-module', properties: {}, appliedAt: '2026-10-20T10:00:00.000Z' });
+      writeFileSync(path, JSON.stringify(history));
+
+      const { warnings } = service.apply('fastify-server', { projectFolder }, { onConflict: 'overwrite' });
+
+      expect(warnings).toHaveLength(2);
+    });
+
+    it('says nothing when no other module completed the replaced file, or when nothing is replaced', () => {
+      const { service, projectFolder } = completedServer();
+
+      expect(service.apply('init', { projectFolder }, { onConflict: 'overwrite' }).warnings).toEqual([]);
+      expect(service.apply('fastify-server', { projectFolder }, { onConflict: 'skip' }).warnings).toEqual([]);
+    });
+  });
+
   describe('history of an unchanged module', () => {
     const later = () => new Date('2026-10-21T09:00:00Z');
     const historyOf = (folder: string) => readFileSync(join(folder, '.crafttype/modules/history.json'), 'utf8');
