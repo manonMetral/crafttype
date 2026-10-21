@@ -1,3 +1,5 @@
+// Exception assumée à l'isolation du domaine : `posix.normalize` est une fonction pure (aucune entrée-sortie), elle ne
+// justifie pas un port. arch-unit-ts ignore les imports `node:*` ; toute bibliothèque tierce passe, elle, par un port.
 import { posix } from 'node:path';
 import { DuplicateDestinationError } from './errors.js';
 import type { ModuleProperties } from './ModuleProperties.js';

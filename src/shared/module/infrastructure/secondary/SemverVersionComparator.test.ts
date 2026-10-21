@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { keepsExistingVersion } from './versions.js';
+import { SemverVersionComparator } from './SemverVersionComparator.js';
 
-describe('keepsExistingVersion', () => {
+describe('SemverVersionComparator', () => {
+  const comparator = new SemverVersionComparator();
+
   it.each([
     ['5.13.0', '5.12.7', 'version exacte plus récente'],
     ['6.0.0', '5.12.7', 'version majeure plus récente'],
@@ -10,7 +12,7 @@ describe('keepsExistingVersion', () => {
     ['>=5', '5.12.7', 'intervalle ouvert'],
     ['*', '5.12.7', 'toute version'],
   ])('garde %s face à %s (%s)', (existing, wanted) => {
-    expect(keepsExistingVersion(existing, wanted)).toBe(true);
+    expect(comparator.keepsExistingVersion(existing, wanted)).toBe(true);
   });
 
   it.each([
@@ -23,6 +25,6 @@ describe('keepsExistingVersion', () => {
     ['workspace:*', '5.12.7', 'référence de workspace'],
     ['file:../fastify', '5.12.7', 'chemin local'],
   ])('ne garde pas %s face à %s (%s)', (existing, wanted) => {
-    expect(keepsExistingVersion(existing, wanted)).toBe(false);
+    expect(comparator.keepsExistingVersion(existing, wanted)).toBe(false);
   });
 });

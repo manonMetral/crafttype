@@ -18,6 +18,7 @@ import type {
   ModuleResourcesReader,
   ProjectFiles,
   TemplateRenderer,
+  VersionComparator,
 } from '../domain/ports.js';
 
 const PACKAGE_JSON = 'package.json';
@@ -28,6 +29,7 @@ export interface ModulesApplicationServiceDependencies {
   readonly resourcesReader: ModuleResourcesReader;
   readonly renderer: TemplateRenderer;
   readonly history: ModulesHistory;
+  readonly versions: VersionComparator;
   readonly clock: () => Date;
 }
 
@@ -122,7 +124,7 @@ export class ModulesApplicationService {
       ['devDependency', packageJson.devDependencies, 'devDependencies'],
     ];
     if (sections.every(([, wanted]) => Object.keys(wanted).length === 0)) {
-      return new ChangePlan(fileChanges);
+      return new ChangePlan(fileChanges, this.dependencies.versions);
     }
 
     const current = this.readPackageJson(projectFolder);
@@ -135,7 +137,7 @@ export class ModulesApplicationService {
         next: JSON.stringify(value),
       }));
     });
-    return new ChangePlan([...fileChanges, ...packageJsonChanges]);
+    return new ChangePlan([...fileChanges, ...packageJsonChanges], this.dependencies.versions);
   }
 
   /** Écrit uniquement ce qui est à créer ou à remplacer, pour ne pas toucher aux fichiers déjà à jour. */
