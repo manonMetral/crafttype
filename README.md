@@ -3,7 +3,7 @@
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
 Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
-> Status: end of phase 1. The core and ten modules work, the CLI is minimal. ESLint (blocked, see below) and npm publication are still to come.
+> Status: phase 2 (wider catalog) has started. The core and eleven modules work, the CLI is minimal. ESLint (blocked, see below) and npm publication are still to come.
 
 ## Usage
 
@@ -20,6 +20,7 @@ npm run cli -- apply logs --project-folder ../my-app
 npm run cli -- apply vue-app --project-folder ../my-app
 npm run cli -- apply pinia --project-folder ../my-app
 npm run cli -- apply vue-router --project-folder ../my-app
+npm run cli -- apply github-actions --project-folder ../my-app
 ```
 
 Applied modules are recorded in the generated project's `.crafttype/modules/history.json`, together with the properties they declare. A module refuses to apply if the modules it depends on are not in that history.
@@ -46,6 +47,8 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 **Front-end typing.** `vue-app` adds `npm run webapp:typecheck` (`tsc` on `src/webapp`): it checks the `.ts` files (`main.ts`, `router.ts`...) but not the `<script>` of `.vue` files. `vue-tsc`, which would do it, does not work with TypeScript 7 yet (tested with version 3.3.13); it will replace this script as soon as it supports it. `vite build` does not check any type.
 
 **Modules that complete a file.** `pinia` and `vue-router` (files of `vue-app`), `config` and `logs` (files of `fastify-server`) overwrite nothing: they insert their code into the file at needles (`// crafttype-needle-main-imports`...) that the owning module placed there, in the order you apply them. This is not a conflict, and the command prints the modified file. If a needle was removed by hand, the module fails and names it, without writing anything (see `documentation/module-creation.md`).
+
+**CI.** `github-actions` adds `.github/workflows/ci.yml` to the generated project: it runs on pushes to `main` and on pull requests, on Node 22 and 24, with read-only permissions. It runs `typecheck` and `test`, and the scripts other modules may have added (`format:check`, `webapp:typecheck`, `server:build`, `webapp:build`) only if they exist (`npm run --if-present`), so modules applied later need no change. It uses `npm ci`: run `npm install` once in the generated project and commit `package-lock.json`.
 
 **Dependency versions.** A dependency already present in `package.json` with a version equal to, newer than or compatible with the catalog one (`^5.0.0` for `5.12.7`) is not a conflict: it is kept, even with `--force`, so that a project updated by Renovate never goes backwards. An older version, a tag (`latest`), a URL or a workspace reference remains a conflict.
 

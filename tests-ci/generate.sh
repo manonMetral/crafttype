@@ -24,6 +24,12 @@ done
 
 cd "$APP"
 npm install
+# The CI workflow is checked by `format:check` below (Prettier parses and formats the YAML).
+test -f .github/workflows/ci.yml
+# Every script the workflow runs without `--if-present` must exist in the generated project.
+for script in $(sed -n 's/^ *- run: npm run \([a-z:-]*\)$/\1/p' .github/workflows/ci.yml); do
+  npm run | grep -q "^  $script\$" || { echo "workflow runs npm run $script, which does not exist" >&2; exit 1; }
+done
 npm run format:check
 npm run typecheck
 npm run webapp:typecheck
