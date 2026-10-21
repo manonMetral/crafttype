@@ -4,6 +4,11 @@
   "labels": ["dependencies"],
   "packageRules": [
     {
+      "description": "@types/node reste sur la majeure du Node minimal supporté (engines >=22.12) : le typage refuse alors les API absentes de Node 22",
+      "matchPackageNames": ["@types/node"],
+      "allowedVersions": "<23"
+    },
+    {
       "description": "Catalogue de versions injectées dans les projets générés : un seul lot, validé par la CI de génération",
       "matchFileNames": ["resources/generator/dependencies/**/package.json"],
       "groupName": "catalogue de versions des projets générés",
