@@ -92,7 +92,9 @@ This is how `vue-app` reads back the port set by `fastify-server` and the name s
 
 ### Existing files
 
-A module never replaces a file or a `package.json` entry (field, script, version) whose content differs: it fails by listing the conflicts, without writing anything. Reapplying a module identically changes nothing.
+A module never replaces a file or a `package.json` entry (field, script, version) whose content differs: it fails by listing the conflicts, without writing anything. Reapplying a module identically changes nothing, and leaves `history.json` as it is (the entry keeps its place and its date) when the properties are the same too.
+
+**Failures.** Everything the engine can check is checked before the first write: conflicts, needles, destinations, missing dependencies. These errors write nothing and record nothing. A failure of the file system during the writes (permission denied, disk full, a path that is not a folder) is different: the files already written stay, and the module is not recorded in the history, so the project is partly written. The CLI prints one line (`Error: cannot write <path>: permission denied (EACCES)`). Each file is written to a temporary file and renamed, so a file is never left truncated. Fix the cause and run the same command again: the engine is idempotent, so it completes the missing files and records the module (checked by a test that compares the result with a project that never failed).
 
 The engine first computes a plan (`ChangePlan`): each file or `package.json` entry is created, unchanged or in conflict. A policy then settles the conflicts:
 

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../../composition.js';
@@ -697,6 +697,116 @@ describe('ModulesApplicationService', () => {
 
       expect(() => createModulesApplicationService().applyModule(module)).toThrow(DuplicateDestinationError);
       expect(existsSync(join(projectFolder, 'src'))).toBe(false);
+    });
+  });
+
+  describe('history of an unchanged module', () => {
+    const later = () => new Date('2026-10-21T09:00:00Z');
+    const historyOf = (folder: string) => readFileSync(join(folder, '.crafttype/modules/history.json'), 'utf8');
+
+    it('is left as it is when the module is applied again with nothing to change', () => {
+      const projectFolder = tmpDirForTest();
+      const first = createModulesApplicationService({ clock });
+      first.apply('init', { projectFolder, projectName: 'shop' });
+      first.apply('typescript', { projectFolder });
+      const before = historyOf(projectFolder);
+
+      const { report } = createModulesApplicationService({ clock: later }).apply('init', { projectFolder });
+
+      expect(report).toMatchObject({ created: 0, replaced: 0, edited: 0 });
+      expect(historyOf(projectFolder)).toBe(before);
+    });
+
+    it('is left as it is when the existing newer dependency versions are kept', () => {
+      const projectFolder = tmpDirForTest();
+      const first = createModulesApplicationService({ clock });
+      first.apply('init', { projectFolder });
+      first.apply('typescript', { projectFolder });
+      const packageJson = readJson(projectFolder, 'package.json');
+      packageJson.devDependencies.typescript = '^99.0.0';
+      writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
+      const before = historyOf(projectFolder);
+
+      const { report } = createModulesApplicationService({ clock: later }).apply('typescript', { projectFolder });
+
+      expect(report.kept).toBe(1);
+      expect(historyOf(projectFolder)).toBe(before);
+    });
+
+    it('is recorded again when something was written', () => {
+      const projectFolder = tmpDirForTest();
+      createModulesApplicationService({ clock }).apply('init', { projectFolder });
+      rmSync(join(projectFolder, '.editorconfig'));
+
+      createModulesApplicationService({ clock: later }).apply('init', { projectFolder });
+
+      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules[0].appliedAt).toBe(
+        '2026-10-21T09:00:00.000Z',
+      );
+    });
+
+    it('is recorded again when the properties differ, even if nothing was written', () => {
+      const projectFolder = tmpDirForTest();
+      createModulesApplicationService({ clock }).apply('init', { projectFolder, projectName: 'shop' });
+
+      createModulesApplicationService({ clock: later }).apply(
+        'init',
+        { projectFolder, projectName: 'other' },
+        { onConflict: 'skip' },
+      );
+
+      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules[0]).toMatchObject({
+        properties: { projectName: 'other' },
+        appliedAt: '2026-10-21T09:00:00.000Z',
+      });
+    });
+  });
+
+  // A permission cannot be taken away from root, nor from a Windows file.
+  describe.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('after an I/O failure', () => {
+    const FILES_BEFORE_VUE_APP = ['init', 'typescript', 'vitest', 'prettier', 'fastify-server'] as const;
+
+    const applyAll = (projectFolder: string, modules: readonly string[]) => {
+      const service = createModulesApplicationService({ clock });
+      for (const slug of modules) {
+        service.apply(slug, slug === 'init' ? { projectFolder, projectName: 'shop' } : { projectFolder });
+      }
+    };
+
+    const tree = (folder: string, prefix = ''): Record<string, string> =>
+      Object.assign(
+        {},
+        ...readdirSync(join(folder, prefix), { withFileTypes: true }).map((entry) => {
+          const path = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+          return entry.isDirectory() ? tree(folder, path) : { [path]: readFileSync(join(folder, path), 'utf8') };
+        }),
+      );
+
+    const setWritable = (folder: string, writable: boolean) => {
+      chmodSync(folder, writable ? 0o755 : 0o555);
+    };
+
+    it('may leave the project partly written, and applying the module again completes it', () => {
+      const projectFolder = tmpDirForTest();
+      applyAll(projectFolder, FILES_BEFORE_VUE_APP);
+      setWritable(join(projectFolder, 'src'), false);
+
+      try {
+        expect(() => applyAll(projectFolder, ['vue-app'])).toThrow(/EACCES/);
+      } finally {
+        setWritable(join(projectFolder, 'src'), true);
+      }
+      // Partly written: a file of the module is there, the history entry is not.
+      expect(existsSync(join(projectFolder, 'vite.config.ts'))).toBe(true);
+      expect(
+        readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug),
+      ).not.toContain('vue-app');
+
+      applyAll(projectFolder, ['vue-app']);
+
+      const reference = tmpDirForTest();
+      applyAll(reference, [...FILES_BEFORE_VUE_APP, 'vue-app']);
+      expect(tree(projectFolder)).toEqual(tree(reference));
     });
   });
 });

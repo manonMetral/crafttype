@@ -90,11 +90,14 @@ export class ModulesApplicationService {
     const changes = plan.resolve(onConflict);
     this.write(module, changes);
 
-    this.dependencies.history.record(properties.projectFolder, {
-      slug,
-      properties: resource.propertiesDefinition.portable(properties),
-      appliedAt: this.dependencies.clock().toISOString(),
-    });
+    const portable = resource.propertiesDefinition.portable(properties);
+    if (!this.alreadyRecorded(slug, portable, properties.projectFolder, changes)) {
+      this.dependencies.history.record(properties.projectFolder, {
+        slug,
+        properties: portable,
+        appliedAt: this.dependencies.clock().toISOString(),
+      });
+    }
     return { slug, dryRun, changes, report: reportOf(changes) };
   }
 
@@ -187,6 +190,23 @@ export class ModulesApplicationService {
     files.write(module.projectFolder, PACKAGE_JSON_PATH, current.with(entries).serialize());
   }
 
+  /**
+   * Applying a module again with the same properties and nothing to change leaves the history as it is: recording it
+   * would only move the entry to the end and give it a new date, which is noise in version control.
+   */
+  private alreadyRecorded(
+    slug: ModuleSlug,
+    properties: KnownProperties,
+    projectFolder: string,
+    changes: readonly DecidedChange[],
+  ): boolean {
+    if (!changes.every(({ decision }) => decision === 'unchanged' || decision === 'keep')) {
+      return false;
+    }
+    const recorded = this.dependencies.history.list(projectFolder).find((applied) => applied.slug === slug);
+    return recorded !== undefined && sameProperties(recorded.properties, properties);
+  }
+
   /** Properties already set by the applied modules; the most recent one wins. */
   private knownProperties(projectFolder: PropertyValue | undefined): KnownProperties {
     const folder = String(projectFolder ?? '');
@@ -207,3 +227,8 @@ export class ModulesApplicationService {
     }
   }
 }
+
+const sameProperties = (left: KnownProperties, right: KnownProperties): boolean => {
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
+};

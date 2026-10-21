@@ -50,6 +50,8 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 
 **CI.** `github-actions` adds `.github/workflows/ci.yml` to the generated project: it runs on pushes to `main` and on pull requests, on Node 22 and 24, with read-only permissions. It runs `typecheck` and `test`, and the scripts other modules may have added (`format:check`, `webapp:typecheck`, `server:build`, `webapp:build`) only if they exist (`npm run --if-present`), so modules applied later need no change. It uses `npm ci`: run `npm install` once in the generated project and commit `package-lock.json`.
 
+**Failures.** Conflicts, missing needles, invalid destinations and missing dependencies are all detected before the first write: nothing is written or recorded. A failure of the file system during the writes (permission denied, disk full...) can leave the project partly written, and the CLI prints it on one line. Files are written through a temporary file and renamed, so none is left truncated. Fix the cause and run the same command again: it completes the project and records the module in the history.
+
 **Dependency versions.** A dependency already present in `package.json` with a version equal to, newer than or compatible with the catalog one (`^5.0.0` for `5.12.7`) is not a conflict: it is kept, even with `--force`, so that a project updated by Renovate never goes backwards. An older version, a tag (`latest`), a URL or a workspace reference remains a conflict.
 
 ## Checking that it works

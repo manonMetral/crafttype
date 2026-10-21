@@ -121,6 +121,16 @@ describe('CLI', () => {
     expect(output).toContain('Usage:');
   });
 
+  it('reports a file system failure on one line, without a stack trace', () => {
+    const file = join(tmpDirForTest(), 'not-a-folder');
+    writeFileSync(file, '');
+
+    const { code, output } = run('apply', 'init', '--project-folder', file);
+
+    expect(code).toBe(1);
+    expect(output).toMatch(/^Error: cannot (write|access) .*not-a-folder.*: not a directory \(ENOTDIR\)$/);
+  });
+
   it('refuses to overwrite a modified file, except with --force', () => {
     const projectFolder = tmpDirForTest();
     run('apply', 'init', '--project-folder', projectFolder);

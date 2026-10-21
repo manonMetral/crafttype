@@ -8,6 +8,7 @@ import {
   ModuleConflictError,
 } from '../../domain/errors.js';
 import type { ModulePropertiesDefinition, PropertyDefinition, PropertyValue } from '../../domain/ModuleProperties.js';
+import { describeSystemError, isSystemError } from './systemErrors.js';
 
 const USAGE = `Usage:
   crafttype list
@@ -59,6 +60,10 @@ export const runCli = (
     if (isUsageError(error)) {
       out(`Error: ${describeUsageError(error)}`);
       out(USAGE);
+      return 1;
+    }
+    if (isSystemError(error)) {
+      out(`Error: ${describeSystemError(error)}`);
       return 1;
     }
     throw error;
