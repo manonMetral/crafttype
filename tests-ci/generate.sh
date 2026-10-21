@@ -20,6 +20,7 @@ done
 
 cd "$APP"
 npm install
+npm run format:check
 npm run typecheck
 npm test
 npm run server:build

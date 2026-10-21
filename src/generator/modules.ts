@@ -2,6 +2,7 @@ import type { ModuleResource } from '../shared/module/domain/ModuleResource.js';
 import type { NodePackagesVersionsReader } from '../shared/module/domain/PackageVersions.js';
 import { createFastifyServerModuleResource } from './fastify-server/infrastructure/primary/fastifyServerModuleResource.js';
 import { createInitModuleResource } from './init/infrastructure/primary/initModuleResource.js';
+import { createPrettierModuleResource } from './prettier/infrastructure/primary/prettierModuleResource.js';
 import { createTypescriptModuleResource } from './typescript/infrastructure/primary/typescriptModuleResource.js';
 import { createVitestModuleResource } from './vitest/infrastructure/primary/vitestModuleResource.js';
 import { createVueAppModuleResource } from './vue-app/infrastructure/primary/vueAppModuleResource.js';
@@ -11,6 +12,7 @@ export const allModuleResources = (versions: NodePackagesVersionsReader): readon
   createInitModuleResource(),
   createTypescriptModuleResource(versions),
   createVitestModuleResource(versions),
+  createPrettierModuleResource(versions),
   createFastifyServerModuleResource(versions),
   createVueAppModuleResource(versions),
 ];
