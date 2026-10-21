@@ -3,29 +3,48 @@
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
 Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
-> Status: phase 2 (wider catalog) has started. The core and eleven modules work, the CLI is minimal. ESLint (blocked, see below) and npm publication are still to come.
+> Status: phase 2 (wider catalog) has started. The core and eleven modules work, the CLI is minimal. ESLint (blocked, see below) is not available yet, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
 
-## Usage
+## Usage with npx
+
+Requirements: Node.js 22.12 or newer.
+
+Run the commands from the folder of the project to generate or extend (an empty folder to start a new project):
 
 ```bash
-npm install
-npm run cli -- list
-npm run cli -- apply init --project-folder ../my-app --project-name my-app
-npm run cli -- apply typescript --project-folder ../my-app
-npm run cli -- apply vitest --project-folder ../my-app
-npm run cli -- apply prettier --project-folder ../my-app
-npm run cli -- apply fastify-server --project-folder ../my-app --server-port 3000
-npm run cli -- apply config --project-folder ../my-app
-npm run cli -- apply logs --project-folder ../my-app
-npm run cli -- apply vue-app --project-folder ../my-app
-npm run cli -- apply pinia --project-folder ../my-app
-npm run cli -- apply vue-router --project-folder ../my-app
-npm run cli -- apply github-actions --project-folder ../my-app
+npx crafttype list
+npx crafttype apply init --project-folder . --project-name my-app
+npx crafttype apply typescript --project-folder .
+npx crafttype apply vitest --project-folder .
+npx crafttype apply prettier --project-folder .
+npx crafttype apply fastify-server --project-folder . --server-port 3000
+npx crafttype apply config --project-folder .
+npx crafttype apply logs --project-folder .
+npx crafttype apply vue-app --project-folder .
+npx crafttype apply pinia --project-folder .
+npx crafttype apply vue-router --project-folder .
+npx crafttype apply github-actions --project-folder .
 ```
+
+A module only works after the modules it depends on: apply them in the order shown (`npx crafttype list` shows each module's prerequisites). Then run `npm install` in the project.
+
+| Module | What it adds | Needs first |
+|---|---|---|
+| `init` | `package.json`, `.gitignore`, `.editorconfig`, README | |
+| `typescript` | TypeScript and its configuration | `init` |
+| `vitest` | Vitest | `typescript` |
+| `prettier` | Prettier | `init` |
+| `fastify-server` | a Fastify server with a health endpoint | `typescript`, `vitest` |
+| `config` | server configuration from the environment, validated (`PORT`, `HOST`) | `fastify-server` |
+| `logs` | structured logs (level from `LOG_LEVEL`, validated request id) | `fastify-server` |
+| `vue-app` | a Vue.js application with Vite | `typescript` |
+| `pinia` | Pinia, for shared state in the Vue application | `vue-app` |
+| `vue-router` | Vue Router in the Vue application | `vue-app` |
+| `github-actions` | a GitHub Actions workflow (format, typecheck, tests, builds) | `typescript`, `vitest` |
 
 Applied modules are recorded in the generated project's `.crafttype/modules/history.json`, together with the properties they declare. A module refuses to apply if the modules it depends on are not in that history.
 Options already given to a previous module (`--project-name` for `init`, `--server-port` for `fastify-server`) are reused by the following ones: `vue-app` proxies to the port chosen for the server.
-Each module declares its own options: `npm run cli -- apply <module> --help` lists them.
+Each module declares its own options: `npx crafttype apply <module> --help` lists them.
 
 **Server port.** The port is written when the files are generated: in `src/server/main.ts` (`fastify-server`) and in the dev proxy of `vite.config.ts` (`vue-app`). Nothing keeps them in sync afterwards:
 
@@ -51,13 +70,6 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 **CI.** `github-actions` adds `.github/workflows/ci.yml` to the generated project: it runs on pushes to `main` and on pull requests, on Node 22 and 24, with read-only permissions. It runs `typecheck` and `test`, and the scripts other modules may have added (`format:check`, `webapp:typecheck`, `server:build`, `webapp:build`) only if they exist (`npm run --if-present`), so modules applied later need no change. It uses `npm ci`: run `npm install` once in the generated project and commit `package-lock.json`.
 
 **Dependency versions.** A dependency already present in `package.json` with a version equal to, newer than or compatible with the catalog one (`^5.0.0` for `5.12.7`) is not a conflict: it is kept, even with `--force`, so that a project updated by Renovate never goes backwards. An older version, a tag (`latest`), a URL or a workspace reference remains a conflict.
-
-## Checking that it works
-
-```bash
-npm test               # unit and acceptance tests (CLI)
-npm run ci:generate    # generates a complete application, then installs, compiles and tests it
-```
 
 ## Code organization
 
