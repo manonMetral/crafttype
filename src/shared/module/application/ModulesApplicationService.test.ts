@@ -543,6 +543,60 @@ describe('ModulesApplicationService', () => {
       expect(readFileSync(join(projectFolder, 'src/webapp/App.vue'), 'utf8')).toContain('    <RouterView />\n    <!-- crafttype-needle-app-template -->');
     });
 
+    describe('modules du serveur', () => {
+      const withServer = (serverPort?: number) => {
+        const service = createModulesApplicationService({ clock });
+        const projectFolder = tmpDirForTest();
+        for (const module of ['init', 'typescript', 'vitest']) service.apply(module, { projectFolder });
+        service.apply('fastify-server', serverPort === undefined ? { projectFolder } : { projectFolder, serverPort });
+        return { service, projectFolder };
+      };
+      const read = (folder: string, path: string) => readFileSync(join(folder, path), 'utf8');
+
+      it.each([
+        ['config puis logs', ['config', 'logs']],
+        ['logs puis config', ['logs', 'config']],
+      ])('config et logs modifient chacun leur fichier : %s', (_, modules) => {
+        const { service, projectFolder } = withServer();
+
+        for (const module of modules) service.apply(module, { projectFolder });
+        for (const module of modules) expect(service.apply(module, { projectFolder }).report).toMatchObject({ created: 0, edited: 0, conflicts: 0 });
+
+        expect(read(projectFolder, 'src/server/main.ts')).toContain('  Object.assign(settings, loadConfig(settings));\n  // crafttype-needle-main-settings');
+        expect(read(projectFolder, 'src/server/app.ts')).toContain('  serverOptions.genReqId = genReqId;\n  // crafttype-needle-app-server-options');
+      });
+
+      it('config n’a pas de port propre : elle complète celui de fastify-server', () => {
+        const { service, projectFolder } = withServer(4321);
+
+        service.apply('config', { projectFolder });
+
+        expect(read(projectFolder, 'src/server/main.ts')).toContain('port: 4321');
+        expect(read(projectFolder, 'src/server/config.ts')).not.toContain('4321');
+        expect(() => service.apply('config', { projectFolder, serverPort: 5000 })).toThrow(InvalidPropertyError);
+        expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.at(-1).properties).toEqual({});
+      });
+
+      it('logs n’enregistre aucune propriété et n’ajoute aucune dépendance', () => {
+        const { service, projectFolder } = withServer();
+        const before = readJson(projectFolder, 'package.json');
+
+        service.apply('logs', { projectFolder });
+
+        expect(readJson(projectFolder, 'package.json')).toEqual(before);
+        expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.at(-1).properties).toEqual({});
+      });
+
+      it('exigent fastify-server', () => {
+        const service = createModulesApplicationService({ clock });
+        const projectFolder = tmpDirForTest();
+        service.apply('init', { projectFolder });
+
+        expect(() => service.apply('config', { projectFolder })).toThrow(MissingModuleDependenciesError);
+        expect(() => service.apply('logs', { projectFolder })).toThrow(MissingModuleDependenciesError);
+      });
+    });
+
     it('explique que le fichier à modifier est introuvable', () => {
       const { service, projectFolder } = withVueApp();
       rmSync(join(projectFolder, MAIN));

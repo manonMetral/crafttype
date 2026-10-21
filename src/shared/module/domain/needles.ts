@@ -34,7 +34,7 @@ export const insertAtNeedle = (fileContent: string, { path, needle, content }: F
   const found = lines.flatMap((line, index) => (pattern.test(line) ? [index] : []));
   const [index] = found;
   if (index === undefined) {
-    throw new NeedleError(path, token, 'repère introuvable. Si vous avez supprimé cette ligne, remettez-la là où le code doit être ajouté');
+    throw new NeedleError(path, token, 'repère introuvable : le fichier a été modifié, ou généré par une version plus ancienne du module qui le crée. Ajoutez à la main une ligne de commentaire contenant ce repère là où le code doit être inséré');
   }
   if (found.length > 1) {
     throw new NeedleError(path, token, `repère présent ${found.length} fois : il doit être unique`);

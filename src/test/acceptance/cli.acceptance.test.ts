@@ -293,6 +293,21 @@ describe('CLI', () => {
       expect(existsSync(join(projectFolder, 'src/webapp/router.ts'))).toBe(true);
     });
 
+    it('branche config et logs dans le serveur et le dit dans le compte rendu', () => {
+      const projectFolder = tmpDirForTest();
+      for (const module of ['init', 'typescript', 'vitest', 'fastify-server']) {
+        run('apply', module, '--project-folder', projectFolder);
+      }
+
+      const config = run('apply', 'config', '--project-folder', projectFolder);
+      const logs = run('apply', 'logs', '--project-folder', projectFolder);
+
+      expect(config.output).toContain('(créés : 2, modifiés : 1, remplacés : 0, inchangés : 0, ignorés : 0)');
+      expect(config.output).toContain('  modifié : src/server/main.ts');
+      expect(logs.output).toContain('(créés : 2, modifiés : 1, remplacés : 0, inchangés : 0, ignorés : 0)');
+      expect(logs.output).toContain('  modifié : src/server/app.ts');
+    });
+
     it('annonce la modification en simulation', () => {
       const { code, output } = run('apply', 'pinia', '--project-folder', withVueApp(), '--dry-run');
 

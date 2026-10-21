@@ -1,7 +1,16 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, {
+  type FastifyInstance,
+  type FastifyServerOptions,
+} from 'fastify';
+// crafttype-needle-app-imports
 
 export function buildApp(options: { logger?: boolean } = {}): FastifyInstance {
-  const app = Fastify({ logger: options.logger ?? true });
+  const serverOptions: FastifyServerOptions = {
+    logger: options.logger ?? true,
+  };
+  // crafttype-needle-app-server-options
+  const app = Fastify(serverOptions);
+  // crafttype-needle-app-plugins
 
   app.get('/api/health', async () => ({ status: 'UP' }));
 

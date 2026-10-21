@@ -12,7 +12,10 @@ describe('FastifyServerFactory', () => {
 
     const result = assertThatModule(module)
       .hasFiles('src/server/app.ts', 'src/server/app.test.ts', 'tsconfig.build.json')
-      .hasFileContaining('src/server/main.ts', '?? 4321');
+      .hasFileContaining('src/server/main.ts', 'port: 4321')
+      // Contrat avec les modules qui modifient app.ts et main.ts (config, logs...) : si un repère disparaît, ils échouent.
+      .hasFileContaining('src/server/app.ts', 'crafttype-needle-app-imports', 'crafttype-needle-app-server-options', 'crafttype-needle-app-plugins')
+      .hasFileContaining('src/server/main.ts', 'crafttype-needle-main-imports', 'crafttype-needle-main-settings')
 
     expect(result.hasPackageJson().dependencies).toHaveProperty('fastify');
     expect(result.hasPackageJson().scripts).toHaveProperty('server:dev');
