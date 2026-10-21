@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { InvalidProjectFileError } from './errors.js';
 import { describePackageJsonEntry, PackageJsonDocument } from './PackageJsonDocument.js';
 
-const changes = { fields: { name: 'shop' }, scripts: { test: 'vitest run' }, dependencies: { vue: '3.5.44' }, devDependencies: { vite: '8.3.5' } };
+const changes = {
+  fields: { name: 'shop' },
+  scripts: { test: 'vitest run' },
+  dependencies: { vue: '3.5.44' },
+  devDependencies: { vite: '8.3.5' },
+};
 
 describe('PackageJsonDocument', () => {
   describe('lecture', () => {
@@ -16,7 +21,13 @@ describe('PackageJsonDocument', () => {
 
     it('donne la valeur actuelle de chaque sorte d’entrée, sérialisée en JSON', () => {
       const document = PackageJsonDocument.parse(
-        JSON.stringify({ name: 'shop', engines: { node: '>=22' }, scripts: { test: 'jest' }, dependencies: { vue: '3.5.0' }, devDependencies: { vite: '8.0.0' } }),
+        JSON.stringify({
+          name: 'shop',
+          engines: { node: '>=22' },
+          scripts: { test: 'jest' },
+          dependencies: { vue: '3.5.0' },
+          devDependencies: { vite: '8.0.0' },
+        }),
       );
 
       expect(document.entry('field', 'name')).toBe('"shop"');
@@ -46,7 +57,9 @@ describe('PackageJsonDocument', () => {
     });
 
     it('sont vides quand le module ne touche pas au package.json', () => {
-      expect(PackageJsonDocument.wantedBy({ fields: {}, scripts: {}, dependencies: {}, devDependencies: {} })).toEqual([]);
+      expect(PackageJsonDocument.wantedBy({ fields: {}, scripts: {}, dependencies: {}, devDependencies: {} })).toEqual(
+        [],
+      );
     });
   });
 
@@ -74,9 +87,18 @@ describe('PackageJsonDocument', () => {
     });
 
     it('trie les dépendances touchées, et seulement elles', () => {
-      const document = PackageJsonDocument.parse('{"scripts":{"z":"1","a":"2"},"devDependencies":{"vite":"1","@types/node":"2"}}');
+      const document = PackageJsonDocument.parse(
+        '{"scripts":{"z":"1","a":"2"},"devDependencies":{"vite":"1","@types/node":"2"}}',
+      );
 
-      const result = JSON.parse(document.with([{ kind: 'dependency', target: 'vue', value: '"3"' }, { kind: 'dependency', target: 'axios', value: '"1"' }]).serialize());
+      const result = JSON.parse(
+        document
+          .with([
+            { kind: 'dependency', target: 'vue', value: '"3"' },
+            { kind: 'dependency', target: 'axios', value: '"1"' },
+          ])
+          .serialize(),
+      );
 
       expect(Object.keys(result.dependencies)).toEqual(['axios', 'vue']);
       expect(Object.keys(result.scripts)).toEqual(['z', 'a']);
@@ -90,7 +112,14 @@ describe('PackageJsonDocument', () => {
 
       const result = JSON.parse(PackageJsonDocument.parse('{}').with(entries).serialize());
 
-      expect(Object.keys(result.dependencies)).toEqual(['@types/node', '@vitejs/plugin-vue', 'chalk', 'hono', 'vue', 'vue-router']);
+      expect(Object.keys(result.dependencies)).toEqual([
+        '@types/node',
+        '@vitejs/plugin-vue',
+        'chalk',
+        'hono',
+        'vue',
+        'vue-router',
+      ]);
     });
 
     it('remplace une section qui n’est pas un objet', () => {
@@ -102,7 +131,11 @@ describe('PackageJsonDocument', () => {
     });
 
     it('termine le fichier par un retour à la ligne, indenté de deux espaces', () => {
-      expect(PackageJsonDocument.parse('{}').with([{ kind: 'field', target: 'type', value: '"module"' }]).serialize()).toBe('{\n  "type": "module"\n}\n');
+      expect(
+        PackageJsonDocument.parse('{}')
+          .with([{ kind: 'field', target: 'type', value: '"module"' }])
+          .serialize(),
+      ).toBe('{\n  "type": "module"\n}\n');
     });
   });
 

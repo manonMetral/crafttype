@@ -18,7 +18,14 @@ export interface PackageJsonEntry {
  * le tri et les libellés s'y réfèrent. `section` vaut `undefined` pour un champ de premier niveau (`name`, `type`...).
  */
 const KINDS: Readonly<
-  Record<PackageJsonEntryKind, { readonly section: string | undefined; readonly sorted: boolean; readonly wanted: (changes: PackageJsonChanges) => Readonly<Record<string, unknown>> }>
+  Record<
+    PackageJsonEntryKind,
+    {
+      readonly section: string | undefined;
+      readonly sorted: boolean;
+      readonly wanted: (changes: PackageJsonChanges) => Readonly<Record<string, unknown>>;
+    }
+  >
 > = {
   field: { section: undefined, sorted: false, wanted: (changes) => changes.fields },
   script: { section: 'scripts', sorted: false, wanted: (changes) => changes.scripts },
@@ -44,7 +51,11 @@ export class PackageJsonDocument {
   /** Les entrées que le module veut poser, dans l'ordre champs, scripts, dépendances, dépendances de développement. */
   static wantedBy(changes: PackageJsonChanges): readonly PackageJsonEntry[] {
     return (Object.keys(KINDS) as PackageJsonEntryKind[]).flatMap((kind) =>
-      Object.entries(KINDS[kind].wanted(changes)).map(([target, value]) => ({ kind, target, value: JSON.stringify(value) })),
+      Object.entries(KINDS[kind].wanted(changes)).map(([target, value]) => ({
+        kind,
+        target,
+        value: JSON.stringify(value),
+      })),
     );
   }
 

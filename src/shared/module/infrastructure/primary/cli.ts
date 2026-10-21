@@ -1,7 +1,12 @@
 import { parseArgs } from 'node:util';
 import type { ApplyResult, ModulesApplicationService } from '../../application/ModulesApplicationService.js';
 import { describeConflict, describeChange, type ConflictPolicy, type DecidedChange } from '../../domain/ChangePlan.js';
-import { CraftTypeError, InvalidPropertyError, MissingPropertyError, ModuleConflictError } from '../../domain/errors.js';
+import {
+  CraftTypeError,
+  InvalidPropertyError,
+  MissingPropertyError,
+  ModuleConflictError,
+} from '../../domain/errors.js';
 import type { ModulePropertiesDefinition, PropertyDefinition, PropertyValue } from '../../domain/ModuleProperties.js';
 
 const USAGE = `Usage :
@@ -19,7 +24,11 @@ Un module ne remplace jamais un fichier ou une entrée du package.json dont le c
   --dry-run         affiche ce que le module ferait, sans rien écrire`;
 
 /** Adaptateur primaire : traduit la ligne de commande en appels au service d'application. */
-export const runCli = (argv: readonly string[], service: ModulesApplicationService, out: (line: string) => void): number => {
+export const runCli = (
+  argv: readonly string[],
+  service: ModulesApplicationService,
+  out: (line: string) => void,
+): number => {
   const [command, ...rest] = argv;
 
   try {
@@ -80,7 +89,15 @@ const apply = (args: readonly string[], service: ModulesApplicationService, out:
     args: options,
     allowPositionals: false,
     allowNegative: true,
-    options: { ...COMMON_OPTIONS, ...Object.fromEntries(definition.custom.map(({ key, type }) => [toOption(key), { type: type === 'boolean' ? 'boolean' : 'string' } as const])) },
+    options: {
+      ...COMMON_OPTIONS,
+      ...Object.fromEntries(
+        definition.custom.map(({ key, type }) => [
+          toOption(key),
+          { type: type === 'boolean' ? 'boolean' : 'string' } as const,
+        ]),
+      ),
+    },
   });
 
   if (values.help === true) {
@@ -101,26 +118,39 @@ const apply = (args: readonly string[], service: ModulesApplicationService, out:
     out(USAGE);
     return 1;
   }
-  const onConflict: ConflictPolicy = values.force === true ? 'overwrite' : values['skip-conflicts'] === true ? 'skip' : 'fail';
+  const onConflict: ConflictPolicy =
+    values.force === true ? 'overwrite' : values['skip-conflicts'] === true ? 'skip' : 'fail';
 
   const result = service.apply(slug, raw, { onConflict, dryRun: values['dry-run'] === true });
   return report(result, String(raw['projectFolder']), out);
 };
 
-const describeModule = (slug: string, service: ModulesApplicationService, definition: ModulePropertiesDefinition, out: (line: string) => void): void => {
+const describeModule = (
+  slug: string,
+  service: ModulesApplicationService,
+  definition: ModulePropertiesDefinition,
+  out: (line: string) => void,
+): void => {
   out(`Module ${slug} : ${service.find(slug).apiDoc.operation}`);
   out('Options :');
-  const lines = definition.properties.map((property) => [`--${toOption(property.key)} ${valueHint(property)}`.trimEnd(), summary(property)] as const);
+  const lines = definition.properties.map(
+    (property) => [`--${toOption(property.key)} ${valueHint(property)}`.trimEnd(), summary(property)] as const,
+  );
   const width = Math.max(...lines.map(([flag]) => flag.length));
   for (const [flag, text] of lines) {
     out(`  ${flag.padEnd(width)}  ${text}`);
   }
 };
 
-const valueHint = ({ type }: PropertyDefinition): string => (type === 'boolean' ? '' : type === 'number' ? '<nombre>' : '<texte>');
+const valueHint = ({ type }: PropertyDefinition): string =>
+  type === 'boolean' ? '' : type === 'number' ? '<nombre>' : '<texte>';
 
 const summary = ({ mandatory, defaultValue, description }: PropertyDefinition): string => {
-  const constraint = mandatory ? '(obligatoire) ' : typeof defaultValue === 'function' || defaultValue === undefined ? '' : `(défaut : ${String(defaultValue)}) `;
+  const constraint = mandatory
+    ? '(obligatoire) '
+    : typeof defaultValue === 'function' || defaultValue === undefined
+      ? ''
+      : `(défaut : ${String(defaultValue)}) `;
   return `${constraint}${description}`;
 };
 
@@ -143,23 +173,31 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
   if (dryRun) {
     out(`Simulation du module ${slug} dans ${projectFolder} (rien n'est écrit) :`);
     for (const change of changes) {
-      out(`  ${LABELS[change.decision].padEnd(10)} ${hasConflictingContent(change) ? describeConflict(change) : describeChange(change)}`);
+      out(
+        `  ${LABELS[change.decision].padEnd(10)} ${hasConflictingContent(change) ? describeConflict(change) : describeChange(change)}`,
+      );
     }
     out(counts.conflicts > 0 ? `${summary}, conflits : ${counts.conflicts}\n${CONFLICT_HINT}` : summary);
     return counts.conflicts > 0 ? 1 : 0;
   }
 
   out(`Module ${slug} appliqué dans ${projectFolder} (${summary})`);
-  for (const change of changes.filter(({ decision }) => decision === 'edit' || decision === 'overwrite' || decision === 'skip')) {
-    const label = { edit: 'modifié', overwrite: 'remplacé', skip: 'ignoré' }[change.decision as 'edit' | 'overwrite' | 'skip'];
+  for (const change of changes.filter(
+    ({ decision }) => decision === 'edit' || decision === 'overwrite' || decision === 'skip',
+  )) {
+    const label = { edit: 'modifié', overwrite: 'remplacé', skip: 'ignoré' }[
+      change.decision as 'edit' | 'overwrite' | 'skip'
+    ];
     out(`  ${label} : ${describeConflict(change)}`);
   }
   return 0;
 };
 
-const hasConflictingContent = ({ decision }: DecidedChange): boolean => decision === 'conflict' || decision === 'overwrite' || decision === 'skip' || decision === 'keep';
+const hasConflictingContent = ({ decision }: DecidedChange): boolean =>
+  decision === 'conflict' || decision === 'overwrite' || decision === 'skip' || decision === 'keep';
 
-const CONFLICT_HINT = 'Relancez avec --skip-conflicts pour garder les éléments existants ou --force pour les remplacer.';
+const CONFLICT_HINT =
+  'Relancez avec --skip-conflicts pour garder les éléments existants ou --force pour les remplacer.';
 
 /** Nomme les erreurs métier avec les options de la ligne de commande plutôt qu'avec les clés internes. */
 const describe = (error: CraftTypeError): string => {
@@ -181,7 +219,10 @@ const toFlag = (key: string): string => `--${toOption(key)}`;
 
 /** Erreurs de `parseArgs` : option inconnue, valeur manquante... */
 const isUsageError = (error: unknown): error is TypeError & { code: string } =>
-  error instanceof TypeError && 'code' in error && typeof error.code === 'string' && error.code.startsWith('ERR_PARSE_ARGS_');
+  error instanceof TypeError &&
+  'code' in error &&
+  typeof error.code === 'string' &&
+  error.code.startsWith('ERR_PARSE_ARGS_');
 
 const describeUsageError = (error: TypeError & { code: string }): string => {
   const option = /'(--?[^']+)'/.exec(error.message)?.[1];

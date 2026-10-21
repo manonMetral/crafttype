@@ -11,7 +11,10 @@ describe('ConfigFactory', () => {
   const projectWithServer = (): string => {
     const projectFolder = tmpDirForTest();
     mkdirSync(join(projectFolder, 'src/server'), { recursive: true });
-    writeFileSync(join(projectFolder, 'src/server/main.ts'), '// crafttype-needle-main-imports\nconst settings = {};\n// crafttype-needle-main-settings\n');
+    writeFileSync(
+      join(projectFolder, 'src/server/main.ts'),
+      '// crafttype-needle-main-imports\nconst settings = {};\n// crafttype-needle-main-settings\n',
+    );
     return projectFolder;
   };
 

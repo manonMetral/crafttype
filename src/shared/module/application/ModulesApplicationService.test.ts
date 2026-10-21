@@ -22,7 +22,9 @@ describe('ModulesApplicationService', () => {
   it('refuse un module dont les dépendances ne sont pas appliquées', () => {
     const service = createModulesApplicationService({ clock });
 
-    expect(() => service.apply('typescript', { projectFolder: tmpDirForTest() })).toThrow(MissingModuleDependenciesError);
+    expect(() => service.apply('typescript', { projectFolder: tmpDirForTest() })).toThrow(
+      MissingModuleDependenciesError,
+    );
   });
 
   it('refuse un module inconnu ou une propriété obligatoire absente', () => {
@@ -118,7 +120,9 @@ describe('ModulesApplicationService', () => {
 
       expect(() => service.apply('fastify-server', { projectFolder, serverPort: 'abc' })).toThrow(InvalidPropertyError);
       expect(() => service.apply('typescript', { projectFolder, serverPort: 4000 })).toThrow(InvalidPropertyError);
-      expect(() => service.apply('init', { projectFolder: tmpDirForTest(), projectName: 'Mon App' })).toThrow(InvalidPropertyError);
+      expect(() => service.apply('init', { projectFolder: tmpDirForTest(), projectName: 'Mon App' })).toThrow(
+        InvalidPropertyError,
+      );
     });
   });
 
@@ -155,7 +159,12 @@ describe('ModulesApplicationService', () => {
         throw new Error('une erreur était attendue');
       })();
 
-      expect(error.conflicts).toEqual(expect.arrayContaining(['README.md', expect.stringContaining('package.json : name (existant : "shop", module : "autre")')]));
+      expect(error.conflicts).toEqual(
+        expect.arrayContaining([
+          'README.md',
+          expect.stringContaining('package.json : name (existant : "shop", module : "autre")'),
+        ]),
+      );
     });
 
     it('refuse de changer un script ou une version déjà présents dans le package.json', () => {
@@ -166,7 +175,9 @@ describe('ModulesApplicationService', () => {
       packageJson.devDependencies.typescript = '^6.0.0';
       writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
 
-      expect(() => service.apply('typescript', { projectFolder })).toThrow(/scripts\.typecheck.*devDependencies\.typescript/s);
+      expect(() => service.apply('typescript', { projectFolder })).toThrow(
+        /scripts\.typecheck.*devDependencies\.typescript/s,
+      );
       expect(readJson(projectFolder, 'package.json').devDependencies.typescript).toBe('^6.0.0');
     });
 
@@ -176,7 +187,9 @@ describe('ModulesApplicationService', () => {
 
       expect(() => service.apply('typescript', { projectFolder })).toThrow(ModuleConflictError);
 
-      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug)).toEqual(['init']);
+      expect(
+        readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug),
+      ).toEqual(['init']);
     });
 
     it('remplace les éléments en conflit avec force', () => {
@@ -224,7 +237,15 @@ describe('ModulesApplicationService', () => {
 
       expect(first.report).toMatchObject({ replaced: 0, unchanged: 0, skipped: 0, conflicts: 0 });
       expect(first.report.created).toBeGreaterThan(0);
-      expect(second.report).toEqual({ created: 0, edited: 0, replaced: 0, unchanged: first.report.created, kept: 0, skipped: 0, conflicts: 0 });
+      expect(second.report).toEqual({
+        created: 0,
+        edited: 0,
+        replaced: 0,
+        unchanged: first.report.created,
+        kept: 0,
+        skipped: 0,
+        conflicts: 0,
+      });
     });
 
     it('garde l’existant et applique le reste avec skip', () => {
@@ -238,7 +259,10 @@ describe('ModulesApplicationService', () => {
       expect(packageJson.scripts.typecheck).toBe('tsc -b');
       expect(packageJson.devDependencies['@types/node']).toBeDefined();
       expect(report).toMatchObject({ created: 1, skipped: 2, replaced: 0, conflicts: 0 });
-      expect(changes.filter(({ decision }) => decision === 'skip').map(({ target }) => target)).toEqual(['tsconfig.json', 'typecheck']);
+      expect(changes.filter(({ decision }) => decision === 'skip').map(({ target }) => target)).toEqual([
+        'tsconfig.json',
+        'typecheck',
+      ]);
     });
 
     it('enregistre le module dans l’historique avec skip', () => {
@@ -247,7 +271,9 @@ describe('ModulesApplicationService', () => {
 
       service.apply('typescript', { projectFolder }, { onConflict: 'skip' });
 
-      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug)).toEqual(['init', 'typescript']);
+      expect(
+        readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug),
+      ).toEqual(['init', 'typescript']);
     });
 
     it('remplace et compte les remplacements avec overwrite', () => {
@@ -340,7 +366,9 @@ describe('ModulesApplicationService', () => {
       edit(projectFolder);
 
       const decisions = (onConflict: 'fail' | 'overwrite' | 'skip') =>
-        service.apply('typescript', { projectFolder }, { dryRun: true, onConflict }).changes.map(({ decision }) => decision);
+        service
+          .apply('typescript', { projectFolder }, { dryRun: true, onConflict })
+          .changes.map(({ decision }) => decision);
 
       expect(decisions('fail')).toContain('conflict');
       expect(decisions('overwrite')).toContain('overwrite');
@@ -389,15 +417,16 @@ describe('ModulesApplicationService', () => {
       expect(() => service.apply('vitest', { projectFolder })).toThrow(InvalidProjectFileError);
     });
 
-    it.each([['JSON invalide', '{ oops'], ['sans liste de modules', '{}'], ['modules mal formés', '{"modules":[{"slug":1}]}']])(
-      'signale un historique %s comme une erreur métier',
-      (_name, content) => {
-        const { service, projectFolder } = withTypescriptPrerequisite();
-        writeFileSync(join(projectFolder, '.crafttype/modules/history.json'), content);
+    it.each([
+      ['JSON invalide', '{ oops'],
+      ['sans liste de modules', '{}'],
+      ['modules mal formés', '{"modules":[{"slug":1}]}'],
+    ])('signale un historique %s comme une erreur métier', (_name, content) => {
+      const { service, projectFolder } = withTypescriptPrerequisite();
+      writeFileSync(join(projectFolder, '.crafttype/modules/history.json'), content);
 
-        expect(() => service.apply('vitest', { projectFolder })).toThrow(InvalidProjectFileError);
-      },
-    );
+      expect(() => service.apply('vitest', { projectFolder })).toThrow(InvalidProjectFileError);
+    });
   });
   describe('propriétés propres à un module', () => {
     const database = () => createModulesApplicationService({ clock, extraResources: databaseModuleResources });
@@ -440,8 +469,12 @@ describe('ModulesApplicationService', () => {
       const projectFolder = tmpDirForTest();
 
       expect(() => service.apply('database', { projectFolder })).toThrow(MissingPropertyError);
-      expect(() => service.apply('database', { projectFolder, databaseName: 'shop', poolSize: 0 })).toThrow(InvalidPropertyError);
-      expect(() => service.apply('database', { projectFolder, databaseName: 'shop', serverPort: 4000 })).toThrow(InvalidPropertyError);
+      expect(() => service.apply('database', { projectFolder, databaseName: 'shop', poolSize: 0 })).toThrow(
+        InvalidPropertyError,
+      );
+      expect(() => service.apply('database', { projectFolder, databaseName: 'shop', serverPort: 4000 })).toThrow(
+        InvalidPropertyError,
+      );
       expect(existsSync(join(projectFolder, 'package.json'))).toBe(false);
     });
   });
@@ -459,7 +492,10 @@ describe('ModulesApplicationService', () => {
 
     it('insère le code avant les repères et garde ce que l’équipe a ajouté', () => {
       const { service, projectFolder } = withVueApp();
-      writeFileSync(join(projectFolder, MAIN), `${readFileSync(join(projectFolder, MAIN), 'utf8')}console.info('perso');\n`);
+      writeFileSync(
+        join(projectFolder, MAIN),
+        `${readFileSync(join(projectFolder, MAIN), 'utf8')}console.info('perso');\n`,
+      );
 
       const { report } = service.apply('pinia', { projectFolder });
 
@@ -508,12 +544,17 @@ describe('ModulesApplicationService', () => {
 
       expect(changes.find(({ target }) => target === MAIN)).toMatchObject({ kind: 'edit', decision: 'edit' });
       expect(readFileSync(join(projectFolder, MAIN), 'utf8')).toBe(before);
-      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug)).not.toContain('pinia');
+      expect(
+        readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug),
+      ).not.toContain('pinia');
     });
 
     it('n’écrit rien quand un repère a été supprimé', () => {
       const { service, projectFolder } = withVueApp();
-      const withoutNeedle = readFileSync(join(projectFolder, MAIN), 'utf8').replace('// crafttype-needle-main-plugins\n', '');
+      const withoutNeedle = readFileSync(join(projectFolder, MAIN), 'utf8').replace(
+        '// crafttype-needle-main-plugins\n',
+        '',
+      );
       writeFileSync(join(projectFolder, MAIN), withoutNeedle);
       const packageJson = readFileSync(join(projectFolder, 'package.json'), 'utf8');
 
@@ -522,7 +563,9 @@ describe('ModulesApplicationService', () => {
 
       expect(readFileSync(join(projectFolder, MAIN), 'utf8')).toBe(withoutNeedle);
       expect(readFileSync(join(projectFolder, 'package.json'), 'utf8')).toBe(packageJson);
-      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug)).not.toContain('pinia');
+      expect(
+        readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug),
+      ).not.toContain('pinia');
     });
 
     it.each([
@@ -535,12 +578,24 @@ describe('ModulesApplicationService', () => {
       for (const module of modules) service.apply(module, { projectFolder });
 
       const main = lines(projectFolder);
-      for (const line of ["import { createPinia } from 'pinia';", "import { router } from './router.js';", 'app.use(createPinia());', 'app.use(router);']) {
-        expect(main.filter((candidate) => candidate === line), line).toHaveLength(1);
+      for (const line of [
+        "import { createPinia } from 'pinia';",
+        "import { router } from './router.js';",
+        'app.use(createPinia());',
+        'app.use(router);',
+      ]) {
+        expect(
+          main.filter((candidate) => candidate === line),
+          line,
+        ).toHaveLength(1);
       }
-      expect(main.indexOf('// crafttype-needle-main-imports')).toBeGreaterThan(main.indexOf("import { router } from './router.js';"));
+      expect(main.indexOf('// crafttype-needle-main-imports')).toBeGreaterThan(
+        main.indexOf("import { router } from './router.js';"),
+      );
       expect(main.indexOf('// crafttype-needle-main-plugins')).toBeGreaterThan(main.indexOf('app.use(router);'));
-      expect(readFileSync(join(projectFolder, 'src/webapp/App.vue'), 'utf8')).toContain('    <RouterView />\n    <!-- crafttype-needle-app-template -->');
+      expect(readFileSync(join(projectFolder, 'src/webapp/App.vue'), 'utf8')).toContain(
+        '    <RouterView />\n    <!-- crafttype-needle-app-template -->',
+      );
     });
 
     describe('modules du serveur', () => {
@@ -560,10 +615,19 @@ describe('ModulesApplicationService', () => {
         const { service, projectFolder } = withServer();
 
         for (const module of modules) service.apply(module, { projectFolder });
-        for (const module of modules) expect(service.apply(module, { projectFolder }).report).toMatchObject({ created: 0, edited: 0, conflicts: 0 });
+        for (const module of modules)
+          expect(service.apply(module, { projectFolder }).report).toMatchObject({
+            created: 0,
+            edited: 0,
+            conflicts: 0,
+          });
 
-        expect(read(projectFolder, 'src/server/main.ts')).toContain('  Object.assign(settings, loadConfig(settings));\n  // crafttype-needle-main-settings');
-        expect(read(projectFolder, 'src/server/app.ts')).toContain('  serverOptions.genReqId = genReqId;\n  // crafttype-needle-app-server-options');
+        expect(read(projectFolder, 'src/server/main.ts')).toContain(
+          '  Object.assign(settings, loadConfig(settings));\n  // crafttype-needle-main-settings',
+        );
+        expect(read(projectFolder, 'src/server/app.ts')).toContain(
+          '  serverOptions.genReqId = genReqId;\n  // crafttype-needle-app-server-options',
+        );
       });
 
       it('config n’a pas de port propre : elle complète celui de fastify-server', () => {

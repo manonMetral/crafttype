@@ -21,14 +21,27 @@ export const databaseModuleResources: readonly ModuleResource[] = [
     .standalone()
     .tags('database')
     .factory((properties) => {
-      const builder = moduleBuilder(properties).addScript('db:info', `echo ${properties.string('databaseName')}:${properties.number('poolSize')}`);
-      return properties.boolean('migrations') ? builder.addScript('db:migrate', 'echo migrate').build() : builder.build();
+      const builder = moduleBuilder(properties).addScript(
+        'db:info',
+        `echo ${properties.string('databaseName')}:${properties.number('poolSize')}`,
+      );
+      return properties.boolean('migrations')
+        ? builder.addScript('db:migrate', 'echo migrate').build()
+        : builder.build();
     }),
   moduleResource()
     .slug('database-seed')
-    .propertiesDefinition(ModulePropertiesDefinition.builder().addString('databaseName', { description: 'Nom de la base', mandatory: true }).build())
+    .propertiesDefinition(
+      ModulePropertiesDefinition.builder()
+        .addString('databaseName', { description: 'Nom de la base', mandatory: true })
+        .build(),
+    )
     .apiDoc('Données', 'Charge un jeu de données')
     .dependsOn('database')
     .tags('database')
-    .factory((properties) => moduleBuilder(properties).addScript('db:seed', `echo seed ${properties.string('databaseName')}`).build()),
+    .factory((properties) =>
+      moduleBuilder(properties)
+        .addScript('db:seed', `echo seed ${properties.string('databaseName')}`)
+        .build(),
+    ),
 ];

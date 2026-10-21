@@ -8,7 +8,9 @@ describe('InitFactory', () => {
   it('crée les fichiers de base et le package.json', () => {
     const module = factory.buildModule(propertiesFixture({ projectName: 'shop' }));
 
-    const result = assertThatModule(module).hasFiles('.gitignore', '.editorconfig').hasFileContaining('README.md', '# shop');
+    const result = assertThatModule(module)
+      .hasFiles('.gitignore', '.editorconfig')
+      .hasFileContaining('README.md', '# shop');
 
     expect(result.hasPackageJson()).toMatchObject({ name: 'shop', type: 'module', private: true });
   });

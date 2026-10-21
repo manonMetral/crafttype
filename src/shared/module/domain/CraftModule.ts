@@ -65,7 +65,10 @@ export class CraftModuleBuilder {
 
   addFile(source: Source, destination: string): this {
     const normalized = posix.normalize(destination);
-    if (this.files.some((file) => file.destination === normalized) || this.edits.some((edit) => edit.path === normalized)) {
+    if (
+      this.files.some((file) => file.destination === normalized) ||
+      this.edits.some((edit) => edit.path === normalized)
+    ) {
       throw new DuplicateDestinationError(normalized);
     }
     this.files.push({ ...source, destination: normalized });

@@ -97,7 +97,9 @@ describe('architecture hexagonale', () => {
         .should()
         .onlyDependOnClassesThat()
         .resideInAnyPackage('..domain..')
-        .because('le domaine ne connaît ni l’application ni l’infrastructure, et passe par un port pour toute bibliothèque tierce')
+        .because(
+          'le domaine ne connaît ni l’application ni l’infrastructure, et passe par un port pour toute bibliothèque tierce',
+        )
         .check(sources.allClasses());
     });
   });
@@ -138,16 +140,19 @@ describe('architecture hexagonale', () => {
         .check(sources.allClasses());
     });
 
-    it.each(generators)('primaires de %s passent par l’application et n’appellent pas le domaine du contexte', (context) => {
-      noClasses()
-        .that()
-        .resideInAnyPackage(`${context}.infrastructure.primary..`)
-        .should()
-        .dependOnClassesThat()
-        .resideInAnyPackage(`${context}.domain..`)
-        .because('documentation/module-creation.md : l’adaptateur primaire passe par le service d’application')
-        .check(sources.allClasses());
-    });
+    it.each(generators)(
+      'primaires de %s passent par l’application et n’appellent pas le domaine du contexte',
+      (context) => {
+        noClasses()
+          .that()
+          .resideInAnyPackage(`${context}.infrastructure.primary..`)
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(`${context}.domain..`)
+          .because('documentation/module-creation.md : l’adaptateur primaire passe par le service d’application')
+          .check(sources.allClasses());
+      },
+    );
   });
 
   describe('couches', () => {

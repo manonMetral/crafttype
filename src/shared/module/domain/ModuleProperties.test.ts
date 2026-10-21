@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { InvalidPropertyDefinitionError, InvalidPropertyError, MissingPropertyError, PropertyAccessError } from './errors.js';
+import {
+  InvalidPropertyDefinitionError,
+  InvalidPropertyError,
+  MissingPropertyError,
+  PropertyAccessError,
+} from './errors.js';
 import { ModulePropertiesDefinition, moduleProperties } from './ModuleProperties.js';
 
 describe('ModulePropertiesDefinition', () => {
@@ -29,8 +34,12 @@ describe('ModulePropertiesDefinition', () => {
     });
 
     it('accepte un nom explicite valide, avec ou sans scope', () => {
-      expect(definition.resolve({ projectFolder: 'x', projectName: 'shop.front_1' }).string('projectName')).toBe('shop.front_1');
-      expect(definition.resolve({ projectFolder: 'x', projectName: '@equipe/shop' }).string('projectName')).toBe('@equipe/shop');
+      expect(definition.resolve({ projectFolder: 'x', projectName: 'shop.front_1' }).string('projectName')).toBe(
+        'shop.front_1',
+      );
+      expect(definition.resolve({ projectFolder: 'x', projectName: '@equipe/shop' }).string('projectName')).toBe(
+        '@equipe/shop',
+      );
     });
 
     it.each(['Mon App', 'shop front', 'Shop', '.cache', '_x', '</title><script>alert(1)</script>', 'a'.repeat(215)])(
@@ -45,8 +54,14 @@ describe('ModulePropertiesDefinition', () => {
     it('passent avant les valeurs par défaut, après les valeurs explicites', () => {
       const known = { projectName: 'shop', serverPort: 4000 };
 
-      expect(definition.resolve({ projectFolder: 'app' }, known).values).toEqual({ projectName: 'shop', serverPort: 4000 });
-      expect(definition.resolve({ projectFolder: 'app', serverPort: 5000 }, known).values).toEqual({ projectName: 'shop', serverPort: 5000 });
+      expect(definition.resolve({ projectFolder: 'app' }, known).values).toEqual({
+        projectName: 'shop',
+        serverPort: 4000,
+      });
+      expect(definition.resolve({ projectFolder: 'app', serverPort: 5000 }, known).values).toEqual({
+        projectName: 'shop',
+        serverPort: 5000,
+      });
     });
 
     it('sont validées comme les autres', () => {
@@ -70,19 +85,30 @@ describe('ModulePropertiesDefinition', () => {
     const properties = moduleProperties('/x', { projectName: 'shop', serverPort: 4000 });
 
     expect(definition.portable(properties)).toEqual({ projectName: 'shop', serverPort: 4000 });
-    expect(ModulePropertiesDefinition.builder().addServerPort().build().portable(properties)).toEqual({ serverPort: 4000 });
+    expect(ModulePropertiesDefinition.builder().addServerPort().build().portable(properties)).toEqual({
+      serverPort: 4000,
+    });
     expect(ModulePropertiesDefinition.builder().build().portable(properties)).toEqual({});
   });
   describe('propriétés propres à un module', () => {
     const database = ModulePropertiesDefinition.builder()
       .addString('databaseName', { description: 'Nom de la base', mandatory: true })
-      .addNumber('poolSize', { description: 'Taille du pool', defaultValue: 10, validate: (size) => (Number(size) >= 1 ? undefined : 'au moins 1') })
+      .addNumber('poolSize', {
+        description: 'Taille du pool',
+        defaultValue: 10,
+        validate: (size) => (Number(size) >= 1 ? undefined : 'au moins 1'),
+      })
       .addBoolean('migrations', { description: 'Active les migrations', defaultValue: true })
       .addString('schema', { description: 'Schéma, sans valeur par défaut' })
       .build();
 
     it('résout chaque propriété avec son type', () => {
-      const properties = database.resolve({ projectFolder: 'app', databaseName: 'shop', poolSize: '25', migrations: 'false' });
+      const properties = database.resolve({
+        projectFolder: 'app',
+        databaseName: 'shop',
+        poolSize: '25',
+        migrations: 'false',
+      });
 
       expect(properties.string('databaseName')).toBe('shop');
       expect(properties.number('poolSize')).toBe(25);
@@ -116,11 +142,18 @@ describe('ModulePropertiesDefinition', () => {
       ['poolSize', '0'],
       ['migrations', 'peut-être'],
     ])('refuse %s = %j', (key, value) => {
-      expect(() => database.resolve({ projectFolder: 'app', databaseName: 'shop', [key]: value })).toThrow(InvalidPropertyError);
+      expect(() => database.resolve({ projectFolder: 'app', databaseName: 'shop', [key]: value })).toThrow(
+        InvalidPropertyError,
+      );
     });
 
     it('accepte des valeurs déjà typées', () => {
-      const properties = database.resolve({ projectFolder: 'app', databaseName: 'shop', poolSize: 5, migrations: false });
+      const properties = database.resolve({
+        projectFolder: 'app',
+        databaseName: 'shop',
+        poolSize: 5,
+        migrations: false,
+      });
 
       expect(properties.values).toEqual({ databaseName: 'shop', poolSize: 5, migrations: false });
     });
@@ -140,17 +173,26 @@ describe('ModulePropertiesDefinition', () => {
 
   describe('définition d’une propriété', () => {
     it.each(['projectFolder', 'force', 'skipConflicts', 'dryRun', 'help'])('refuse la clé réservée %s', (key) => {
-      expect(() => ModulePropertiesDefinition.builder().addString(key, { description: 'x' })).toThrow(InvalidPropertyDefinitionError);
-    });
-
-    it.each(['Database', 'database_name', '1pool', 'database-name', ''])('refuse la clé %j, illisible comme option', (key) => {
-      expect(() => ModulePropertiesDefinition.builder().addString(key, { description: 'x' })).toThrow(InvalidPropertyDefinitionError);
-    });
-
-    it('refuse une clé déclarée deux fois', () => {
-      expect(() => ModulePropertiesDefinition.builder().addString('label', { description: 'x' }).addNumber('label', { description: 'y' })).toThrow(
+      expect(() => ModulePropertiesDefinition.builder().addString(key, { description: 'x' })).toThrow(
         InvalidPropertyDefinitionError,
       );
+    });
+
+    it.each(['Database', 'database_name', '1pool', 'database-name', ''])(
+      'refuse la clé %j, illisible comme option',
+      (key) => {
+        expect(() => ModulePropertiesDefinition.builder().addString(key, { description: 'x' })).toThrow(
+          InvalidPropertyDefinitionError,
+        );
+      },
+    );
+
+    it('refuse une clé déclarée deux fois', () => {
+      expect(() =>
+        ModulePropertiesDefinition.builder()
+          .addString('label', { description: 'x' })
+          .addNumber('label', { description: 'y' }),
+      ).toThrow(InvalidPropertyDefinitionError);
     });
   });
 });

@@ -27,4 +27,7 @@ export class FileSystemModulesHistory implements ModulesHistory {
 }
 
 const isAppliedModule = (value: unknown): value is AppliedModule =>
-  isRecord(value) && typeof value['slug'] === 'string' && isRecord(value['properties']) && typeof value['appliedAt'] === 'string';
+  isRecord(value) &&
+  typeof value['slug'] === 'string' &&
+  isRecord(value['properties']) &&
+  typeof value['appliedAt'] === 'string';

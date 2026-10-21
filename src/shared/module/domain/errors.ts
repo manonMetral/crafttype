@@ -76,7 +76,9 @@ export class NeedleError extends CraftTypeError {
 /** Le module modifierait des éléments existants du projet (fichiers, entrées du package.json) avec un contenu différent. */
 export class ModuleConflictError extends CraftTypeError {
   constructor(readonly conflicts: readonly string[]) {
-    super(`Le module écraserait des éléments existants différents :\n${conflicts.map((conflict) => `  - ${conflict}`).join('\n')}`);
+    super(
+      `Le module écraserait des éléments existants différents :\n${conflicts.map((conflict) => `  - ${conflict}`).join('\n')}`,
+    );
   }
 }
 

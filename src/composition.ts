@@ -13,12 +13,17 @@ import { resourcesRoot } from './shared/module/infrastructure/secondary/resource
  * Racine de composition : le seul endroit qui connaît à la fois le domaine et les adaptateurs.
  * `extraResources` ajoute des modules au catalogue (extensions, tests).
  */
-export const createModulesApplicationService = (options: { clock?: () => Date; extraResources?: readonly ModuleResource[] } = {}): ModulesApplicationService => {
+export const createModulesApplicationService = (
+  options: { clock?: () => Date; extraResources?: readonly ModuleResource[] } = {},
+): ModulesApplicationService => {
   const root = resourcesRoot();
   const files = new FileSystemProjectFiles();
 
   return new ModulesApplicationService({
-    resources: [...allModuleResources(new FileSystemNodePackagesVersionsReader(root)), ...(options.extraResources ?? [])],
+    resources: [
+      ...allModuleResources(new FileSystemNodePackagesVersionsReader(root)),
+      ...(options.extraResources ?? []),
+    ],
     files,
     resourcesReader: new FileSystemModuleResourcesReader(root),
     renderer: new MustacheTemplateRenderer(),

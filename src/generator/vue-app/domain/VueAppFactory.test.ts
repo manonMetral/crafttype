@@ -22,9 +22,16 @@ describe('VueAppFactory', () => {
   });
 
   it('ajoute le typage du front : tsc sur src/webapp, avec la bibliothèque DOM et sans les types de Node', () => {
-    const result = assertThatModule(factory.buildModule(propertiesFixture()))
-      .hasFileContaining('tsconfig.webapp.json', '"include": ["src/webapp"]', '"DOM"', '"types": []', 'vue-tsc');
+    const result = assertThatModule(factory.buildModule(propertiesFixture())).hasFileContaining(
+      'tsconfig.webapp.json',
+      '"include": ["src/webapp"]',
+      '"DOM"',
+      '"types": []',
+      'vue-tsc',
+    );
 
-    expect(result.hasPackageJson().scripts).toMatchObject({ 'webapp:typecheck': 'tsc --noEmit -p tsconfig.webapp.json' });
+    expect(result.hasPackageJson().scripts).toMatchObject({
+      'webapp:typecheck': 'tsc --noEmit -p tsconfig.webapp.json',
+    });
   });
 });

@@ -12,7 +12,11 @@ for (const assignment of assignments) {
 }
 
 // Le délai évite qu'un serveur qui démarrerait par erreur bloque la CI.
-const { status, stdout, stderr } = spawnSync(process.execPath, ['dist/server/main.js'], { env, encoding: 'utf8', timeout: 10_000 });
+const { status, stdout, stderr } = spawnSync(process.execPath, ['dist/server/main.js'], {
+  env,
+  encoding: 'utf8',
+  timeout: 10_000,
+});
 const output = `${stdout}${stderr}`;
 const description = assignments.join(' ');
 

@@ -16,26 +16,37 @@ describe('insertAtNeedle', () => {
   it('reprend l’indentation de la ligne du repère, ligne vide comprise', () => {
     const indented = ['function f() {', '  // crafttype-needle-body', '}'].join('\n');
 
-    expect(insertAtNeedle(indented, edit('a();\n\nb();', 'body'))).toBe(['function f() {', '  a();', '', '  b();', '  // crafttype-needle-body', '}'].join('\n'));
+    expect(insertAtNeedle(indented, edit('a();\n\nb();', 'body'))).toBe(
+      ['function f() {', '  a();', '', '  b();', '  // crafttype-needle-body', '}'].join('\n'),
+    );
   });
 
   it('s’appuie sur le repère quel que soit le commentaire qui l’entoure', () => {
     const html = '<ul>\n  <!-- crafttype-needle-items -->\n</ul>';
 
-    expect(insertAtNeedle(html, edit('<li>un</li>', 'items'))).toBe('<ul>\n  <li>un</li>\n  <!-- crafttype-needle-items -->\n</ul>');
+    expect(insertAtNeedle(html, edit('<li>un</li>', 'items'))).toBe(
+      '<ul>\n  <li>un</li>\n  <!-- crafttype-needle-items -->\n</ul>',
+    );
   });
 
   it('ne duplique pas un bloc déjà présent, même ré-indenté ailleurs dans le fichier', () => {
     const once = insertAtNeedle(file, edit('import b from "b";'));
 
     expect(insertAtNeedle(once, edit('import b from "b";'))).toBe(once);
-    expect(insertAtNeedle(once.replace('import b', '    import b'), edit('import b from "b";'))).toBe(once.replace('import b', '    import b'));
+    expect(insertAtNeedle(once.replace('import b', '    import b'), edit('import b from "b";'))).toBe(
+      once.replace('import b', '    import b'),
+    );
   });
 
   it('ajoute les blocs de plusieurs modules dans l’ordre d’application', () => {
     const twice = insertAtNeedle(insertAtNeedle(file, edit('import b from "b";')), edit('import c from "c";'));
 
-    expect(twice.split('\n').slice(0, 4)).toEqual(['import a from "a";', 'import b from "b";', 'import c from "c";', '// crafttype-needle-imports']);
+    expect(twice.split('\n').slice(0, 4)).toEqual([
+      'import a from "a";',
+      'import b from "b";',
+      'import c from "c";',
+      '// crafttype-needle-imports',
+    ]);
   });
 
   it('ignore les retours à la ligne en fin de bloc', () => {
@@ -51,7 +62,9 @@ describe('insertAtNeedle', () => {
   it('ne confond pas un repère avec un autre dont le nom commence pareil', () => {
     const two = ['// crafttype-needle-main-imports', '// crafttype-needle-main'].join('\n');
 
-    expect(insertAtNeedle(two, edit('x();', 'main'))).toBe(['// crafttype-needle-main-imports', 'x();', '// crafttype-needle-main'].join('\n'));
+    expect(insertAtNeedle(two, edit('x();', 'main'))).toBe(
+      ['// crafttype-needle-main-imports', 'x();', '// crafttype-needle-main'].join('\n'),
+    );
   });
 
   it('refuse un repère absent, en nommant le fichier et le repère', () => {

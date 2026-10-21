@@ -1,4 +1,9 @@
-import { InvalidPropertyDefinitionError, InvalidPropertyError, MissingPropertyError, PropertyAccessError } from './errors.js';
+import {
+  InvalidPropertyDefinitionError,
+  InvalidPropertyError,
+  MissingPropertyError,
+  PropertyAccessError,
+} from './errors.js';
 
 export type PropertyType = 'string' | 'number' | 'boolean';
 export type PropertyValue = string | number | boolean;
@@ -34,7 +39,10 @@ export const moduleProperties = (projectFolder: string, values: KnownProperties 
   const read = <T extends PropertyValue>(key: string, type: PropertyType): T => {
     const value = values[key];
     if (value === undefined) {
-      throw new PropertyAccessError(key, 'le module ne la déclare pas, ou elle n\'a pas de valeur (ni obligatoire, ni valeur par défaut)');
+      throw new PropertyAccessError(
+        key,
+        "le module ne la déclare pas, ou elle n'a pas de valeur (ni obligatoire, ni valeur par défaut)",
+      );
     }
     if (typeof value !== type) {
       throw new PropertyAccessError(key, `lue comme ${type} alors qu'elle vaut ${JSON.stringify(value)}`);
@@ -171,10 +179,16 @@ export class ModulePropertiesDefinitionBuilder {
 
   private addProperty(key: string, type: PropertyType, options: PropertyOptions): ModulePropertiesDefinitionBuilder {
     if (RESERVED_KEYS.includes(key)) {
-      throw new InvalidPropertyDefinitionError(key, 'clé réservée par le noyau ou par les options de la commande apply');
+      throw new InvalidPropertyDefinitionError(
+        key,
+        'clé réservée par le noyau ou par les options de la commande apply',
+      );
     }
     if (!KEY_FORMAT.test(key)) {
-      throw new InvalidPropertyDefinitionError(key, 'la clé doit être en camelCase (lettres et chiffres, commençant par une minuscule)');
+      throw new InvalidPropertyDefinitionError(
+        key,
+        'la clé doit être en camelCase (lettres et chiffres, commençant par une minuscule)',
+      );
     }
     if (this.properties.some((definition) => definition.key === key)) {
       throw new InvalidPropertyDefinitionError(key, 'déclarée deux fois');
@@ -196,7 +210,11 @@ const isBlank = (value: PropertyValue | undefined): boolean => value === undefin
 
 const given = (value: PropertyValue | undefined): PropertyValue | undefined => (isBlank(value) ? undefined : value);
 
-const resolveValue = (definition: PropertyDefinition, candidate: PropertyValue | undefined, projectFolder: string): PropertyValue | undefined => {
+const resolveValue = (
+  definition: PropertyDefinition,
+  candidate: PropertyValue | undefined,
+  projectFolder: string,
+): PropertyValue | undefined => {
   const { key, defaultValue } = definition;
   const chosen = candidate ?? (typeof defaultValue === 'function' ? defaultValue({ projectFolder }) : defaultValue);
 

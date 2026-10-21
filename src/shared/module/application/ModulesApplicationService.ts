@@ -112,7 +112,12 @@ export class ModulesApplicationService {
     const fileChanges = module.files.map((file) => {
       const content = resourcesReader.read(file.module, file.path);
       const next = file.rendered ? renderer.render(content, module.context) : content;
-      return { kind: 'file' as const, target: file.destination, current: files.read(projectFolder, file.destination), next };
+      return {
+        kind: 'file' as const,
+        target: file.destination,
+        current: files.read(projectFolder, file.destination),
+        next,
+      };
     });
 
     const editChanges = this.planEdits(module);
@@ -123,7 +128,12 @@ export class ModulesApplicationService {
     }
 
     const current = PackageJsonDocument.parse(files.read(projectFolder, PACKAGE_JSON_PATH));
-    const packageJsonChanges = wanted.map(({ kind, target, value }) => ({ kind, target, current: current.entry(kind, target), next: value }));
+    const packageJsonChanges = wanted.map(({ kind, target, value }) => ({
+      kind,
+      target,
+      current: current.entry(kind, target),
+      next: value,
+    }));
     return new ChangePlan([...fileChanges, ...editChanges, ...packageJsonChanges], this.dependencies.versions);
   }
 
@@ -137,7 +147,11 @@ export class ModulesApplicationService {
     return [...byPath].map(([path, fileEdits]) => {
       const current = this.dependencies.files.read(projectFolder, path);
       if (current === undefined) {
-        throw new NeedleError(path, needleToken(fileEdits[0]?.needle ?? ''), 'fichier introuvable : appliquez d\'abord le module qui le crée');
+        throw new NeedleError(
+          path,
+          needleToken(fileEdits[0]?.needle ?? ''),
+          "fichier introuvable : appliquez d'abord le module qui le crée",
+        );
       }
       return { kind: 'edit' as const, target: path, current, next: fileEdits.reduce(insertAtNeedle, current) };
     });
@@ -146,7 +160,9 @@ export class ModulesApplicationService {
   /** Écrit uniquement ce qui est à créer, à modifier ou à remplacer, pour ne pas toucher aux fichiers déjà à jour. */
   private write(module: CraftModule, changes: readonly DecidedChange[]): void {
     const { files } = this.dependencies;
-    const toWrite = changes.filter(({ decision }) => decision === 'create' || decision === 'edit' || decision === 'overwrite');
+    const toWrite = changes.filter(
+      ({ decision }) => decision === 'create' || decision === 'edit' || decision === 'overwrite',
+    );
 
     for (const { kind, target, next } of toWrite) {
       if (kind === 'file' || kind === 'edit') {
@@ -154,7 +170,9 @@ export class ModulesApplicationService {
       }
     }
 
-    const entries = toWrite.flatMap(({ kind, target, next }) => (kind === 'file' || kind === 'edit' ? [] : [{ kind, target, value: next }]));
+    const entries = toWrite.flatMap(({ kind, target, next }) =>
+      kind === 'file' || kind === 'edit' ? [] : [{ kind, target, value: next }],
+    );
     if (entries.length === 0) {
       return;
     }
@@ -169,7 +187,9 @@ export class ModulesApplicationService {
     if (folder.trim() === '') {
       return {};
     }
-    return this.dependencies.history.list(folder).reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
+    return this.dependencies.history
+      .list(folder)
+      .reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
   }
 
   private checkDependencies(resource: ModuleResource, properties: ModuleProperties): void {

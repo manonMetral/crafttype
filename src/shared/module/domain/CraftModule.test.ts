@@ -28,16 +28,21 @@ describe('CraftModuleBuilder', () => {
       expect(() => builder.addFile(from('demo').file('a.txt'), 'a.txt')).toThrow(DuplicateDestinationError);
     });
 
-    it.each(['./src/a.txt', 'src//a.txt', 'src/x/../a.txt'])('reconnaît %j comme la même destination que src/a.txt', (variant) => {
-      const builder = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
+    it.each(['./src/a.txt', 'src//a.txt', 'src/x/../a.txt'])(
+      'reconnaît %j comme la même destination que src/a.txt',
+      (variant) => {
+        const builder = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
 
-      expect(() => builder.addFile(from('demo').file('b.txt'), variant)).toThrow(DuplicateDestinationError);
-    });
+        expect(() => builder.addFile(from('demo').file('b.txt'), variant)).toThrow(DuplicateDestinationError);
+      },
+    );
 
     it('nomme la destination en double dans le message', () => {
       const builder = moduleBuilder(properties).addFile(from('demo').file('a.txt'), 'src/a.txt');
 
-      expect(() => builder.addFile(from('demo').file('b.txt'), './src/a.txt')).toThrow('Le module déclare deux fois le fichier src/a.txt');
+      expect(() => builder.addFile(from('demo').file('b.txt'), './src/a.txt')).toThrow(
+        'Le module déclare deux fois le fichier src/a.txt',
+      );
     });
   });
   describe('insertAtNeedle', () => {

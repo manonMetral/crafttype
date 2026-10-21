@@ -10,11 +10,20 @@ export class LogsFactory {
     return moduleBuilder(properties)
       .addFile(SOURCE.file('logger.ts'), `${SERVER}/logger.ts`)
       .addFile(SOURCE.file('logger.test.ts'), `${SERVER}/logger.test.ts`)
-      .insertAtNeedle(`${SERVER}/app.ts`, 'app-imports', "import { echoRequestId, genReqId, loggerOptions } from './logger.js';")
+      .insertAtNeedle(
+        `${SERVER}/app.ts`,
+        'app-imports',
+        "import { echoRequestId, genReqId, loggerOptions } from './logger.js';",
+      )
       .insertAtNeedle(
         `${SERVER}/app.ts`,
         'app-server-options',
-        ['if (options.logger !== false) {', '  serverOptions.logger = loggerOptions();', '}', 'serverOptions.genReqId = genReqId;'].join('\n'),
+        [
+          'if (options.logger !== false) {',
+          '  serverOptions.logger = loggerOptions();',
+          '}',
+          'serverOptions.genReqId = genReqId;',
+        ].join('\n'),
       )
       .insertAtNeedle(`${SERVER}/app.ts`, 'app-plugins', 'echoRequestId(app);')
       .build();

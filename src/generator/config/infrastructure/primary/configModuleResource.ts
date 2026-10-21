@@ -10,7 +10,7 @@ export const createConfigModuleResource = (): ModuleResource => {
   return moduleResource()
     .slug(configSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-    .apiDoc('Serveur', 'Ajoute la configuration du serveur par l\'environnement, validée (PORT, HOST)')
+    .apiDoc('Serveur', "Ajoute la configuration du serveur par l'environnement, validée (PORT, HOST)")
     .dependsOn('fastify-server')
     .tags('server', 'config')
     .factory((properties) => modules.buildModule(properties));

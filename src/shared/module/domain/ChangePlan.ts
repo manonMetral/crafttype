@@ -47,7 +47,9 @@ export const describeChange = ({ kind, target }: PlannedChange): string =>
 
 /** Description d'un conflit : l'élément, et pour le package.json la valeur existante face à celle du module. */
 export const describeConflict = (change: PlannedChange): string =>
-  change.kind === 'file' || change.kind === 'edit' ? describeChange(change) : `${describeChange(change)} (existant : ${change.current}, module : ${change.next})`;
+  change.kind === 'file' || change.kind === 'edit'
+    ? describeChange(change)
+    : `${describeChange(change)} (existant : ${change.current}, module : ${change.next})`;
 
 /** Ce qu'un module changerait dans un projet, avant toute écriture. */
 export class ChangePlan {
@@ -82,7 +84,11 @@ const decisionFor = (change: PlannedChange, policy: ConflictPolicy, versions: Ve
   if (change.current === undefined) return 'create';
   if (change.current === change.next) return 'unchanged';
   if (change.kind === 'edit') return 'edit';
-  if (isDependency(change) && versions.keepsExistingVersion(JSON.parse(change.current) as string, JSON.parse(change.next) as string)) return 'keep';
+  if (
+    isDependency(change) &&
+    versions.keepsExistingVersion(JSON.parse(change.current) as string, JSON.parse(change.next) as string)
+  )
+    return 'keep';
   return { fail: 'conflict', overwrite: 'overwrite', skip: 'skip' }[policy] as Decision;
 };
 
