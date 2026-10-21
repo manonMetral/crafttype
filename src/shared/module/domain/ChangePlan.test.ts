@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ChangePlan, describeConflict, reportOf, type PlannedChange } from './ChangePlan.js';
+import { ChangePlan, describeChange, describeConflict, reportOf, type PlannedChange } from './ChangePlan.js';
 import { ModuleConflictError } from './errors.js';
 import type { VersionComparator } from './ports.js';
 
@@ -38,8 +38,8 @@ describe('ChangePlan', () => {
   });
 
   it('compte les décisions', () => {
-    expect(reportOf(plan.decide('skip'))).toEqual({ created: 1, replaced: 0, unchanged: 1, kept: 0, skipped: 2, conflicts: 0 });
-    expect(reportOf(plan.decide('fail'))).toEqual({ created: 1, replaced: 0, unchanged: 1, kept: 0, skipped: 0, conflicts: 2 });
+    expect(reportOf(plan.decide('skip'))).toEqual({ created: 1, edited: 0, replaced: 0, unchanged: 1, kept: 0, skipped: 2, conflicts: 0 });
+    expect(reportOf(plan.decide('fail'))).toEqual({ created: 1, edited: 0, replaced: 0, unchanged: 1, kept: 0, skipped: 0, conflicts: 2 });
   });
 
   it('décrit un conflit sur le package.json avec les deux valeurs', () => {
@@ -94,6 +94,29 @@ describe('ChangePlan', () => {
 
     it('compte les versions conservées', () => {
       expect(reportOf(new ChangePlan([dependency('5.13.0'), created], keeping('5.13.0')).decide('fail'))).toMatchObject({ kept: 1, created: 1, conflicts: 0 });
+    });
+  });
+  describe('modification d’un fichier existant', () => {
+    const edit: PlannedChange = { kind: 'edit', target: 'src/main.ts', current: 'a\n// crafttype-needle-x', next: 'a\nb\n// crafttype-needle-x' };
+
+    it.each(['fail', 'overwrite', 'skip'] as const)('l’applique avec la politique %s : ce n’est pas un conflit', (policy) => {
+      expect(new ChangePlan([edit], keepingNothing).decide(policy).map(({ decision }) => decision)).toEqual(['edit']);
+      expect(new ChangePlan([edit], keepingNothing).resolve(policy)).toHaveLength(1);
+    });
+
+    it('ne fait rien quand le fichier contient déjà l’insertion', () => {
+      const done = { ...edit, current: edit.next };
+
+      expect(new ChangePlan([done], keepingNothing).decide('fail')[0]?.decision).toBe('unchanged');
+    });
+
+    it('se décrit par le chemin du fichier', () => {
+      expect(describeChange(edit)).toBe('src/main.ts');
+      expect(describeConflict(edit)).toBe('src/main.ts');
+    });
+
+    it('compte les fichiers modifiés', () => {
+      expect(reportOf(new ChangePlan([edit, created], keepingNothing).decide('fail'))).toMatchObject({ edited: 1, created: 1, conflicts: 0 });
     });
   });
 });

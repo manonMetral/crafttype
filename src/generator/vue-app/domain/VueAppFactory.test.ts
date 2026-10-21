@@ -12,6 +12,8 @@ describe('VueAppFactory', () => {
 
     const result = assertThatModule(module)
       .hasFiles('src/webapp/main.ts', 'src/webapp/env.d.ts')
+      // Contrat avec les modules qui modifient main.ts (pinia...) : si un repère disparaît, ils échouent.
+      .hasFileContaining('src/webapp/main.ts', 'crafttype-needle-main-imports', 'crafttype-needle-main-plugins')
       .hasFileContaining('vite.config.ts', 'http://127.0.0.1:4321')
       // App.vue est copié tel quel : ses {{ }} ne doivent pas être interprétés par mustache.
       .hasFileContaining('src/webapp/App.vue', '{{ status }}');

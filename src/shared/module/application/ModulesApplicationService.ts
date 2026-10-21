@@ -7,8 +7,9 @@ import {
   type DecidedChange,
   type PlannedChange,
 } from '../domain/ChangePlan.js';
-import { MissingModuleDependenciesError, UnknownModuleError } from '../domain/errors.js';
+import { MissingModuleDependenciesError, NeedleError, UnknownModuleError } from '../domain/errors.js';
 import { isRecord, parseJsonObject } from '../domain/jsonFile.js';
+import { insertAtNeedle, needleToken, type FileEdit } from '../domain/needles.js';
 import type { KnownProperties, ModuleProperties, PropertyValue, RawProperties } from '../domain/ModuleProperties.js';
 import type { ModuleResource, ModuleSlug } from '../domain/ModuleResource.js';
 import type { CraftModule } from '../domain/CraftModule.js';
@@ -117,6 +118,8 @@ export class ModulesApplicationService {
       return { kind: 'file' as const, target: file.destination, current: files.read(projectFolder, file.destination), next };
     });
 
+    const editChanges = this.planEdits(module);
+
     const sections: readonly [ChangeKind, Readonly<Record<string, unknown>>, string | undefined][] = [
       ['field', packageJson.fields, undefined],
       ['script', packageJson.scripts, 'scripts'],
@@ -124,7 +127,7 @@ export class ModulesApplicationService {
       ['devDependency', packageJson.devDependencies, 'devDependencies'],
     ];
     if (sections.every(([, wanted]) => Object.keys(wanted).length === 0)) {
-      return new ChangePlan(fileChanges, this.dependencies.versions);
+      return new ChangePlan([...fileChanges, ...editChanges], this.dependencies.versions);
     }
 
     const current = this.readPackageJson(projectFolder);
@@ -137,21 +140,37 @@ export class ModulesApplicationService {
         next: JSON.stringify(value),
       }));
     });
-    return new ChangePlan([...fileChanges, ...packageJsonChanges], this.dependencies.versions);
+    return new ChangePlan([...fileChanges, ...editChanges, ...packageJsonChanges], this.dependencies.versions);
   }
 
-  /** Écrit uniquement ce qui est à créer ou à remplacer, pour ne pas toucher aux fichiers déjà à jour. */
+  /** Un changement par fichier modifié : les insertions d'un même fichier s'enchaînent dans l'ordre où le module les déclare. */
+  private planEdits({ projectFolder, edits }: CraftModule): PlannedChange[] {
+    const byPath = new Map<string, FileEdit[]>();
+    for (const edit of edits) {
+      byPath.set(edit.path, [...(byPath.get(edit.path) ?? []), edit]);
+    }
+
+    return [...byPath].map(([path, fileEdits]) => {
+      const current = this.dependencies.files.read(projectFolder, path);
+      if (current === undefined) {
+        throw new NeedleError(path, needleToken(fileEdits[0]?.needle ?? ''), 'fichier introuvable : appliquez d\'abord le module qui le crée');
+      }
+      return { kind: 'edit' as const, target: path, current, next: fileEdits.reduce(insertAtNeedle, current) };
+    });
+  }
+
+  /** Écrit uniquement ce qui est à créer, à modifier ou à remplacer, pour ne pas toucher aux fichiers déjà à jour. */
   private write(module: CraftModule, changes: readonly DecidedChange[]): void {
     const { files } = this.dependencies;
-    const toWrite = changes.filter(({ decision }) => decision === 'create' || decision === 'overwrite');
+    const toWrite = changes.filter(({ decision }) => decision === 'create' || decision === 'edit' || decision === 'overwrite');
 
     for (const { kind, target, next } of toWrite) {
-      if (kind === 'file') {
+      if (kind === 'file' || kind === 'edit') {
         files.write(module.projectFolder, target, next);
       }
     }
 
-    const packageJsonChanges = toWrite.filter(({ kind }) => kind !== 'file');
+    const packageJsonChanges = toWrite.filter(({ kind }) => kind !== 'file' && kind !== 'edit');
     if (packageJsonChanges.length === 0) {
       return;
     }
@@ -159,7 +178,7 @@ export class ModulesApplicationService {
     const packageJson = this.readPackageJson(module.projectFolder);
     const touched = new Set<string>();
     for (const { kind, target, next } of packageJsonChanges) {
-      const section = SECTIONS[kind as Exclude<ChangeKind, 'file'>];
+      const section = SECTIONS[kind as Exclude<ChangeKind, 'file' | 'edit'>];
       if (section === undefined) {
         packageJson[target] = JSON.parse(next);
         continue;
@@ -202,7 +221,7 @@ export class ModulesApplicationService {
   }
 }
 
-const SECTIONS: Record<Exclude<ChangeKind, 'file'>, string | undefined> = {
+const SECTIONS: Record<Exclude<ChangeKind, 'file' | 'edit'>, string | undefined> = {
   field: undefined,
   script: 'scripts',
   dependency: 'dependencies',

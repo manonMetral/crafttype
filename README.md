@@ -3,7 +3,7 @@
 Générateur modulaire de projets **Node.js (Fastify)** et **Vue.js**, inspiré de [Seed4J](https://github.com/seed4j/seed4j).
 Chaque module ajoute une seule chose à un projet (TypeScript, Vitest, un serveur Fastify, une application Vue...) et s'applique à la demande, dans l'ordre voulu.
 
-> État : prototype de la phase 0. Le noyau et six modules fonctionnent, la CLI est minimale.
+> État : prototype de la phase 0. Le noyau et sept modules fonctionnent, la CLI est minimale.
 
 ## Utilisation
 
@@ -16,6 +16,7 @@ npm run cli -- apply vitest --project-folder ../mon-app
 npm run cli -- apply prettier --project-folder ../mon-app
 npm run cli -- apply fastify-server --project-folder ../mon-app --server-port 3000
 npm run cli -- apply vue-app --project-folder ../mon-app
+npm run cli -- apply pinia --project-folder ../mon-app
 ```
 
 Les modules appliqués sont notés dans `.crafttype/modules/history.json` du projet généré, avec les propriétés qu'ils déclarent. Un module refuse de s'appliquer si les modules dont il dépend ne sont pas dans cet historique.
@@ -31,6 +32,8 @@ Un module ne remplace jamais un fichier ou une entrée du `package.json` dont le
 | `--dry-run` | affiche ce que le module créerait, laisserait inchangé ou trouverait en conflit, sans rien écrire (code de sortie 1 s'il reste un conflit) |
 
 `--force` et `--skip-conflicts` sont incompatibles ; `--dry-run` se combine avec l'un ou l'autre pour voir leur effet.
+
+**Modules qui complètent un fichier.** `pinia` n'écrase pas le `main.ts` de `vue-app` : il y insère son code à des repères (`// crafttype-needle-main-imports`...) que `vue-app` y a posés. Ce n'est pas un conflit, et la commande affiche le fichier modifié. Si un repère a été supprimé à la main, le module échoue en le nommant, sans rien écrire (voir `documentation/module-creation.md`).
 
 **Versions de dépendances.** Une dépendance déjà présente dans le `package.json` avec une version égale, plus récente ou compatible avec celle du catalogue (`^5.0.0` pour `5.12.7`) n'est pas un conflit : elle est conservée, même avec `--force`, pour ne jamais faire reculer un projet mis à jour par Renovate. Une version plus ancienne, un tag (`latest`), une URL ou une référence de workspace restent des conflits.
 

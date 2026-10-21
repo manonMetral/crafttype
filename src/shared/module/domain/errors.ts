@@ -62,6 +62,17 @@ export class DuplicateDestinationError extends CraftTypeError {
   }
 }
 
+/** Un module veut modifier un fichier existant, mais le fichier ou son repère d'insertion est introuvable ou ambigu. */
+export class NeedleError extends CraftTypeError {
+  constructor(
+    readonly path: string,
+    readonly needle: string,
+    reason: string,
+  ) {
+    super(`Impossible de modifier ${path} : ${reason} (${needle})`);
+  }
+}
+
 /** Le module modifierait des éléments existants du projet (fichiers, entrées du package.json) avec un contenu différent. */
 export class ModuleConflictError extends CraftTypeError {
   constructor(readonly conflicts: readonly string[]) {

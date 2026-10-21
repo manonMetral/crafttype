@@ -1,7 +1,8 @@
 // Exception assumée à l'isolation du domaine : `posix.normalize` est une fonction pure (aucune entrée-sortie), elle ne
 // justifie pas un port. arch-unit-ts ignore les imports `node:*` ; toute bibliothèque tierce passe, elle, par un port.
 import { posix } from 'node:path';
-import { DuplicateDestinationError } from './errors.js';
+import { DuplicateDestinationError, NeedleError } from './errors.js';
+import { isValidNeedleName, type FileEdit } from './needles.js';
 import type { ModuleProperties } from './ModuleProperties.js';
 import type { PackageVersions } from './PackageVersions.js';
 
@@ -28,6 +29,8 @@ export type TemplateContext = Readonly<Record<string, string | number | boolean>
 export interface CraftModule {
   readonly projectFolder: string;
   readonly files: readonly FileToAdd[];
+  /** Insertions dans des fichiers qui existent déjà dans le projet (créés par un autre module). */
+  readonly edits: readonly FileEdit[];
   readonly packageJson: PackageJsonChanges;
   readonly context: TemplateContext;
 }
@@ -51,6 +54,7 @@ type Source = ReturnType<ModuleSource['template']> | ReturnType<ModuleSource['fi
 
 export class CraftModuleBuilder {
   private readonly files: FileToAdd[] = [];
+  private readonly edits: FileEdit[] = [];
   private readonly dependencies: Record<string, string> = {};
   private readonly devDependencies: Record<string, string> = {};
   private readonly scripts: Record<string, string> = {};
@@ -61,10 +65,26 @@ export class CraftModuleBuilder {
 
   addFile(source: Source, destination: string): this {
     const normalized = posix.normalize(destination);
-    if (this.files.some((file) => file.destination === normalized)) {
+    if (this.files.some((file) => file.destination === normalized) || this.edits.some((edit) => edit.path === normalized)) {
       throw new DuplicateDestinationError(normalized);
     }
     this.files.push({ ...source, destination: normalized });
+    return this;
+  }
+
+  /**
+   * Ajoute `content` dans un fichier déjà présent, juste avant la ligne qui contient `crafttype-needle-<needle>`.
+   * Le module qui crée ce fichier doit y poser le repère (voir `documentation/module-creation.md`).
+   */
+  insertAtNeedle(path: string, needle: string, content: string): this {
+    const normalized = posix.normalize(path);
+    if (!isValidNeedleName(needle)) {
+      throw new NeedleError(normalized, needle, 'nom de repère invalide (minuscules, chiffres et tirets)');
+    }
+    if (this.files.some((file) => file.destination === normalized)) {
+      throw new DuplicateDestinationError(normalized);
+    }
+    this.edits.push({ path: normalized, needle, content });
     return this;
   }
 
@@ -97,6 +117,7 @@ export class CraftModuleBuilder {
     return {
       projectFolder: this.properties.projectFolder,
       files: [...this.files],
+      edits: [...this.edits],
       packageJson: {
         fields: { ...this.fields },
         dependencies: { ...this.dependencies },
