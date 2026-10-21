@@ -282,6 +282,17 @@ describe('CLI', () => {
       expect(readFileSync(join(projectFolder, 'src/webapp/main.ts'), 'utf8')).toContain("import { createPinia } from 'pinia';");
     });
 
+    it('ajoute le routeur : fichiers créés, main.ts et App.vue modifiés', () => {
+      const projectFolder = withVueApp();
+
+      const { code, output } = run('apply', 'vue-router', '--project-folder', projectFolder);
+
+      expect(code).toBe(0);
+      expect(output).toContain('(créés : 3, modifiés : 2, remplacés : 0, inchangés : 0, ignorés : 0)');
+      expect(output).toContain('  modifié : src/webapp/App.vue');
+      expect(existsSync(join(projectFolder, 'src/webapp/router.ts'))).toBe(true);
+    });
+
     it('annonce la modification en simulation', () => {
       const { code, output } = run('apply', 'pinia', '--project-folder', withVueApp(), '--dry-run');
 

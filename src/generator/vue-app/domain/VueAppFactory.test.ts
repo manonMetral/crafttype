@@ -16,7 +16,7 @@ describe('VueAppFactory', () => {
       .hasFileContaining('src/webapp/main.ts', 'crafttype-needle-main-imports', 'crafttype-needle-main-plugins')
       .hasFileContaining('vite.config.ts', 'http://127.0.0.1:4321')
       // App.vue est copié tel quel : ses {{ }} ne doivent pas être interprétés par mustache.
-      .hasFileContaining('src/webapp/App.vue', '{{ status }}');
+      .hasFileContaining('src/webapp/App.vue', '{{ status }}', 'crafttype-needle-app-template');
 
     expect(result.hasPackageJson().devDependencies).toHaveProperty('vite');
   });

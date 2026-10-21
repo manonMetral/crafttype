@@ -6,6 +6,7 @@ import { createPiniaModuleResource } from './pinia/infrastructure/primary/piniaM
 import { createPrettierModuleResource } from './prettier/infrastructure/primary/prettierModuleResource.js';
 import { createTypescriptModuleResource } from './typescript/infrastructure/primary/typescriptModuleResource.js';
 import { createVitestModuleResource } from './vitest/infrastructure/primary/vitestModuleResource.js';
+import { createVueRouterModuleResource } from './vue-router/infrastructure/primary/vueRouterModuleResource.js';
 import { createVueAppModuleResource } from './vue-app/infrastructure/primary/vueAppModuleResource.js';
 
 /** Catalogue des modules : ajouter une ligne ici pour exposer un nouveau module. */
@@ -17,4 +18,5 @@ export const allModuleResources = (versions: NodePackagesVersionsReader): readon
   createFastifyServerModuleResource(versions),
   createVueAppModuleResource(versions),
   createPiniaModuleResource(versions),
+  createVueRouterModuleResource(versions),
 ];
