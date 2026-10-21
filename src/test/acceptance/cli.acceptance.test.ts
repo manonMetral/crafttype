@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../composition.js';
 import { runCli } from '../../shared/module/infrastructure/primary/cli.js';
@@ -8,11 +8,25 @@ import { tmpDirForTest } from '../../shared/test/ModuleAssertions.js';
 
 // Equivalent of Seed4J's Cucumber tests: we go through the entry point (here the CLI) and only check
 // that a module is wired end to end, without duplicating the factory tests.
-const run = (...argv: string[]) => {
-  const lines: string[] = [];
-  const code = runCli(argv, createModulesApplicationService(), (line) => lines.push(line));
-  return { code, output: lines.join('\n') };
+const VERSION = '1.2.3-test';
+
+/** Runs the CLI. `output` is stdout then stderr in the order of writing; `stdout` and `stderr` tell them apart. */
+const runWith = (service: ReturnType<typeof createModulesApplicationService>, argv: string[]) => {
+  const lines: { stream: 'stdout' | 'stderr'; line: string }[] = [];
+  const code = runCli(argv, service, {
+    out: (line) => lines.push({ stream: 'stdout', line }),
+    err: (line) => lines.push({ stream: 'stderr', line }),
+    version: VERSION,
+  });
+  const of = (stream?: 'stdout' | 'stderr') =>
+    lines
+      .filter((entry) => stream === undefined || entry.stream === stream)
+      .map(({ line }) => line)
+      .join('\n');
+  return { code, output: of(), stdout: of('stdout'), stderr: of('stderr') };
 };
+
+const run = (...argv: string[]) => runWith(createModulesApplicationService(), argv);
 
 describe('CLI', () => {
   it('lists the modules of the catalog', () => {
@@ -33,10 +47,16 @@ describe('CLI', () => {
   });
 
   it('explains what is missing when the order is not respected', () => {
-    const { code, output } = run('apply', 'vitest', '--project-folder', tmpDirForTest());
+    const folder = tmpDirForTest();
+    const { code, output } = run('apply', 'vitest', '--project-folder', folder);
 
     expect(code).toBe(1);
-    expect(output).toBe('Error: Module vitest requires these modules to be applied first: typescript');
+    expect(output).toBe(
+      [
+        'Error: Module vitest requires these modules to be applied first: typescript',
+        `Apply them first, for example: crafttype apply typescript --project-folder ${folder}`,
+      ].join('\n'),
+    );
   });
 
   it('names the missing option with its flag', () => {
@@ -109,7 +129,7 @@ describe('CLI', () => {
     const { code, output } = run('apply', 'init', '--project-folder');
 
     expect(code).toBe(1);
-    expect(output).toContain('Error: missing or invalid value for option --project-folder');
+    expect(output.split('\n')[0]).toBe('Error: missing value for option --project-folder');
     expect(output).toContain('Usage:');
   });
 
@@ -246,13 +266,8 @@ describe('CLI', () => {
     });
   });
   describe('properties specific to a module', () => {
-    const runDatabase = (...argv: string[]) => {
-      const lines: string[] = [];
-      const code = runCli(argv, createModulesApplicationService({ extraResources: databaseModuleResources }), (line) =>
-        lines.push(line),
-      );
-      return { code, output: lines.join('\n') };
-    };
+    const runDatabase = (...argv: string[]) =>
+      runWith(createModulesApplicationService({ extraResources: databaseModuleResources }), argv);
 
     it('derives the options from the module definition', () => {
       const projectFolder = tmpDirForTest();
@@ -416,6 +431,135 @@ describe('CLI', () => {
       expect(code).toBe(1);
       expect(output).toContain('Error: Cannot modify src/webapp/main.ts: needle not found');
       expect(output).toContain('crafttype-needle-main-imports');
+    });
+  });
+
+  describe('command line', () => {
+    it.each(['--version', '-v'])('prints the version with %s and nothing else', (flag) => {
+      const { code, stdout, stderr } = run(flag);
+
+      expect(code).toBe(0);
+      expect(stdout).toBe(VERSION);
+      expect(stderr).toBe('');
+    });
+
+    it('lists --version in the usage', () => {
+      expect(run('--help').stdout).toContain('crafttype --version');
+    });
+
+    it('names an unknown command, then shows the usage, on stderr', () => {
+      const { code, stdout, stderr } = run('lisst');
+
+      expect(code).toBe(1);
+      expect(stdout).toBe('');
+      expect(stderr.split('\n')[0]).toBe('Error: Unknown command: lisst');
+      expect(stderr).toContain('Usage:');
+    });
+
+    it('writes results on stdout and nothing on stderr', () => {
+      const { stdout, stderr } = run('list');
+
+      expect(stdout).toContain('fastify-server');
+      expect(stderr).toBe('');
+    });
+
+    it.each([
+      ['a business error', ['apply', 'init']],
+      ['an unknown option', ['apply', 'init', '--foo']],
+      ['apply without a module', ['apply']],
+      ['--force with --skip-conflicts', ['apply', 'init', '--force', '--skip-conflicts']],
+    ])('writes %s on stderr and nothing on stdout', (_name, argv) => {
+      const { code, stdout, stderr } = run(...argv);
+
+      expect(code).toBe(1);
+      expect(stdout).toBe('');
+      expect(stderr).not.toBe('');
+    });
+
+    it('says that an option does not take a value', () => {
+      const { stderr } = run('apply', 'init', '--dry-run=yes');
+
+      expect(stderr).toContain('Error: option --dry-run does not take a value');
+    });
+
+    it('explains an option whose value is missing or starts with a dash', () => {
+      const { stderr } = run('apply', 'init', '--project-name', '--force');
+
+      expect(stderr.split('\n')[0]).toBe(
+        'Error: value of option --project-name is missing or starts with a dash (write --project-name=<value>)',
+      );
+    });
+
+    it('quotes the folder in the hint when it contains a space', () => {
+      const folder = join(tmpDirForTest(), 'my app');
+      mkdirSync(folder);
+
+      expect(run('apply', 'vitest', '--project-folder', folder).stderr).toContain(`--project-folder "${folder}"`);
+    });
+  });
+
+  describe('project folder', () => {
+    const projectNameAfter = (...argv: string[]) => {
+      const { code } = run('apply', 'init', ...argv);
+      expect(code).toBe(0);
+    };
+    const nameIn = (folder: string): string => readJson(folder, 'package.json').name;
+    const readJson = (folder: string, path: string) => JSON.parse(readFileSync(join(folder, path), 'utf8'));
+
+    const inFolder = (folder: string, action: () => void) => {
+      const previous = process.cwd();
+      process.chdir(folder);
+      try {
+        action();
+      } finally {
+        process.chdir(previous);
+      }
+    };
+
+    it('names the project after the current folder with `.`', () => {
+      const folder = join(tmpDirForTest(), 'my-proj');
+      mkdirSync(folder);
+
+      inFolder(folder, () => projectNameAfter('--project-folder', '.'));
+
+      expect(nameIn(folder)).toBe('my-proj');
+    });
+
+    it('names the project after the parent folder with `..`', () => {
+      const folder = join(tmpDirForTest(), 'parent-proj');
+      const child = join(folder, 'child');
+      mkdirSync(child, { recursive: true });
+
+      inFolder(child, () => projectNameAfter('--project-folder', '..'));
+
+      expect(nameIn(folder)).toBe('parent-proj');
+    });
+
+    it('accepts a path relative to the current folder', () => {
+      const folder = join(tmpDirForTest(), 'relative-proj');
+      mkdirSync(folder);
+
+      projectNameAfter('--project-folder', relative(process.cwd(), folder));
+
+      expect(nameIn(folder)).toBe('relative-proj');
+    });
+
+    it('ignores a trailing slash', () => {
+      const folder = join(tmpDirForTest(), 'slash-proj');
+      mkdirSync(folder);
+
+      projectNameAfter('--project-folder', `${folder}/`);
+
+      expect(nameIn(folder)).toBe('slash-proj');
+    });
+
+    it('prints the absolute folder in the report', () => {
+      const folder = join(tmpDirForTest(), 'report-proj');
+      mkdirSync(folder);
+
+      const { stdout } = run('apply', 'init', '--project-folder', relative(process.cwd(), folder));
+
+      expect(stdout).toContain(`applied in ${folder} (`);
     });
   });
 });

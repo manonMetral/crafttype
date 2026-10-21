@@ -8,6 +8,7 @@ import { FileSystemProjectFiles } from './shared/module/infrastructure/secondary
 import { NodePathNormalizer } from './shared/module/infrastructure/secondary/NodePathNormalizer.js';
 import { MustacheTemplateRenderer } from './shared/module/infrastructure/secondary/MustacheTemplateRenderer.js';
 import { SemverVersionComparator } from './shared/module/infrastructure/secondary/SemverVersionComparator.js';
+import { readPackageVersion } from './shared/module/infrastructure/secondary/readPackageVersion.js';
 import { resourcesRoot } from './shared/module/infrastructure/secondary/resourcesRoot.js';
 
 /**
@@ -34,3 +35,6 @@ export const createModulesApplicationService = (
     clock: options.clock ?? (() => new Date()),
   });
 };
+
+/** Version of the crafttype package, printed by `crafttype --version`. */
+export const packageVersion = readPackageVersion;
