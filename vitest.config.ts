@@ -16,7 +16,7 @@ export default defineConfig({
         'src/shared/module/infrastructure/primary/main.ts',
       ],
       reporter: ['text'],
-      thresholds: { statements: 99, branches: 95, functions: 99, lines: 99 },
+      thresholds: { statements: 100, branches: 95, functions: 100, lines: 100 },
     },
   },
 });

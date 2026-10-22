@@ -2,6 +2,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../composition.js';
+import type { ModulesApplicationService } from '../../shared/module/application/ModulesApplicationService.js';
+import { CraftTypeError } from '../../shared/module/domain/errors.js';
 import { runCli } from '../../shared/module/infrastructure/primary/cli.js';
 import { databaseModuleResources } from '../../shared/test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../shared/test/ModuleAssertions.js';
@@ -184,6 +186,22 @@ describe('CLI', () => {
     expect(output).toContain(
       'Warning: src/server/main.ts is replaced, and config had inserted code in it: apply config again to restore it',
     );
+  });
+
+  it('shows the same warning in a dry run, and writes nothing', () => {
+    const projectFolder = tmpDirForTest();
+    for (const module of ['init', 'typescript', 'vitest', 'fastify-server', 'config']) {
+      run('apply', module, '--project-folder', projectFolder);
+    }
+    const before = readFileSync(join(projectFolder, 'src/server/main.ts'), 'utf8');
+
+    const { code, output } = run('apply', 'fastify-server', '--project-folder', projectFolder, '--force', '--dry-run');
+
+    expect(code).toBe(0);
+    expect(output).toContain(
+      'Warning: src/server/main.ts is replaced, and config had inserted code in it: apply config again to restore it',
+    );
+    expect(readFileSync(join(projectFolder, 'src/server/main.ts'), 'utf8')).toBe(before);
   });
 
   it('refuses to overwrite a modified file, except with --force', () => {
@@ -605,6 +623,41 @@ describe('CLI', () => {
       const { stdout } = run('apply', 'init', '--project-folder', relative(process.cwd(), folder));
 
       expect(stdout).toContain(`applied in ${folder} (`);
+    });
+  });
+
+  describe('errors the CLI does not know how to describe', () => {
+    // A service that fails with the given error, whatever the command: only the error handling of `runCli` is under test.
+    const failingWith = (error: unknown) =>
+      ({
+        list: () => {
+          throw error;
+        },
+      }) as unknown as ModulesApplicationService;
+    const runFailing = (error: unknown) => {
+      const lines: string[] = [];
+      const code = runCli(['list'], failingWith(error), {
+        out: (line) => lines.push(line),
+        err: (line) => lines.push(line),
+        version: VERSION,
+      });
+      return { code, output: lines.join('\n') };
+    };
+
+    it('lets a bug that is not an error of the tool reach the caller, with its stack trace', () => {
+      expect(() => runFailing(new Error('bug in the tool'))).toThrow('bug in the tool');
+    });
+
+    it('still prints the message of an error of the tool whose kind the CLI does not list', () => {
+      // `kind` is a plain string in the base class: an extension may declare an error that `DomainError` does not know.
+      class ExtensionError extends CraftTypeError {
+        readonly kind = 'made-up-by-an-extension';
+      }
+
+      const { code, output } = runFailing(new ExtensionError('the extension failed'));
+
+      expect(code).toBe(1);
+      expect(output).toBe('Error: the extension failed');
     });
   });
 });

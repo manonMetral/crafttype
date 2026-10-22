@@ -34,7 +34,7 @@ npm run cli -- apply typescript --project-folder ../my-app
 npm run format        # formats the code (Prettier); format:check verifies it, and so does the CI
 npm run lint:types    # typecheck
 npm test              # unit and acceptance tests
-npm run test:coverage # same tests with coverage; the CI requires 99% of statements, functions and lines, and 95% of branches
+npm run test:coverage # same tests with coverage; the CI requires 100% of statements, functions and lines, and 95% of branches
 npm run build         # compilation to dist/
 npm run ci:generate   # generates a complete application with all the modules, then installs, type-checks, tests and compiles it
                       # (CRAFTTYPE_DOCKER=1 also builds its Docker image and checks the container; needs Docker and curl)
