@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../../composition.js';
@@ -697,6 +697,170 @@ describe('ModulesApplicationService', () => {
 
       expect(() => createModulesApplicationService().applyModule(module)).toThrow(DuplicateDestinationError);
       expect(existsSync(join(projectFolder, 'src'))).toBe(false);
+    });
+  });
+
+  describe('replacing a file that other modules completed', () => {
+    const completedServer = () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+      for (const slug of ['init', 'typescript', 'vitest', 'fastify-server', 'config', 'logs']) {
+        service.apply(slug, slug === 'init' ? { projectFolder, projectName: 'shop' } : { projectFolder });
+      }
+      return { service, projectFolder };
+    };
+
+    it('warns, naming the file and the modules whose insertions are lost', () => {
+      const { service, projectFolder } = completedServer();
+
+      const { warnings, report } = service.apply('fastify-server', { projectFolder }, { onConflict: 'overwrite' });
+
+      expect(report.replaced).toBeGreaterThan(0);
+      expect(warnings).toEqual([
+        'src/server/app.ts is replaced, and logs had inserted code in it: apply logs again to restore it',
+        'src/server/main.ts is replaced, and config had inserted code in it: apply config again to restore it',
+      ]);
+    });
+
+    it('shows the same warnings in a dry run', () => {
+      const { service, projectFolder } = completedServer();
+
+      const { warnings } = service.apply(
+        'fastify-server',
+        { projectFolder },
+        { onConflict: 'overwrite', dryRun: true },
+      );
+
+      expect(warnings).toHaveLength(2);
+    });
+
+    it('ignores a history entry whose module no longer exists, and still warns about the others', () => {
+      const { service, projectFolder } = completedServer();
+      const path = join(projectFolder, '.crafttype/modules/history.json');
+      const history = JSON.parse(readFileSync(path, 'utf8'));
+      history.modules.push({ slug: 'removed-module', properties: {}, appliedAt: '2026-10-20T10:00:00.000Z' });
+      writeFileSync(path, JSON.stringify(history));
+
+      const { warnings } = service.apply('fastify-server', { projectFolder }, { onConflict: 'overwrite' });
+
+      expect(warnings).toHaveLength(2);
+    });
+
+    it('says nothing when no other module completed the replaced file, or when nothing is replaced', () => {
+      const { service, projectFolder } = completedServer();
+
+      expect(service.apply('init', { projectFolder }, { onConflict: 'overwrite' }).warnings).toEqual([]);
+      expect(service.apply('fastify-server', { projectFolder }, { onConflict: 'skip' }).warnings).toEqual([]);
+    });
+  });
+
+  describe('history of an unchanged module', () => {
+    const later = () => new Date('2026-10-21T09:00:00Z');
+    const historyOf = (folder: string) => readFileSync(join(folder, '.crafttype/modules/history.json'), 'utf8');
+
+    it('is left as it is when the module is applied again with nothing to change', () => {
+      const projectFolder = tmpDirForTest();
+      const first = createModulesApplicationService({ clock });
+      first.apply('init', { projectFolder, projectName: 'shop' });
+      first.apply('typescript', { projectFolder });
+      const before = historyOf(projectFolder);
+
+      const { report } = createModulesApplicationService({ clock: later }).apply('init', { projectFolder });
+
+      expect(report).toMatchObject({ created: 0, replaced: 0, edited: 0 });
+      expect(historyOf(projectFolder)).toBe(before);
+    });
+
+    it('is left as it is when the existing newer dependency versions are kept', () => {
+      const projectFolder = tmpDirForTest();
+      const first = createModulesApplicationService({ clock });
+      first.apply('init', { projectFolder });
+      first.apply('typescript', { projectFolder });
+      const packageJson = readJson(projectFolder, 'package.json');
+      packageJson.devDependencies.typescript = '^99.0.0';
+      writeFileSync(join(projectFolder, 'package.json'), JSON.stringify(packageJson));
+      const before = historyOf(projectFolder);
+
+      const { report } = createModulesApplicationService({ clock: later }).apply('typescript', { projectFolder });
+
+      expect(report.kept).toBe(1);
+      expect(historyOf(projectFolder)).toBe(before);
+    });
+
+    it('is recorded again when something was written', () => {
+      const projectFolder = tmpDirForTest();
+      createModulesApplicationService({ clock }).apply('init', { projectFolder });
+      rmSync(join(projectFolder, '.editorconfig'));
+
+      createModulesApplicationService({ clock: later }).apply('init', { projectFolder });
+
+      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules[0].appliedAt).toBe(
+        '2026-10-21T09:00:00.000Z',
+      );
+    });
+
+    it('is recorded again when the properties differ, even if nothing was written', () => {
+      const projectFolder = tmpDirForTest();
+      createModulesApplicationService({ clock }).apply('init', { projectFolder, projectName: 'shop' });
+
+      createModulesApplicationService({ clock: later }).apply(
+        'init',
+        { projectFolder, projectName: 'other' },
+        { onConflict: 'skip' },
+      );
+
+      expect(readJson(projectFolder, '.crafttype/modules/history.json').modules[0]).toMatchObject({
+        properties: { projectName: 'other' },
+        appliedAt: '2026-10-21T09:00:00.000Z',
+      });
+    });
+  });
+
+  // A permission cannot be taken away from root, nor from a Windows file.
+  describe.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('after an I/O failure', () => {
+    const FILES_BEFORE_VUE_APP = ['init', 'typescript', 'vitest', 'prettier', 'fastify-server'] as const;
+
+    const applyAll = (projectFolder: string, modules: readonly string[]) => {
+      const service = createModulesApplicationService({ clock });
+      for (const slug of modules) {
+        service.apply(slug, slug === 'init' ? { projectFolder, projectName: 'shop' } : { projectFolder });
+      }
+    };
+
+    const tree = (folder: string, prefix = ''): Record<string, string> =>
+      Object.assign(
+        {},
+        ...readdirSync(join(folder, prefix), { withFileTypes: true }).map((entry) => {
+          const path = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+          return entry.isDirectory() ? tree(folder, path) : { [path]: readFileSync(join(folder, path), 'utf8') };
+        }),
+      );
+
+    const setWritable = (folder: string, writable: boolean) => {
+      chmodSync(folder, writable ? 0o755 : 0o555);
+    };
+
+    it('may leave the project partly written, and applying the module again completes it', () => {
+      const projectFolder = tmpDirForTest();
+      applyAll(projectFolder, FILES_BEFORE_VUE_APP);
+      setWritable(join(projectFolder, 'src'), false);
+
+      try {
+        expect(() => applyAll(projectFolder, ['vue-app'])).toThrow(/EACCES/);
+      } finally {
+        setWritable(join(projectFolder, 'src'), true);
+      }
+      // Partly written: a file of the module is there, the history entry is not.
+      expect(existsSync(join(projectFolder, 'vite.config.ts'))).toBe(true);
+      expect(
+        readJson(projectFolder, '.crafttype/modules/history.json').modules.map(({ slug }: { slug: string }) => slug),
+      ).not.toContain('vue-app');
+
+      applyAll(projectFolder, ['vue-app']);
+
+      const reference = tmpDirForTest();
+      applyAll(reference, [...FILES_BEFORE_VUE_APP, 'vue-app']);
+      expect(tree(projectFolder)).toEqual(tree(reference));
     });
   });
 });

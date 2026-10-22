@@ -6,7 +6,7 @@ import {
   type DecidedChange,
   type PlannedChange,
 } from '../domain/ChangePlan.js';
-import { MissingModuleDependenciesError, NeedleError, UnknownModuleError } from '../domain/errors.js';
+import { CraftTypeError, MissingModuleDependenciesError, NeedleError, UnknownModuleError } from '../domain/errors.js';
 import { PACKAGE_JSON_PATH, PackageJsonDocument } from '../domain/PackageJsonDocument.js';
 import { insertAtNeedle, needleToken, type FileEdit } from '../domain/needles.js';
 import type { KnownProperties, ModuleProperties, PropertyValue, RawProperties } from '../domain/ModuleProperties.js';
@@ -46,6 +46,8 @@ export interface ApplyResult {
   readonly dryRun: boolean;
   readonly changes: readonly DecidedChange[];
   readonly report: ApplyReport;
+  /** Things the user should know about although the module applies, for example insertions a replacement loses. */
+  readonly warnings: readonly string[];
 }
 
 /** Orchestration: no business rule here, only the chaining of ports. */
@@ -84,18 +86,33 @@ export class ModulesApplicationService {
 
     if (dryRun) {
       const changes = plan.decide(onConflict);
-      return { slug, dryRun, changes, report: reportOf(changes) };
+      return {
+        slug,
+        dryRun,
+        changes,
+        report: reportOf(changes),
+        warnings: this.lostInsertions(slug, properties, changes),
+      };
     }
 
     const changes = plan.resolve(onConflict);
     this.write(module, changes);
 
-    this.dependencies.history.record(properties.projectFolder, {
+    const portable = resource.propertiesDefinition.portable(properties);
+    if (!this.alreadyRecorded(slug, portable, properties.projectFolder, changes)) {
+      this.dependencies.history.record(properties.projectFolder, {
+        slug,
+        properties: portable,
+        appliedAt: this.dependencies.clock().toISOString(),
+      });
+    }
+    return {
       slug,
-      properties: resource.propertiesDefinition.portable(properties),
-      appliedAt: this.dependencies.clock().toISOString(),
-    });
-    return { slug, dryRun, changes, report: reportOf(changes) };
+      dryRun,
+      changes,
+      report: reportOf(changes),
+      warnings: this.lostInsertions(slug, properties, changes),
+    };
   }
 
   /**
@@ -187,6 +204,65 @@ export class ModulesApplicationService {
     files.write(module.projectFolder, PACKAGE_JSON_PATH, current.with(entries).serialize());
   }
 
+  /**
+   * Replacing a file that another applied module completed at a needle (`config` in the `main.ts` of `fastify-server`)
+   * loses that module's insertions, and the history still lists it. Only a warning: the user asked for the replacement.
+   */
+  private lostInsertions(slug: ModuleSlug, properties: ModuleProperties, changes: readonly DecidedChange[]): string[] {
+    const replaced = changes.filter(({ kind, decision }) => kind === 'file' && decision === 'overwrite');
+    if (replaced.length === 0) {
+      return [];
+    }
+
+    const { history, paths } = this.dependencies;
+    const editors = history
+      .list(properties.projectFolder)
+      .filter((applied) => applied.slug !== slug)
+      .flatMap((applied) => {
+        try {
+          const other = this.buildModule(applied.slug, {
+            ...applied.properties,
+            projectFolder: properties.projectFolder,
+          });
+          return [
+            { slug: applied.slug, edited: normalizeDestinations(other.module, paths).edits.map(({ path }) => path) },
+          ];
+        } catch (error) {
+          // A history entry that can no longer be rebuilt (module removed, property changed) cannot be checked.
+          if (error instanceof CraftTypeError) {
+            return [];
+          }
+          throw error;
+        }
+      });
+
+    return replaced.flatMap(({ target }) => {
+      const lost = editors.filter(({ edited }) => edited.includes(target)).map((editor) => editor.slug);
+      return lost.length === 0
+        ? []
+        : [
+            `${target} is replaced, and ${lost.join(', ')} had inserted code in it: apply ${lost.join(', ')} again to restore it`,
+          ];
+    });
+  }
+
+  /**
+   * Applying a module again with the same properties and nothing to change leaves the history as it is: recording it
+   * would only move the entry to the end and give it a new date, which is noise in version control.
+   */
+  private alreadyRecorded(
+    slug: ModuleSlug,
+    properties: KnownProperties,
+    projectFolder: string,
+    changes: readonly DecidedChange[],
+  ): boolean {
+    if (!changes.every(({ decision }) => decision === 'unchanged' || decision === 'keep')) {
+      return false;
+    }
+    const recorded = this.dependencies.history.list(projectFolder).find((applied) => applied.slug === slug);
+    return recorded !== undefined && sameProperties(recorded.properties, properties);
+  }
+
   /** Properties already set by the applied modules; the most recent one wins. */
   private knownProperties(projectFolder: PropertyValue | undefined): KnownProperties {
     const folder = String(projectFolder ?? '');
@@ -207,3 +283,8 @@ export class ModulesApplicationService {
     }
   }
 }
+
+const sameProperties = (left: KnownProperties, right: KnownProperties): boolean => {
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
+};

@@ -10,6 +10,7 @@ import {
   ModuleConflictError,
 } from '../../domain/errors.js';
 import type { ModulePropertiesDefinition, PropertyDefinition, PropertyValue } from '../../domain/ModuleProperties.js';
+import { describeSystemError, isSystemError } from './systemErrors.js';
 
 const USAGE = `Usage:
   crafttype list
@@ -71,6 +72,10 @@ export const runCli = (argv: readonly string[], service: ModulesApplicationServi
     if (isUsageError(error)) {
       err(`Error: ${describeUsageError(error)}`);
       err(USAGE);
+      return 1;
+    }
+    if (isSystemError(error)) {
+      out(`Error: ${describeSystemError(error)}`);
       return 1;
     }
     throw error;
@@ -191,7 +196,7 @@ const LABELS: Record<DecidedChange['decision'], string> = {
 };
 
 const report = (result: ApplyResult, projectFolder: string, out: (line: string) => void): number => {
-  const { slug, dryRun, changes, report: counts } = result;
+  const { slug, dryRun, changes, report: counts, warnings } = result;
   const kept = counts.kept > 0 ? `, kept versions: ${counts.kept}` : '';
   const edited = counts.edited > 0 ? `, modified: ${counts.edited}` : '';
   const summary =
@@ -206,6 +211,7 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
       );
     }
     out(counts.conflicts > 0 ? `${summary}, conflicts: ${counts.conflicts}\n${CONFLICT_HINT}` : summary);
+    warnings.forEach((warning) => out(`Warning: ${warning}`));
     return counts.conflicts > 0 ? 1 : 0;
   }
 
@@ -218,6 +224,7 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
     ];
     out(`  ${label}: ${describeConflict(change)}`);
   }
+  warnings.forEach((warning) => out(`Warning: ${warning}`));
   return 0;
 };
 
