@@ -2,6 +2,7 @@ import type { ModuleResource } from '../shared/module/domain/ModuleResource.js';
 import type { NodePackagesVersionsReader } from '../shared/module/domain/PackageVersions.js';
 import { createConfigModuleResource } from './config/infrastructure/primary/configModuleResource.js';
 import { createDockerModuleResource } from './docker/infrastructure/primary/dockerModuleResource.js';
+import { createFetchClientModuleResource } from './fetch-client/infrastructure/primary/fetchClientModuleResource.js';
 import { createFastifyServerModuleResource } from './fastify-server/infrastructure/primary/fastifyServerModuleResource.js';
 import { createGithubActionsModuleResource } from './github-actions/infrastructure/primary/githubActionsModuleResource.js';
 import { createInitModuleResource } from './init/infrastructure/primary/initModuleResource.js';
@@ -27,4 +28,5 @@ export const allModuleResources = (versions: NodePackagesVersionsReader): readon
   createVueRouterModuleResource(versions),
   createGithubActionsModuleResource(),
   createDockerModuleResource(),
+  createFetchClientModuleResource(),
 ];
