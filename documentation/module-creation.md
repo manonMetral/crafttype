@@ -156,6 +156,8 @@ Needles placed by the catalog today:
 
 Needles are comments that stay in the generated code. The engine does not parse the code (no AST): it suits additions at places planned in advance, not the rewriting of arbitrary code.
 
+**Routes of the server.** The routes of `buildApp` are declared inside a plugin (`app.register(async (routes) => { ... })`) placed after the `app-plugins` needle, not directly on `app`. `buildApp` is synchronous, and Fastify adds a route declared on `app` immediately, before the plugins registered just above are loaded: a plugin that watches the routes (`openapi` does) would never see it. A module that adds routes does the same, in its own plugin.
+
 ## 4. The catalog
 
 Add the module to `src/generator/modules.ts`, after the modules it depends on (a test checks this).
