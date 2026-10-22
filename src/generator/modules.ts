@@ -6,6 +6,7 @@ import { createFastifyServerModuleResource } from './fastify-server/infrastructu
 import { createGithubActionsModuleResource } from './github-actions/infrastructure/primary/githubActionsModuleResource.js';
 import { createInitModuleResource } from './init/infrastructure/primary/initModuleResource.js';
 import { createLogsModuleResource } from './logs/infrastructure/primary/logsModuleResource.js';
+import { createOpenapiModuleResource } from './openapi/infrastructure/primary/openapiModuleResource.js';
 import { createPiniaModuleResource } from './pinia/infrastructure/primary/piniaModuleResource.js';
 import { createPrettierModuleResource } from './prettier/infrastructure/primary/prettierModuleResource.js';
 import { createTypescriptModuleResource } from './typescript/infrastructure/primary/typescriptModuleResource.js';
@@ -27,4 +28,5 @@ export const allModuleResources = (versions: NodePackagesVersionsReader): readon
   createVueRouterModuleResource(versions),
   createGithubActionsModuleResource(),
   createDockerModuleResource(),
+  createOpenapiModuleResource(versions),
 ];

@@ -14,8 +14,10 @@ else
 fi
 IMAGE=""
 CONTAINER=""
+SERVER_PID=""
 cleanup() {
   status=$?
+  [ -z "$SERVER_PID" ] || kill "$SERVER_PID" > /dev/null 2>&1 || true
   [ -z "$CONTAINER" ] || docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
   [ -z "$IMAGE" ] || docker rmi -f "$IMAGE" > /dev/null 2>&1 || true
   # The generated application (with node_modules) is only removed on success: after a failure it is kept to investigate.
@@ -71,6 +73,54 @@ rm src/webapp/probe.ts
 # An invalid configuration stops the server with an error message, without a stack trace.
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid PORT' PORT=abc
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid LOG_LEVEL' LOG_LEVEL=verbose
+node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid OPENAPI_DOCS' OPENAPI_DOCS=maybe
+
+# The built server describes its routes (module `openapi`): the OpenAPI document and the Swagger UI answer, and
+# production serves neither by default. Each server listens on a free port and is stopped whatever happens.
+free_port() {
+  node -e "const s = require('node:net').createServer(); s.listen(0, '127.0.0.1', () => { console.log(s.address().port); s.close(); });"
+}
+wait_for_health() {
+  for _ in $(seq 1 30); do
+    curl --silent --fail "http://127.0.0.1:$1/api/health" > /dev/null && return 0
+    sleep 1
+  done
+  echo "the server does not answer on /api/health (port $1)" >&2
+  exit 1
+}
+stop_server() {
+  kill "$SERVER_PID" > /dev/null 2>&1 || true
+  wait "$SERVER_PID" > /dev/null 2>&1 || true
+  SERVER_PID=""
+}
+
+SERVER_PORT="$(free_port)"
+PORT="$SERVER_PORT" node dist/server/main.js > /dev/null 2>&1 &
+SERVER_PID=$!
+wait_for_health "$SERVER_PORT"
+curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/openapi.json" | node -e "
+  const document = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+  if (!/^3\.1\./.test(document.openapi)) throw new Error('openapi version: ' + document.openapi);
+  if (document.info.title !== 'fullapp') throw new Error('title: ' + document.info.title);
+  if (!document.paths['/api/health']) throw new Error('the health route is not described');
+"
+curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/docs/" | grep -qi 'swagger' \
+  || { echo "/api/docs does not serve the Swagger UI" >&2; exit 1; }
+stop_server
+
+SERVER_PORT="$(free_port)"
+NODE_ENV=production PORT="$SERVER_PORT" node dist/server/main.js > /dev/null 2>&1 &
+SERVER_PID=$!
+wait_for_health "$SERVER_PORT"
+if curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/openapi.json" > /dev/null 2>&1; then
+  echo "NODE_ENV=production should not serve /api/openapi.json by default" >&2
+  exit 1
+fi
+if curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/docs/" > /dev/null 2>&1; then
+  echo "NODE_ENV=production should not serve /api/docs by default" >&2
+  exit 1
+fi
+stop_server
 # With CRAFTTYPE_DOCKER=1 (needs Docker): the image builds, the container becomes healthy and answers on /api/health.
 if [ -n "${CRAFTTYPE_DOCKER:-}" ]; then
   IMAGE="crafttype-fullapp:$$"
