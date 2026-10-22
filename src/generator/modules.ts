@@ -5,6 +5,7 @@ import { createDockerModuleResource } from './docker/infrastructure/primary/dock
 import { createFetchClientModuleResource } from './fetch-client/infrastructure/primary/fetchClientModuleResource.js';
 import { createFastifyServerModuleResource } from './fastify-server/infrastructure/primary/fastifyServerModuleResource.js';
 import { createGithubActionsModuleResource } from './github-actions/infrastructure/primary/githubActionsModuleResource.js';
+import { createHexagonalBackModuleResource } from './hexagonal-back/infrastructure/primary/hexagonalBackModuleResource.js';
 import { createInitModuleResource } from './init/infrastructure/primary/initModuleResource.js';
 import { createLogsModuleResource } from './logs/infrastructure/primary/logsModuleResource.js';
 import { createOpenapiModuleResource } from './openapi/infrastructure/primary/openapiModuleResource.js';
@@ -31,4 +32,5 @@ export const allModuleResources = (versions: NodePackagesVersionsReader): readon
   createDockerModuleResource(),
   createFetchClientModuleResource(),
   createOpenapiModuleResource(versions),
+  createHexagonalBackModuleResource(versions),
 ];
