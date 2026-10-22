@@ -75,7 +75,7 @@ export const runCli = (argv: readonly string[], service: ModulesApplicationServi
       return 1;
     }
     if (isSystemError(error)) {
-      out(`Error: ${describeSystemError(error)}`);
+      err(`Error: ${describeSystemError(error)}`);
       return 1;
     }
     throw error;
