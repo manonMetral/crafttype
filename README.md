@@ -3,7 +3,7 @@
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
 Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
-> Status: phase 2 (wider catalog) has started. The core and twelve modules work, the CLI is minimal. ESLint (blocked, see below) is not available yet, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
+> Status: phase 2 (wider catalog) has started. The core and thirteen modules work, the CLI is minimal. ESLint (blocked, see below) is not available yet, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
 
 ## Usage with npx
 
@@ -42,6 +42,7 @@ A module only works after the modules it depends on: apply them in the order sho
 | `vue-router` | Vue Router in the Vue application | `vue-app` |
 | `github-actions` | a GitHub Actions workflow (format, typecheck, tests, builds) | `typescript`, `vitest` |
 | `docker` | a multi-stage `Dockerfile` and a `.dockerignore` for the Fastify server | `fastify-server`, `config` |
+| `hexagonal-back` | a hexagonal structure for the server, an example context (`greeting`) and an architecture test | `fastify-server`, `vitest` |
 
 Applied modules are recorded in the generated project's `.crafttype/modules/history.json`, together with the properties they declare. A module refuses to apply if the modules it depends on are not in that history.
 Options already given to a previous module (`--project-name` for `init`, `--server-port` for `fastify-server`) are reused by the following ones: `vue-app` proxies to the port chosen for the server.
@@ -71,6 +72,8 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 **CI.** `github-actions` adds `.github/workflows/ci.yml` to the generated project: it runs on pushes to `main` and on pull requests, on Node 22 and 24, with read-only permissions. It runs `typecheck` and `test`, and the scripts other modules may have added (`format:check`, `webapp:typecheck`, `server:build`, `webapp:build`) only if they exist (`npm run --if-present`), so modules applied later need no change. It uses `npm ci`: run `npm install` once in the generated project and commit `package-lock.json`.
 
 **Docker.** `docker` adds a `Dockerfile` (build stage, production dependencies, small runtime stage on `node:24-alpine`, running as the `node` user, with a healthcheck on `/api/health`) and a `.dockerignore`. The image contains the Fastify server only: it does not serve the Vue application. The server listens on `127.0.0.1` by default, which cannot be reached from outside a container, so the image sets `HOST=0.0.0.0` (that is why the module needs `config`) and `PORT` to the server port. Like `github-actions`, it uses `npm ci`: commit `package-lock.json`. Production dependencies include everything listed in `dependencies`, the Vue packages too.
+
+**Hexagonal structure.** `hexagonal-back` adds to `src/server` one hexagon per context (`domain`, `application`, `infrastructure/primary` and `infrastructure/secondary`), with `greeting` as the example (`GET /api/greeting?name=`, a port, an in-memory adapter, tests for each layer), a composition root (`composition.ts`) wired into `app.ts` through the `app-imports` and `app-plugins` needles, and an architecture test written with arch-unit-ts. The test fails when a context depends on another one, when the domain depends on anything but itself, when the application depends on more than the domain, when a primary adapter calls the domain or a secondary adapter, or when a secondary adapter calls the application; a plain scan also refuses `node:` and library imports in the domain and the application, which arch-unit-ts does not always resolve. The conventions are in the generated `src/server/ARCHITECTURE.md`. The routes of a context are declared inside a Fastify plugin, so that plugins registered earlier (OpenAPI) see them, which also means that `openapi` must be applied before `hexagonal-back` (the catalog order does it): the order of the insertions in `app.ts` is the order of registration. `/api/health` stays inline in `app.ts`: it belongs to `fastify-server`, and CraftType cannot rewrite a file that other modules complete without losing their insertions.
 
 **Failures.** Conflicts, missing needles, invalid destinations and missing dependencies are all detected before the first write: nothing is written or recorded. A failure of the file system during the writes (permission denied, disk full...) can leave the project partly written, and the CLI prints it on one line. Files are written through a temporary file and renamed, so none is left truncated. Fix the cause and run the same command again: it completes the project and records the module in the history.
 

@@ -4,6 +4,7 @@ import { createConfigModuleResource } from './config/infrastructure/primary/conf
 import { createDockerModuleResource } from './docker/infrastructure/primary/dockerModuleResource.js';
 import { createFastifyServerModuleResource } from './fastify-server/infrastructure/primary/fastifyServerModuleResource.js';
 import { createGithubActionsModuleResource } from './github-actions/infrastructure/primary/githubActionsModuleResource.js';
+import { createHexagonalBackModuleResource } from './hexagonal-back/infrastructure/primary/hexagonalBackModuleResource.js';
 import { createInitModuleResource } from './init/infrastructure/primary/initModuleResource.js';
 import { createLogsModuleResource } from './logs/infrastructure/primary/logsModuleResource.js';
 import { createPiniaModuleResource } from './pinia/infrastructure/primary/piniaModuleResource.js';
@@ -27,4 +28,5 @@ export const allModuleResources = (versions: NodePackagesVersionsReader): readon
   createVueRouterModuleResource(versions),
   createGithubActionsModuleResource(),
   createDockerModuleResource(),
+  createHexagonalBackModuleResource(versions),
 ];
