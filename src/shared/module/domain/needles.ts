@@ -31,9 +31,9 @@ export const insertAtNeedle = (fileContent: string, { path, needle, content }: F
   // The character that follows must not extend the name: `main` does not designate `main-imports`.
   const pattern = new RegExp(`${token.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
 
-  const found = lines.flatMap((line, index) => (pattern.test(line) ? [index] : []));
-  const [index] = found;
-  if (index === undefined) {
+  const found = lines.flatMap((line, index) => (pattern.test(line) ? [{ index, line }] : []));
+  const [first] = found;
+  if (first === undefined) {
     throw new NeedleError(
       path,
       token,
@@ -50,9 +50,10 @@ export const insertAtNeedle = (fileContent: string, { path, needle, content }: F
     return fileContent;
   }
 
-  const indent = /^[ \t]*/.exec(lines[index] ?? '')?.[0] ?? '';
+  // The needle line holds the token, so it has a non-blank character: what precedes it is its indentation.
+  const indent = first.line.replace(/[^ \t][^]*$/, '');
   const indented = block.map((line) => (line.trim() === '' ? '' : `${indent}${line}`));
-  return [...lines.slice(0, index), ...indented, ...lines.slice(index)].join(eol);
+  return [...lines.slice(0, first.index), ...indented, ...lines.slice(first.index)].join(eol);
 };
 
 const containsLines = (lines: readonly string[], block: readonly string[]): boolean => {
