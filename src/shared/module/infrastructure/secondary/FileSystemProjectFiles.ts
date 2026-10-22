@@ -49,7 +49,7 @@ export class FileSystemProjectFiles implements ProjectFiles {
 }
 
 /** The user never asked for the temporary file: an error that names it is made to name the file being written. */
-const namingTarget = (error: unknown, temporary: string, target: string): unknown => {
+export const namingTarget = (error: unknown, temporary: string, target: string): unknown => {
   if (typeof error === 'object' && error !== null && 'path' in error && error.path === temporary) {
     error.path = target;
   }
