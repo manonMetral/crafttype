@@ -2,13 +2,7 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { ApplyResult, ModulesApplicationService } from '../../application/ModulesApplicationService.js';
 import { describeConflict, describeChange, type ConflictPolicy, type DecidedChange } from '../../domain/ChangePlan.js';
-import {
-  CraftTypeError,
-  InvalidPropertyError,
-  MissingModuleDependenciesError,
-  MissingPropertyError,
-  ModuleConflictError,
-} from '../../domain/errors.js';
+import { isDomainError, MissingModuleDependenciesError, type DomainError } from '../../domain/errors.js';
 import type { ModulePropertiesDefinition, PropertyDefinition, PropertyValue } from '../../domain/ModuleProperties.js';
 import { describeSystemError, isSystemError } from './systemErrors.js';
 
@@ -65,7 +59,7 @@ export const runCli = (argv: readonly string[], service: ModulesApplicationServi
         return 1;
     }
   } catch (error) {
-    if (error instanceof CraftTypeError) {
+    if (isDomainError(error)) {
       err(`Error: ${describe(error)}`);
       return 1;
     }
@@ -234,18 +228,31 @@ const hasConflictingContent = ({ decision }: DecidedChange): boolean =>
 const CONFLICT_HINT = 'Run again with --skip-conflicts to keep the existing items or --force to replace them.';
 
 /** Names business errors with command line options rather than internal keys. */
-const describe = (error: CraftTypeError): string => {
-  if (error instanceof MissingPropertyError) {
-    return `Missing required option: ${toFlag(error.key)}`;
+const describe = (error: DomainError): string => {
+  switch (error.kind) {
+    case 'missing-property':
+      return `Missing required option: ${toFlag(error.key)}`;
+    case 'invalid-property':
+      return `Invalid option ${toFlag(error.key)}: ${error.reason}`;
+    case 'module-conflict':
+      return `${error.message}\n${CONFLICT_HINT}`;
+    case 'unknown-module':
+    case 'property-access':
+    case 'invalid-property-definition':
+    case 'missing-module-dependencies':
+    case 'unknown-package-version':
+    case 'duplicate-destination':
+    case 'invalid-destination':
+    case 'needle':
+    case 'invalid-project-file':
+      return error.message;
+    default:
+      return unreachable(error);
   }
-  if (error instanceof InvalidPropertyError) {
-    return `Invalid option ${toFlag(error.key)}: ${error.reason}`;
-  }
-  if (error instanceof ModuleConflictError) {
-    return `${error.message}\n${CONFLICT_HINT}`;
-  }
-  return error.message;
 };
+
+/** Compile-time check that `describe` handles every kind; at run time, an unexpected error still has its message. */
+const unreachable = (error: never): string => (error as Error).message;
 
 const toOption = (key: string): string => key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 
