@@ -5,6 +5,7 @@ import { createModulesApplicationService } from '../../../composition.js';
 import { databaseModuleResources } from '../../test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../test/ModuleAssertions.js';
 import { from, moduleBuilder } from '../domain/CraftModule.js';
+import { moduleResource } from '../domain/ModuleResource.js';
 import { ModulePropertiesDefinition } from '../domain/ModuleProperties.js';
 import {
   DuplicateDestinationError,
@@ -744,6 +745,33 @@ describe('ModulesApplicationService', () => {
       const { warnings } = service.apply('fastify-server', { projectFolder }, { onConflict: 'overwrite' });
 
       expect(warnings).toHaveLength(2);
+    });
+
+    it('does not hide an unexpected error raised while rebuilding a history entry', () => {
+      const exploding = moduleResource()
+        .slug('exploding')
+        .propertiesDefinition(ModulePropertiesDefinition.builder().build())
+        .apiDoc('Test', 'Fails with a bug that is not an error of the tool')
+        .standalone()
+        .tags('test')
+        .factory(() => {
+          throw new TypeError('bug in a module');
+        });
+      const service = createModulesApplicationService({ clock, extraResources: [exploding] });
+      const projectFolder = tmpDirForTest();
+      for (const slug of ['init', 'typescript', 'vitest', 'fastify-server']) {
+        service.apply(slug, slug === 'init' ? { projectFolder, projectName: 'shop' } : { projectFolder });
+      }
+      const path = join(projectFolder, '.crafttype/modules/history.json');
+      const history = JSON.parse(readFileSync(path, 'utf8'));
+      history.modules.push({ slug: 'exploding', properties: {}, appliedAt: '2026-10-20T10:00:00.000Z' });
+      writeFileSync(path, JSON.stringify(history));
+      // A file the module would have to replace: without one, there is nothing to check and no entry is rebuilt.
+      writeFileSync(join(projectFolder, 'src/server/main.ts'), '// edited by hand\n');
+
+      expect(() => service.apply('fastify-server', { projectFolder }, { onConflict: 'overwrite' })).toThrow(
+        'bug in a module',
+      );
     });
 
     it('says nothing when no other module completed the replaced file, or when nothing is replaced', () => {
