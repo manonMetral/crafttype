@@ -34,13 +34,15 @@ npm run cli -- apply typescript --project-folder ../my-app
 npm run format        # formats the code (Prettier); format:check verifies it, and so does the CI
 npm run lint:types    # typecheck
 npm test              # unit and acceptance tests
-npm run test:coverage # same tests with coverage; the CI requires 100% of statements, functions and lines, and 95% of branches
+npm run test:coverage # same tests with coverage; the CI requires 100% of statements, branches, functions and lines
 npm run build         # compilation to dist/
 npm run ci:generate   # generates a complete application with all the modules, then installs, type-checks, tests and compiles it
                       # (CRAFTTYPE_DOCKER=1 also builds its Docker image and checks the container; needs Docker and curl)
 ```
 
 The GitHub CI runs the same commands on Node 22 and 24. A pull request must be green to be merged.
+
+**Coverage at 100 %.** Every new statement, branch, function and line needs a test, error paths included. A defensive fallback that no test can reach (`?? ''` after a presence check) is dead code: remove it, or change the type so that the compiler knows (a non-empty tuple, for instance), rather than ignoring it. The count of branches comes from the JavaScript that the transpiler produces, so an update of Vitest, TypeScript or Vite can move it: the pull request that carries the update fails, and the fix is a test or a rewrite, not a lower threshold. Renovate updates `vitest` and `@vitest/coverage-v8` together, because the latter pins the exact version of the former.
 
 ## Adding or changing a module
 

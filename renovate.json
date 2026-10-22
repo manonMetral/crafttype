@@ -21,6 +21,11 @@
       "matchFileNames": ["package.json"],
       "groupName": "development tooling",
       "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "@vitest/coverage-v8 pins the exact version of vitest as a peer dependency, and the coverage thresholds are at 100 %: whatever the update type, they move together, in one pull request where a change in the branch count shows up",
+      "matchPackageNames": ["vitest", "@vitest/**"],
+      "groupName": "vitest and coverage"
     }
   ]
 }
