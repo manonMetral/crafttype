@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync,
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tmpDirForTest } from '../../../test/ModuleAssertions.js';
-import { FileSystemProjectFiles } from './FileSystemProjectFiles.js';
+import { FileSystemProjectFiles, namingTarget } from './FileSystemProjectFiles.js';
 
 // A permission cannot be taken away from root, nor from a Windows file.
 const canRestrictPermissions = process.platform !== 'win32' && process.getuid?.() !== 0;
@@ -86,5 +86,28 @@ describe('FileSystemProjectFiles', () => {
       expect(files.read(folder, 'package.json')).toBe('precious');
       expect(readdirSync(folder)).toEqual(['package.json']);
     });
+  });
+});
+
+describe('namingTarget', () => {
+  it('makes an error that names the temporary file name the target', () => {
+    const error = Object.assign(new Error('boom'), { path: '/p/.a.tmp' });
+
+    expect(namingTarget(error, '/p/.a.tmp', '/p/a')).toBe(error);
+    expect(error.path).toBe('/p/a');
+  });
+
+  it('leaves an error that names another file, or no file, as it is', () => {
+    const other = Object.assign(new Error('boom'), { path: '/p/other' });
+    const without = new Error('boom');
+
+    expect(namingTarget(other, '/p/.a.tmp', '/p/a')).toBe(other);
+    expect(other.path).toBe('/p/other');
+    expect(namingTarget(without, '/p/.a.tmp', '/p/a')).toBe(without);
+    expect('path' in without).toBe(false);
+  });
+
+  it.each([null, undefined, 'text', 42])('returns %j unchanged', (value) => {
+    expect(namingTarget(value, '/p/.a.tmp', '/p/a')).toBe(value);
   });
 });

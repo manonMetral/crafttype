@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../composition.js';
@@ -27,6 +27,8 @@ const runWith = (service: ReturnType<typeof createModulesApplicationService>, ar
 };
 
 const run = (...argv: string[]) => runWith(createModulesApplicationService(), argv);
+
+const canRestrictPermissions = process.platform !== 'win32' && process.getuid?.() !== 0;
 
 describe('CLI', () => {
   it('lists the modules of the catalog', () => {
@@ -116,6 +118,25 @@ describe('CLI', () => {
       expect(run('apply').code).toBe(1);
     });
   });
+
+  it.skipIf(!canRestrictPermissions)(
+    'reports a file system failure on one line on stderr, naming the file being written',
+    () => {
+      const projectFolder = tmpDirForTest();
+      chmodSync(projectFolder, 0o555);
+
+      try {
+        const { code, stdout, stderr } = run('apply', 'init', '--project-folder', projectFolder, '--project-name', 'x');
+
+        expect(code).toBe(1);
+        expect(stdout).toBe('');
+        expect(stderr).toMatch(/^Error: cannot \w+ .+: permission denied \(EACCES\)$/);
+        expect(stderr).not.toContain('.tmp');
+      } finally {
+        chmodSync(projectFolder, 0o755);
+      }
+    },
+  );
 
   it('reports an unknown option without a stack trace', () => {
     const { code, output } = run('apply', 'init', '--foo');
