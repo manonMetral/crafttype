@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1
+# Image of the Fastify server only: the Vue application (`webapp:build`) is not served by it.
+# Needs a committed package-lock.json (run `npm install` once, then commit it): `npm ci` relies on it.
+
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run server:build
+
+FROM node:24-alpine AS dependencies
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+FROM node:24-alpine
+# The server listens on 127.0.0.1 by default, which is unreachable from outside a container.
+ENV NODE_ENV=production HOST=0.0.0.0 PORT={{serverPort}}
+WORKDIR /app
+COPY --chown=node:node package.json ./
+COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist/server ./dist/server
+USER node
+EXPOSE {{serverPort}}
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
+  CMD node -e "fetch('http://127.0.0.1:' + process.env.PORT + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+CMD ["node", "dist/server/main.js"]
