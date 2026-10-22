@@ -170,7 +170,8 @@ const describeModule = (
 const valueHint = ({ type }: PropertyDefinition): string =>
   type === 'boolean' ? '' : type === 'number' ? '<number>' : '<text>';
 
-const summary = ({ mandatory, defaultValue, description }: PropertyDefinition): string => {
+/** What `--help` says of an option. A default computed from the folder is not printed: its description explains it. */
+export const summary = ({ mandatory, defaultValue, description }: PropertyDefinition): string => {
   const constraint = mandatory
     ? '(required) '
     : typeof defaultValue === 'function' || defaultValue === undefined
@@ -280,6 +281,6 @@ const describeUsageError = (error: TypeError & { code: string }): string => {
       }
       return `missing value for option ${option}`;
     default:
-      return error.message.split('\n')[0] ?? error.message;
+      return error.message.replace(/\n[^]*$/, '');
   }
 };

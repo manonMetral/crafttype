@@ -33,6 +33,11 @@ describe('ModulePropertiesDefinition', () => {
       expect(definition.resolve({ projectFolder: '/tmp/@@@' }).string('projectName')).toBe('app');
     });
 
+    it('falls back to "app" when the folder has no name, such as the root', () => {
+      expect(definition.resolve({ projectFolder: '/' }).string('projectName')).toBe('app');
+      expect(definition.resolve({ projectFolder: '//' }).string('projectName')).toBe('app');
+    });
+
     it('accepts a valid explicit name, with or without a scope', () => {
       expect(definition.resolve({ projectFolder: 'x', projectName: 'shop.front_1' }).string('projectName')).toBe(
         'shop.front_1',

@@ -162,9 +162,15 @@ export class ModulesApplicationService {
 
   /** One change per modified file: the insertions in the same file are chained in the order the module declares them. */
   private planEdits({ projectFolder, edits }: CraftModule): PlannedChange[] {
-    const byPath = new Map<string, FileEdit[]>();
+    // A group is created with its first edit: it is never empty, which the tuple type says.
+    const byPath = new Map<string, [FileEdit, ...FileEdit[]]>();
     for (const edit of edits) {
-      byPath.set(edit.path, [...(byPath.get(edit.path) ?? []), edit]);
+      const group = byPath.get(edit.path);
+      if (group === undefined) {
+        byPath.set(edit.path, [edit]);
+      } else {
+        group.push(edit);
+      }
     }
 
     return [...byPath].map(([path, fileEdits]) => {
@@ -172,7 +178,7 @@ export class ModulesApplicationService {
       if (current === undefined) {
         throw new NeedleError(
           path,
-          needleToken(fileEdits[0]?.needle ?? ''),
+          needleToken(fileEdits[0].needle),
           'file not found: apply the module that creates it first',
         );
       }
