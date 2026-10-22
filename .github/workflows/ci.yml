@@ -43,8 +43,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # Generates an application with all modules, then installs it, type-checks it, tests it and builds it.
+      # Generates an application with all modules, then installs it, type-checks it, tests it and builds it,
+      # and builds its Docker image and checks that the container answers.
       - run: npm run ci:generate
+        env:
+          CRAFTTYPE_DOCKER: '1'
 
   packed:
     name: Packed artifact

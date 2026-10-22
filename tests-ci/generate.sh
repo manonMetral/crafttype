@@ -11,9 +11,19 @@ if [ $# -ge 1 ]; then
 else
   WORK="$(mktemp -d)"
   APP="$WORK/fullapp"
-  # The generated application (with node_modules) is only removed on success: after a failure it is kept to investigate.
-  trap '[ $? -eq 0 ] && rm -rf "$WORK" || echo "Kept for investigation: $APP" >&2' EXIT
 fi
+IMAGE=""
+CONTAINER=""
+cleanup() {
+  status=$?
+  [ -z "$CONTAINER" ] || docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
+  [ -z "$IMAGE" ] || docker rmi -f "$IMAGE" > /dev/null 2>&1 || true
+  # The generated application (with node_modules) is only removed on success: after a failure it is kept to investigate.
+  if [ -n "${WORK:-}" ]; then
+    if [ $status -eq 0 ]; then rm -rf "$WORK"; else echo "Kept for investigation: $APP" >&2; fi
+  fi
+}
+trap cleanup EXIT
 if [ -n "${CRAFTTYPE_BIN:-}" ]; then
   CRAFTTYPE=("$CRAFTTYPE_BIN")
 else
@@ -61,6 +71,27 @@ rm src/webapp/probe.ts
 # An invalid configuration stops the server with an error message, without a stack trace.
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid PORT' PORT=abc
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid LOG_LEVEL' LOG_LEVEL=verbose
+# With CRAFTTYPE_DOCKER=1 (needs Docker): the image builds, the container becomes healthy and answers on /api/health.
+if [ -n "${CRAFTTYPE_DOCKER:-}" ]; then
+  IMAGE="crafttype-fullapp:$$"
+  docker build --quiet -t "$IMAGE" .
+  CONTAINER="$(docker run -d -p 127.0.0.1::3000 "$IMAGE")"
+  HOST_PORT="$(docker port "$CONTAINER" 3000/tcp | head -n 1 | sed 's/.*://')"
+  for _ in $(seq 1 30); do
+    curl --silent --fail "http://127.0.0.1:$HOST_PORT/api/health" | grep -q '"UP"' && break
+    sleep 1
+  done
+  curl --silent --fail "http://127.0.0.1:$HOST_PORT/api/health" | grep -q '"UP"' \
+    || { echo "the container does not answer on /api/health" >&2; docker logs "$CONTAINER" >&2; exit 1; }
+  for _ in $(seq 1 40); do
+    [ "$(docker inspect --format '{{.State.Health.Status}}' "$CONTAINER")" = healthy ] && break
+    sleep 1
+  done
+  [ "$(docker inspect --format '{{.State.Health.Status}}' "$CONTAINER")" = healthy ] \
+    || { echo "the container healthcheck is not healthy" >&2; exit 1; }
+  # The container does not run as root.
+  [ "$(docker exec "$CONTAINER" id -u)" != 0 ] || { echo "the container runs as root" >&2; exit 1; }
+fi
 if [ -n "${WORK:-}" ]; then
   echo "OK (temporary folder removed)"
 else
