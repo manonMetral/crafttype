@@ -105,9 +105,31 @@ curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/openapi.json" | node -e 
   if (document.info.title !== 'fullapp') throw new Error('title: ' + document.info.title);
   if (!document.paths['/api/health']) throw new Error('the health route is not described');
   if (!document.paths['/api/greeting']) throw new Error('the greeting route is not described');
+  if (!document.paths['/api/auth/token']) throw new Error('the auth token route is not described');
+  if (!document.paths['/api/auth/me']) throw new Error('the auth profile route is not described');
 "
 curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/docs/" | grep -qi 'swagger' \
   || { echo "/api/docs does not serve the Swagger UI" >&2; exit 1; }
+TOKEN="$(
+  curl --silent --fail -X POST "http://127.0.0.1:$SERVER_PORT/api/auth/token" \
+    -H 'content-type: application/json' \
+    -d '{"sub":"ci-user","role":"maintainer"}' | node -e "
+      const body = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+      if (typeof body.token !== 'string' || body.token.length === 0) {
+        throw new Error('token route did not return a token');
+      }
+      process.stdout.write(body.token);
+    "
+)"
+status_code="$(curl --silent -o /dev/null -w '%{http_code}' "http://127.0.0.1:$SERVER_PORT/api/auth/me")"
+[ "$status_code" = '401' ] || { echo "/api/auth/me should require a bearer token" >&2; exit 1; }
+curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/auth/me" \
+  -H "authorization: Bearer $TOKEN" | node -e "
+    const body = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+    if (body.sub !== 'ci-user') throw new Error('unexpected auth subject: ' + body.sub);
+    if (body.role !== 'maintainer') throw new Error('unexpected auth role: ' + body.role);
+    if (!Number.isInteger(body.expiresAt)) throw new Error('missing expiresAt claim');
+  "
 stop_server
 
 SERVER_PORT="$(free_port)"

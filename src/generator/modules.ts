@@ -1,5 +1,6 @@
 import type { ModuleResource } from '../shared/module/domain/ModuleResource.js';
 import type { NodePackagesVersionsReader } from '../shared/module/domain/PackageVersions.js';
+import { createAuthModuleResource } from './auth/infrastructure/primary/authModuleResource.js';
 import { createConfigModuleResource } from './config/infrastructure/primary/configModuleResource.js';
 import { createDockerModuleResource } from './docker/infrastructure/primary/dockerModuleResource.js';
 import { createEslintModuleResource } from './eslint/infrastructure/primary/eslintModuleResource.js';
@@ -26,6 +27,7 @@ export const allModuleResources = (versions: NodePackagesVersionsReader): readon
   createPrettierModuleResource(versions),
   createEslintModuleResource(versions),
   createFastifyServerModuleResource(versions),
+  createAuthModuleResource(),
   createConfigModuleResource(),
   createLogsModuleResource(),
   createVueAppModuleResource(versions),
