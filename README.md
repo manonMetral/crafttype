@@ -3,7 +3,7 @@
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
 Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
-> Status: phase 2 (wider catalog) has started. The core and twelve modules work, the CLI is minimal. ESLint (blocked, see below) is not available yet, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
+> Status: phase 2 (wider catalog) has started. The core and fourteen modules work, the CLI is minimal. ESLint (blocked, see below) is not available yet, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
 
 ## Usage with npx
 
@@ -24,6 +24,7 @@ npx crafttype apply vue-app --project-folder .
 npx crafttype apply pinia --project-folder .
 npx crafttype apply vue-router --project-folder .
 npx crafttype apply github-actions --project-folder .
+npx crafttype apply openapi --project-folder .
 ```
 
 A module only works after the modules it depends on: apply them in the order shown (`npx crafttype list` shows each module's prerequisites). Then run `npm install` in the project.
@@ -43,6 +44,7 @@ A module only works after the modules it depends on: apply them in the order sho
 | `github-actions` | a GitHub Actions workflow (format, typecheck, tests, builds) | `typescript`, `vitest` |
 | `docker` | a multi-stage `Dockerfile` and a `.dockerignore` for the Fastify server | `fastify-server`, `config` |
 | `fetch-client` | a typed HTTP client (`fetch`) for the Vue application, with its tests | `vue-app`, `vitest` |
+| `openapi` | an OpenAPI document and a Swagger UI for the Fastify server | `fastify-server` |
 
 Applied modules are recorded in the generated project's `.crafttype/modules/history.json`, together with the properties they declare. A module refuses to apply if the modules it depends on are not in that history.
 Options already given to a previous module (`--project-name` for `init`, `--server-port` for `fastify-server`) are reused by the following ones: `vue-app` proxies to the port chosen for the server.
@@ -74,6 +76,8 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 **Docker.** `docker` adds a `Dockerfile` (build stage, production dependencies, small runtime stage on `node:24-alpine`, running as the `node` user, with a healthcheck on `/api/health`) and a `.dockerignore`. The image contains the Fastify server only: it does not serve the Vue application. The server listens on `127.0.0.1` by default, which cannot be reached from outside a container, so the image sets `HOST=0.0.0.0` (that is why the module needs `config`) and `PORT` to the server port. Like `github-actions`, it uses `npm ci`: commit `package-lock.json`. Production dependencies include everything listed in `dependencies`, the Vue packages too.
 
 **HTTP client.** `fetch-client` adds `src/webapp/api/http.ts` to the Vue application: `getJson<T>(path)` and `postJson<T, B>(path, body)` on top of the platform `fetch` (no new dependency), under the `/api` prefix that the Vite dev proxy forwards to the server. A failure is an `ApiError` carrying the HTTP `status` (`undefined` when the server cannot be reached) and the parsed `body` of the reply: JSON, or the raw text when it is not JSON. A cancelled request (`{ signal }`) rejects with the `AbortError` of `fetch`, not with an `ApiError`, so that a component can tell a cancellation from a failure. `health.ts` calls `/api/health` with it, and both files come with tests that stub `fetch`, run by the generated `vitest` (hence the dependency on `vitest`). The module does not edit `App.vue`, which still calls `fetch` itself: to use the client there, replace that call with `fetchHealth()` from `./api/health.js`.
+
+**OpenAPI.** `openapi` adds `@fastify/swagger` and `@fastify/swagger-ui` (OpenAPI 3.1): the document is served at `/api/openapi.json` and a Swagger UI at `/api/docs`. The title and version of the document are the `name` and `version` of the project's `package.json`, read at startup. It describes the routes declared after it in `buildApp`, which `fastify-server` declares inside a plugin for that reason (`documentation/module-creation.md`); `/api/health` has a response schema so that it appears in the document. **In production the documentation is off by default:** when `NODE_ENV=production` neither the document nor the UI is served, so the `docker` image does not expose them. `OPENAPI_DOCS=true` turns them on explicitly, `OPENAPI_DOCS=false` turns them off in development, any other value stops the server at startup with `Invalid OPENAPI_DOCS`.
 
 **Failures.** Conflicts, missing needles, invalid destinations and missing dependencies are all detected before the first write: nothing is written or recorded. A failure of the file system during the writes (permission denied, disk full...) can leave the project partly written, and the CLI prints it on one line. Files are written through a temporary file and renamed, so none is left truncated. Fix the cause and run the same command again: it completes the project and records the module in the history.
 
