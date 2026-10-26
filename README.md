@@ -3,7 +3,7 @@
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
 Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
-> Status: phase 2 (wider catalog) has started. The core and sixteen modules work, the CLI is minimal, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
+> Status: phase 2 (wider catalog) has started. The core and seventeen modules work, the CLI is minimal, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
 
 ## Usage with npx
 
@@ -26,6 +26,7 @@ npx crafttype apply pinia --project-folder .
 npx crafttype apply vue-router --project-folder .
 npx crafttype apply github-actions --project-folder .
 npx crafttype apply openapi --project-folder .
+npx crafttype apply persistence --project-folder .
 ```
 
 A module only works after the modules it depends on: apply them in the order shown (`npx crafttype list` shows each module's prerequisites). Then run `npm install` in the project.
@@ -48,6 +49,7 @@ A module only works after the modules it depends on: apply them in the order sho
 | `fetch-client` | a typed HTTP client (`fetch`) for the Vue application, with its tests | `vue-app`, `vitest` |
 | `openapi` | an OpenAPI document and a Swagger UI for the Fastify server | `fastify-server` |
 | `hexagonal-back` | a hexagonal structure for the server, an example context (`greeting`) and an architecture test | `fastify-server`, `vitest` |
+| `persistence` | repository abstractions and two adapters (in-memory and JSON file), with tests | `fastify-server`, `vitest` |
 
 Applied modules are recorded in the generated project's `.crafttype/modules/history.json`, together with the properties they declare. A module refuses to apply if the modules it depends on are not in that history.
 Options already given to a previous module (`--project-name` for `init`, `--server-port` for `fastify-server`) are reused by the following ones: `vue-app` proxies to the port chosen for the server.
@@ -85,6 +87,8 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 **OpenAPI.** `openapi` adds `@fastify/swagger` and `@fastify/swagger-ui` (OpenAPI 3.1): the document is served at `/api/openapi.json` and a Swagger UI at `/api/docs`. The title and version of the document are the `name` and `version` of the project's `package.json`, read at startup. It describes the routes declared after it in `buildApp`, which `fastify-server` declares inside a plugin for that reason (`documentation/module-creation.md`); `/api/health` has a response schema so that it appears in the document. **In production the documentation is off by default:** when `NODE_ENV=production` neither the document nor the UI is served, so the `docker` image does not expose them. `OPENAPI_DOCS=true` turns them on explicitly, `OPENAPI_DOCS=false` turns them off in development, any other value stops the server at startup with `Invalid OPENAPI_DOCS`.
 
 **Hexagonal structure.** `hexagonal-back` adds to `src/server` one hexagon per context (`domain`, `application`, `infrastructure/primary` and `infrastructure/secondary`), with `greeting` as the example (`GET /api/greeting?name=`, a port, an in-memory adapter, tests for each layer), a composition root (`composition.ts`) wired into `app.ts` through the `app-imports` and `app-routes` needles, and an architecture test written with arch-unit-ts. The test fails when a context depends on another one, when the domain depends on anything but itself, when the application depends on more than the domain, when a primary adapter calls the domain or a secondary adapter, or when a secondary adapter calls the application; a plain scan also refuses `node:` and library imports in the domain and the application, which arch-unit-ts does not always resolve. The conventions are in the generated `src/server/ARCHITECTURE.md`. The routes of a context are declared inside a Fastify plugin, so that plugins registered earlier (OpenAPI) see them; inserting at `app-routes` keeps this order whatever module is applied first. `/api/health` stays inline in `app.ts`: it belongs to `fastify-server`, and CraftType cannot rewrite a file that other modules complete without losing their insertions.
+
+**Persistence.** `persistence` adds `src/server/persistence` with a base `Repository<T>` contract (`save`, `findById`, `findAll`, `delete`), an `InMemoryRepository` adapter (useful in tests and local runs), and a `JsonFileRepository` adapter storing entities in a JSON file. The generated tests cover CRUD behavior and invalid file shape.
 
 **Failures.** Conflicts, missing needles, invalid destinations and missing dependencies are all detected before the first write: nothing is written or recorded. A failure of the file system during the writes (permission denied, disk full...) can leave the project partly written, and the CLI prints it on one line. Files are written through a temporary file and renamed, so none is left truncated. Fix the cause and run the same command again: it completes the project and records the module in the history.
 
