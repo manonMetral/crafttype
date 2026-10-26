@@ -21,6 +21,7 @@ describe('GithubActionsFactory', () => {
       'run: npm run typecheck',
       'run: npm test',
       'run: npm run --if-present format:check',
+      'run: npm run --if-present lint',
       'run: npm run --if-present webapp:typecheck',
       'run: npm run --if-present server:build',
       'run: npm run --if-present webapp:build',

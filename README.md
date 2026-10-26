@@ -3,7 +3,7 @@
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
 Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
-> Status: phase 2 (wider catalog) has started. The core and fifteen modules work, the CLI is minimal. ESLint (blocked, see below) is not available yet, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
+> Status: phase 2 (wider catalog) has started. The core and sixteen modules work, the CLI is minimal, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
 
 ## Usage with npx
 
@@ -17,6 +17,7 @@ npx crafttype apply init --project-folder . --project-name my-app
 npx crafttype apply typescript --project-folder .
 npx crafttype apply vitest --project-folder .
 npx crafttype apply prettier --project-folder .
+npx crafttype apply eslint --project-folder .
 npx crafttype apply fastify-server --project-folder . --server-port 3000
 npx crafttype apply config --project-folder .
 npx crafttype apply logs --project-folder .
@@ -35,6 +36,7 @@ A module only works after the modules it depends on: apply them in the order sho
 | `typescript` | TypeScript and its configuration | `init` |
 | `vitest` | Vitest | `typescript` |
 | `prettier` | Prettier | `init` |
+| `eslint` | ESLint (flat config) for TypeScript sources | `typescript` |
 | `fastify-server` | a Fastify server with a health endpoint | `typescript`, `vitest` |
 | `config` | server configuration from the environment, validated (`PORT`, `HOST`) | `fastify-server` |
 | `logs` | structured logs (level from `LOG_LEVEL`, validated request id) | `fastify-server` |
@@ -70,9 +72,11 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 
 **Front-end typing.** `vue-app` adds `npm run webapp:typecheck` (`tsc` on `src/webapp`): it checks the `.ts` files (`main.ts`, `router.ts`...) but not the `<script>` of `.vue` files. `vue-tsc`, which would do it, does not work with TypeScript 7 yet (tested with version 3.3.13); it will replace this script as soon as it supports it. `vite build` does not check any type.
 
+**ESLint.** `eslint` adds `eslint.config.js` (flat config) and two scripts: `npm run lint` and `npm run lint:fix`. It lint checks `.ts` and `.js` files (including tests) through `eslint`, `@eslint/js`, `@babel/eslint-parser` and `@babel/preset-typescript`.
+
 **Modules that complete a file.** `pinia` and `vue-router` (files of `vue-app`), `config` and `logs` (files of `fastify-server`) overwrite nothing: they insert their code into the file at needles (`// crafttype-needle-main-imports`...) that the owning module placed there, in the order you apply them. This is not a conflict, and the command prints the modified file. If a needle was removed by hand, the module fails and names it, without writing anything (see `documentation/module-creation.md`). Applying the owning module again with `--force` replaces its file and loses those insertions: the command prints a warning naming the file and the modules to apply again.
 
-**CI.** `github-actions` adds `.github/workflows/ci.yml` to the generated project: it runs on pushes to `main` and on pull requests, on Node 22.18.0 and 24.11.0 (the minimum versions of the generated project's `engines`), with read-only permissions. It runs `typecheck` and `test`, and the scripts other modules may have added (`format:check`, `webapp:typecheck`, `server:build`, `webapp:build`) only if they exist (`npm run --if-present`), so modules applied later need no change. It uses `npm ci`: run `npm install` once in the generated project and commit `package-lock.json`.
+**CI.** `github-actions` adds `.github/workflows/ci.yml` to the generated project: it runs on pushes to `main` and on pull requests, on Node 22.18.0 and 24.11.0 (the minimum versions of the generated project's `engines`), with read-only permissions. It runs `typecheck`, `test`, and optional scripts added by modules (`format:check`, `lint`, `webapp:typecheck`, `server:build`, `webapp:build`) through `npm run --if-present`, so modules applied later need no change. It uses `npm ci`: run `npm install` once in the generated project and commit `package-lock.json`.
 
 **Docker.** `docker` adds a `Dockerfile` (build stage, production dependencies, small runtime stage on `node:24-alpine`, running as the `node` user, with a healthcheck on `/api/health`) and a `.dockerignore`. The image contains the Fastify server only: it does not serve the Vue application. The server listens on `127.0.0.1` by default, which cannot be reached from outside a container, so the image sets `HOST=0.0.0.0` (that is why the module needs `config`) and `PORT` to the server port. Like `github-actions`, it uses `npm ci`: commit `package-lock.json`. Production dependencies include everything listed in `dependencies`, the Vue packages too.
 

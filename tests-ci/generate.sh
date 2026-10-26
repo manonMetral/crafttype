@@ -56,6 +56,7 @@ for script in $(sed -n 's/^ *- run: npm run \([a-z:-]*\)$/\1/p' .github/workflow
   npm run | grep -q "^  $script\$" || { echo "workflow runs npm run $script, which does not exist" >&2; exit 1; }
 done
 npm run format:check
+npm run lint
 npm run typecheck
 npm run webapp:typecheck
 npm test
