@@ -19,6 +19,7 @@ describe('FastifyServerFactory', () => {
         'crafttype-needle-app-imports',
         'crafttype-needle-app-server-options',
         'crafttype-needle-app-plugins',
+        'crafttype-needle-app-routes',
       )
       .hasFileContaining('src/server/main.ts', 'crafttype-needle-main-imports', 'crafttype-needle-main-settings');
 

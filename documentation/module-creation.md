@@ -151,12 +151,13 @@ Needles placed by the catalog today:
 | `src/server/app.ts` | `app-imports` | imports of `buildApp` |
 | `src/server/app.ts` | `app-server-options` | completes `serverOptions` before `Fastify(serverOptions)` (logger, request id generation...) |
 | `src/server/app.ts` | `app-plugins` | hooks and plugins, right after the application is created |
+| `src/server/app.ts` | `app-routes` | route plugins (after `app-plugins`, so plugins like OpenAPI can observe them) |
 | `src/server/main.ts` | `main-imports` | entry point imports |
 | `src/server/main.ts` | `main-settings` | start of the startup `try`: code that adjusts `settings` (port, address) or prepares the server. Its errors are printed as a message, without a stack trace |
 
 Needles are comments that stay in the generated code. The engine does not parse the code (no AST): it suits additions at places planned in advance, not the rewriting of arbitrary code.
 
-**Routes of the server.** The routes of `buildApp` are declared inside a plugin (`app.register(async (routes) => { ... })`) placed after the `app-plugins` needle, not directly on `app`. `buildApp` is synchronous, and Fastify adds a route declared on `app` immediately, before the plugins registered just above are loaded: a plugin that watches the routes (`openapi` does) would never see it. A module that adds routes does the same, in its own plugin.
+**Routes of the server.** The routes of `buildApp` are declared inside a plugin (`app.register(async (routes) => { ... })`) placed after the `app-plugins` needle, not directly on `app`. `buildApp` is synchronous, and Fastify adds a route declared on `app` immediately, before the plugins registered just above are loaded: a plugin that watches the routes (`openapi` does) would never see it. Modules that add routes insert their registration at `app-routes`, which is after `app-plugins`, so this ordering is preserved whatever module is applied first.
 
 ## 4. The catalog
 

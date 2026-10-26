@@ -15,7 +15,7 @@ describe('HexagonalBackFactory', () => {
     mkdirSync(join(projectFolder, 'src/server'), { recursive: true });
     writeFileSync(
       join(projectFolder, 'src/server/app.ts'),
-      '// crafttype-needle-app-imports\nexport const app = () => {\n  // crafttype-needle-app-plugins\n};\n',
+      '// crafttype-needle-app-imports\nexport const app = () => {\n  // crafttype-needle-app-plugins\n  // crafttype-needle-app-routes\n};\n',
     );
     return projectFolder;
   };
@@ -56,7 +56,7 @@ describe('HexagonalBackFactory', () => {
         needle: 'app-imports',
         content: "import { registerContexts } from './composition.js';",
       },
-      { path: 'src/server/app.ts', needle: 'app-plugins', content: 'registerContexts(app);' },
+      { path: 'src/server/app.ts', needle: 'app-routes', content: 'registerContexts(app);' },
     ]);
     expect(module.packageJson.devDependencies).toHaveProperty('arch-unit-ts');
   });
