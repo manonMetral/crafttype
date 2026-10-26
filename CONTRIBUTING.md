@@ -40,7 +40,20 @@ npm run ci:generate   # generates a complete application with all the modules, t
                       # (CRAFTTYPE_DOCKER=1 also builds its Docker image and checks the container; needs Docker and curl)
 ```
 
-The GitHub CI runs the same commands on Node 22 and 24. A pull request must be green to be merged.
+The GitHub CI runs the same commands on Node 22.12.0 and 24.11.0. A pull request must be green to be merged.
+
+## Node compatibility policy
+
+CraftType itself and generated projects do not have the same minimum Node version.
+
+| Scope | Declared minimum | Where |
+|---|---|---|
+| CraftType repository | `>=22.12` | `package.json` (`engines.node`) |
+| Generated projects | `^22.18.0 || >=24.11.0` | generated `package.json` (`init` module) |
+| Repository CI | `22.12.0` and `24.11.0` | `.github/workflows/ci.yml` |
+| Generated project CI template | `22.18.0` and `24.11.0` | `resources/generator/github-actions/ci.yml` |
+
+When changing this policy, update all four places in the same pull request.
 
 **Coverage at 100 %.** Every new statement, branch, function and line needs a test, error paths included. A defensive fallback that no test can reach (`?? ''` after a presence check) is dead code: remove it, or change the type so that the compiler knows (a non-empty tuple, for instance), rather than ignoring it. The count of branches comes from the JavaScript that the transpiler produces, so an update of Vitest, TypeScript or Vite can move it: the pull request that carries the update fails, and the fix is a test or a rewrite, not a lower threshold. Renovate updates `vitest` and `@vitest/coverage-v8` together, because the latter pins the exact version of the former.
 
