@@ -24,7 +24,7 @@ export class HexagonalBackFactory {
 
   /**
    * An example context, its composition root and an architecture test. The route is registered through the
-   * `app-imports` and `app-plugins` needles of fastify-server, inside a Fastify plugin.
+   * `app-imports` and `app-routes` needles of fastify-server, inside a Fastify plugin.
    */
   buildModule(properties: ModuleProperties): CraftModule {
     const builder = moduleBuilder(properties)
@@ -39,7 +39,7 @@ export class HexagonalBackFactory {
     return builder
       .addDevDependency('arch-unit-ts', this.versions.get())
       .insertAtNeedle(`${SERVER}/app.ts`, 'app-imports', "import { registerContexts } from './composition.js';")
-      .insertAtNeedle(`${SERVER}/app.ts`, 'app-plugins', 'registerContexts(app);')
+      .insertAtNeedle(`${SERVER}/app.ts`, 'app-routes', 'registerContexts(app);')
       .build();
   }
 }

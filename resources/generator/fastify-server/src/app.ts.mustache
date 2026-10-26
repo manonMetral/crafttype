@@ -12,8 +12,9 @@ export function buildApp(options: { logger?: boolean } = {}): FastifyInstance {
   const app = Fastify(serverOptions);
   // crafttype-needle-app-plugins
 
-  // The routes live in a plugin registered after the ones above: a route declared directly on `app` is added before
+  // The routes live in plugins registered after the ones above: a route declared directly on `app` is added before
   // those plugins are loaded, and plugins that watch the routes (OpenAPI for instance) would never see it.
+  // crafttype-needle-app-routes
   app.register(async (routes) => {
     routes.get(
       '/api/health',

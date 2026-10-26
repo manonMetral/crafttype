@@ -103,6 +103,7 @@ curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/openapi.json" | node -e 
   if (!/^3\.1\./.test(document.openapi)) throw new Error('openapi version: ' + document.openapi);
   if (document.info.title !== 'fullapp') throw new Error('title: ' + document.info.title);
   if (!document.paths['/api/health']) throw new Error('the health route is not described');
+  if (!document.paths['/api/greeting']) throw new Error('the greeting route is not described');
 "
 curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/docs/" | grep -qi 'swagger' \
   || { echo "/api/docs does not serve the Swagger UI" >&2; exit 1; }

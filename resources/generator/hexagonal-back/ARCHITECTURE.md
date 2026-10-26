@@ -39,10 +39,9 @@ Declare a route inside a Fastify plugin (`app.register(async (app) => ...)`,
 see `greetingRoutes`), not on the root instance. A plugin registered earlier,
 OpenAPI for instance, then sees it.
 
-Registration follows the order of the lines in `app.ts`: `registerContexts(app)`
-must come **after** `registerOpenApi(app)` for the OpenAPI document to list the
-routes of the contexts. Applying `openapi` before `hexagonal-back` gives that
-order; in the other order, move the `registerContexts(app);` line down by hand.
+`registerContexts(app)` is inserted at `crafttype-needle-app-routes`: it stays
+after `crafttype-needle-app-plugins`, so OpenAPI sees the routes whatever module
+was applied first.
 
 ## What is not in a hexagon
 
