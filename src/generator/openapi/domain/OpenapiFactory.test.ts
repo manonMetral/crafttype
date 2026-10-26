@@ -7,7 +7,8 @@ import { assertThatModule, propertiesFixture, tmpDirForTest } from '../../../sha
 import { OpenapiFactory } from './OpenapiFactory.js';
 
 describe('OpenapiFactory', () => {
-  const factory = new OpenapiFactory(new FileSystemNodePackagesVersionsReader(resourcesRoot()));
+  const versions = new FileSystemNodePackagesVersionsReader(resourcesRoot());
+  const factory = new OpenapiFactory(versions);
 
   // What fastify-server has already created: only the needles matter to this module.
   const projectWithServer = (): string => {
@@ -27,11 +28,13 @@ describe('OpenapiFactory', () => {
   });
 
   it('adds the two Fastify plugins, with the exact versions of the catalog', () => {
+    const common = versions.get();
     const { dependencies, devDependencies } = factory.buildModule(propertiesFixture()).packageJson;
 
-    expect(Object.keys(dependencies).sort()).toEqual(['@fastify/swagger', '@fastify/swagger-ui']);
-    expect(dependencies['@fastify/swagger']).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(dependencies['@fastify/swagger-ui']).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(dependencies).toEqual({
+      '@fastify/swagger': common.get('@fastify/swagger'),
+      '@fastify/swagger-ui': common.get('@fastify/swagger-ui'),
+    });
     expect(devDependencies).toEqual({});
   });
 
