@@ -3,7 +3,7 @@
 Modular generator of **Node.js (Fastify)** and **Vue.js** projects, inspired by [Seed4J](https://github.com/seed4j/seed4j).
 Each module adds one thing to a project (TypeScript, Vitest, a Fastify server, a Vue application...) and is applied on demand, in the order you want.
 
-> Status: phase 2 (wider catalog) has started. The core and seventeen modules work, the CLI is minimal, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
+> Status: phase 2 (wider catalog) has started. The core and eighteen modules work, the CLI is minimal, and the npm publication is pending: until the package is published, the `npx` commands below do not work, see [CONTRIBUTING.md](CONTRIBUTING.md) to run CraftType from a clone.
 
 ## Usage with npx
 
@@ -19,6 +19,7 @@ npx crafttype apply vitest --project-folder .
 npx crafttype apply prettier --project-folder .
 npx crafttype apply eslint --project-folder .
 npx crafttype apply fastify-server --project-folder . --server-port 3000
+npx crafttype apply auth --project-folder .
 npx crafttype apply config --project-folder .
 npx crafttype apply logs --project-folder .
 npx crafttype apply vue-app --project-folder .
@@ -39,6 +40,7 @@ A module only works after the modules it depends on: apply them in the order sho
 | `prettier` | Prettier | `init` |
 | `eslint` | ESLint (flat config) for TypeScript sources | `typescript` |
 | `fastify-server` | a Fastify server with a health endpoint | `typescript`, `vitest` |
+| `auth` | JWT auth routes and a bearer middleware | `fastify-server`, `vitest` |
 | `config` | server configuration from the environment, validated (`PORT`, `HOST`) | `fastify-server` |
 | `logs` | structured logs (level from `LOG_LEVEL`, validated request id) | `fastify-server` |
 | `vue-app` | a Vue.js application with Vite | `typescript` |
@@ -85,6 +87,8 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 **HTTP client.** `fetch-client` adds `src/webapp/api/http.ts` to the Vue application: `getJson<T>(path)` and `postJson<T, B>(path, body)` on top of the platform `fetch` (no new dependency), under the `/api` prefix that the Vite dev proxy forwards to the server. A failure is an `ApiError` carrying the HTTP `status` (`undefined` when the server cannot be reached) and the parsed `body` of the reply: JSON, or the raw text when it is not JSON. A cancelled request (`{ signal }`) rejects with the `AbortError` of `fetch`, not with an `ApiError`, so that a component can tell a cancellation from a failure. `health.ts` calls `/api/health` with it, and both files come with tests that stub `fetch`, run by the generated `vitest` (hence the dependency on `vitest`). The module does not edit `App.vue`, which still calls `fetch` itself: to use the client there, replace that call with `fetchHealth()` from `./api/health.js`.
 
 **OpenAPI.** `openapi` adds `@fastify/swagger` and `@fastify/swagger-ui` (OpenAPI 3.1): the document is served at `/api/openapi.json` and a Swagger UI at `/api/docs`. The title and version of the document are the `name` and `version` of the project's `package.json`, read at startup. It describes the routes declared after it in `buildApp`, which `fastify-server` declares inside a plugin for that reason (`documentation/module-creation.md`); `/api/health` has a response schema so that it appears in the document. **In production the documentation is off by default:** when `NODE_ENV=production` neither the document nor the UI is served, so the `docker` image does not expose them. `OPENAPI_DOCS=true` turns them on explicitly, `OPENAPI_DOCS=false` turns them off in development, any other value stops the server at startup with `Invalid OPENAPI_DOCS`.
+
+**Auth.** `auth` adds `src/server/auth` with an HS256 JWT service (sign/verify), a Fastify bearer middleware (`preHandler`) and two routes: `POST /api/auth/token` issues a token from a subject (`sub`) and optional role, `GET /api/auth/me` returns the claims of the authenticated token. The secret is read from `AUTH_JWT_SECRET`, with a development fallback (`dev-secret-change-me`) so a local setup works out of the box.
 
 **Hexagonal structure.** `hexagonal-back` adds to `src/server` one hexagon per context (`domain`, `application`, `infrastructure/primary` and `infrastructure/secondary`), with `greeting` as the example (`GET /api/greeting?name=`, a port, an in-memory adapter, tests for each layer), a composition root (`composition.ts`) wired into `app.ts` through the `app-imports` and `app-routes` needles, and an architecture test written with arch-unit-ts. The test fails when a context depends on another one, when the domain depends on anything but itself, when the application depends on more than the domain, when a primary adapter calls the domain or a secondary adapter, or when a secondary adapter calls the application; a plain scan also refuses `node:` and library imports in the domain and the application, which arch-unit-ts does not always resolve. The conventions are in the generated `src/server/ARCHITECTURE.md`. The routes of a context are declared inside a Fastify plugin, so that plugins registered earlier (OpenAPI) see them; inserting at `app-routes` keeps this order whatever module is applied first. `/api/health` stays inline in `app.ts`: it belongs to `fastify-server`, and CraftType cannot rewrite a file that other modules complete without losing their insertions.
 
