@@ -2,6 +2,7 @@ import type { ModuleResource } from '../shared/module/domain/ModuleResource.js';
 import type { NodePackagesVersionsReader } from '../shared/module/domain/PackageVersions.js';
 import { createAuthModuleResource } from './auth/infrastructure/primary/authModuleResource.js';
 import { createConfigModuleResource } from './config/infrastructure/primary/configModuleResource.js';
+import { createDatabaseSqlModuleResource } from './database-sql/infrastructure/primary/databaseSqlModuleResource.js';
 import { createDockerModuleResource } from './docker/infrastructure/primary/dockerModuleResource.js';
 import { createEslintModuleResource } from './eslint/infrastructure/primary/eslintModuleResource.js';
 import { createFetchClientModuleResource } from './fetch-client/infrastructure/primary/fetchClientModuleResource.js';
@@ -39,4 +40,5 @@ export const allModuleResources = (versions: NodePackagesVersionsReader): readon
   createOpenapiModuleResource(versions),
   createHexagonalBackModuleResource(versions),
   createPersistenceModuleResource(),
+  createDatabaseSqlModuleResource(versions),
 ];
