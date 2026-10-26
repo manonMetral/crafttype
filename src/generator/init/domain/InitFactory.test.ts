@@ -14,4 +14,10 @@ describe('InitFactory', () => {
 
     expect(result.hasPackageJson()).toMatchObject({ name: 'shop', type: 'module', private: true });
   });
+
+  it('requires a Node version that the dependencies of the catalog support', () => {
+    const { engines } = assertThatModule(factory.buildModule(propertiesFixture())).hasPackageJson();
+
+    expect(engines).toEqual({ node: '^22.18.0 || >=24.11.0' });
+  });
 });
