@@ -12,3 +12,35 @@ Apply these standards to every software change in this repository. Read and foll
 - Before completion, run the focused tests and relevant broader checks (such as linting, type-checking, and builds). Report actual commands and results; never imply that an unrun check passed.
 
 Project-specific instructions should provide the relevant commands, test tooling, and architecture context without silently weakening these standards. Any exception must be explicit and justified.
+
+## CraftType project-specific instructions
+
+### Architecture context
+
+- Keep the existing hexagonal structure and context boundaries:
+  - `src/shared/module/*` for the core module model, orchestration, and adapters.
+  - `src/generator/<module>/*` for each generator module (`application`, `domain`, `infrastructure`).
+  - `resources/generator/<module>/*` for templates and static files applied by modules.
+- Preserve dependency direction enforced by `src/test/architecture/HexagonalArch.test.ts`:
+  - contexts stay isolated from each other;
+  - domain does not depend on application or infrastructure;
+  - each context keeps its hexagonal layering.
+- For domain changes, express business concepts with explicit domain types and invariants in the relevant `domain` package before touching adapters.
+
+### Commands and checks
+
+- Install dependencies with `npm ci`.
+- Run focused tests first, then run repository checks impacted by the change:
+  - `npm run format:check`
+  - `npm run lint:types`
+  - `npm run test:coverage`
+  - `npm run build`
+- When a change affects generation behavior, module catalog wiring, or templates under `resources/generator`, also run:
+  - `npm run ci:generate`
+- Do not claim a check passed if it was not run successfully.
+
+### Test tooling expectations
+
+- Unit/integration tests use Vitest (`src/**/*.test.ts`).
+- Coverage is enforced by Vitest thresholds in `vitest.config.ts` (currently stricter than 90%).
+- Keep architecture constraints green (`HexagonalArch.test.ts`) and update tests with behavior changes.
