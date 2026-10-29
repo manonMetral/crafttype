@@ -8,7 +8,7 @@ describe('DockerFactory', () => {
   it('builds the server in a multi-stage image that runs as the node user', () => {
     assertThatModule(module).hasFileContaining(
       'Dockerfile',
-      'FROM node:24-alpine AS build',
+      'FROM node:26-alpine AS build',
       'RUN npm run server:build',
       'RUN npm ci --omit=dev',
       'USER node',

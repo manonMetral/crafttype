@@ -2,19 +2,19 @@
 # Image of the Fastify server only: the Vue application (`webapp:build`) is not served by it.
 # Needs a committed package-lock.json (run `npm install` once, then commit it): `npm ci` relies on it.
 
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run server:build
 
-FROM node:24-alpine AS dependencies
+FROM node:26-alpine AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:24-alpine
+FROM node:26-alpine
 # The server listens on 127.0.0.1 by default, which is unreachable from outside a container.
 ENV NODE_ENV=production HOST=0.0.0.0 PORT={{serverPort}}
 WORKDIR /app
