@@ -1,4 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { describe, expect, it } from 'vitest';
@@ -69,6 +71,29 @@ describe('system errors', () => {
       ['EWEIRD', 'open', 'cannot access /p/src: system error (EWEIRD)'],
     ])('describes %s during %s on one line', (code, syscall, expected) => {
       expect(describeSystemError(error(code, syscall, '/p/src'))).toBe(expected);
+    });
+
+    it('describes a port that cannot be listened on, with the port', () => {
+      const taken = Object.assign(error('EADDRINUSE', 'listen'), { port: 4242 });
+
+      expect(describeSystemError(taken)).toBe('cannot listen on port 4242: address already in use (EADDRINUSE)');
+    });
+
+    it('describes the port the system really refused', async () => {
+      const first = createServer();
+      await new Promise<void>((done) => first.listen(0, '127.0.0.1', done));
+      const { port } = first.address() as AddressInfo;
+      const refused = await new Promise<unknown>((resolve) => {
+        const second = createServer();
+        second.once('error', resolve);
+        second.listen(port, '127.0.0.1');
+      });
+      first.close();
+
+      expect(isSystemError(refused)).toBe(true);
+      expect(describeSystemError(refused as Parameters<typeof describeSystemError>[0])).toBe(
+        `cannot listen on port ${port}: address already in use (EADDRINUSE)`,
+      );
     });
 
     it('still works without a path', () => {
