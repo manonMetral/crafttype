@@ -116,6 +116,22 @@ It listens on `127.0.0.1` only (this machine), on port 4242 unless `--port` says
 |---|---|
 | `GET /api/modules` | the catalog: for each module, its group, description, prerequisites, tags and properties |
 | `GET /api/project[?folder=<absolute path>]` | the modules applied in the project, and the value each module's properties would take |
+| `POST /api/basket/preview` | what a basket of modules would do, without writing anything (see below) |
+
+`POST /api/basket/preview` takes a JSON body (`Content-Type: application/json`, 64 KiB at most):
+
+```json
+{
+  "modules": ["auth", "vitest", "fastify-server", "typescript", "init"],
+  "properties": { "projectName": "shop", "serverPort": 4100 },
+  "onConflict": "fail",
+  "projectFolder": "/absolute/path"
+}
+```
+
+Only `modules` is required. `properties` are shared by the whole basket: each module takes those it declares, and a property that no module of the basket declares is refused. `onConflict` is `fail` (default), `skip` or `overwrite`, for the whole basket, like `--skip-conflicts` and `--force`. `projectFolder` defaults to the folder the interface was launched in.
+
+The modules are played in the order the catalog lists them, which is after the modules they depend on, whatever the order of the request, on a copy of the project that lives in memory: the modules already applied count, and each module sees what the previous ones of the basket wrote. Each step answers `ready` (with the changes it would make, as the CLI's `--dry-run` does), `conflict` (an existing item differs and the policy is `fail`), `blocked` (a prerequisite is neither applied nor in the basket, a value is wrong...) or `not-run`: the first module that cannot be applied stops the basket, as it would when applying. `canApply` is true when every step is `ready`.
 
 ## Code organization
 
