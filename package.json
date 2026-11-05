@@ -35,8 +35,12 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint:types": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.ts\" \"tests-ci/**/*.mjs\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"tests-ci/**/*.mjs\"",
+    "format": "prettier --write \"src/**/*.ts\" \"tests-ci/**/*.mjs\" \"web/src/**/*.{ts,vue,css}\" \"web/*.{ts,html}\" web/package.json web/tsconfig.json",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests-ci/**/*.mjs\" \"web/src/**/*.{ts,vue,css}\" \"web/*.{ts,html}\" web/package.json web/tsconfig.json",
+    "web:install": "npm ci --prefix web",
+    "web:build": "npm run build --prefix web",
+    "web:typecheck": "npm run typecheck --prefix web",
+    "web:test": "npm run test:coverage --prefix web",
     "ci:generate": "bash tests-ci/generate.sh"
   },
   "devDependencies": {
