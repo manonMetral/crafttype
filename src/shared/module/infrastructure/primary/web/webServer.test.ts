@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { request, Agent, type IncomingHttpHeaders } from 'node:http';
 import { connect } from 'node:net';
 import { networkInterfaces } from 'node:os';
@@ -36,7 +36,7 @@ interface Reply {
 const send = (
   origin: string,
   path: string,
-  { method = 'GET', headers = AUTHORIZED, setHost = true, agent }: RequestOptions = {},
+  { method = 'GET', headers = AUTHORIZED, setHost = true, agent, body, chunks }: RequestOptions = {},
 ): Promise<Reply> =>
   new Promise((resolve, reject) => {
     const { hostname, port } = new URL(origin);
@@ -55,7 +55,8 @@ const send = (
       },
     );
     call.on('error', reject);
-    call.end();
+    for (const chunk of chunks ?? []) call.write(chunk);
+    call.end(body);
   });
 
 /** What the server answers to text written as is on a socket: for requests the HTTP client would not send. */
@@ -73,6 +74,10 @@ interface RequestOptions {
   readonly headers?: Record<string, string>;
   readonly setHost?: boolean;
   readonly agent?: Agent;
+  /** Sent as one piece, with its length. */
+  readonly body?: string;
+  /** Sent piece by piece, without a length (chunked). */
+  readonly chunks?: readonly string[];
 }
 
 describe('local web server', () => {
@@ -186,6 +191,191 @@ describe('local web server', () => {
 
       expect(reply).toMatchObject({ status: 405, body: { error: 'method not allowed' } });
       expect(reply.headers['allow']).toBe('GET');
+    });
+  });
+
+  describe('Given a basket to preview', () => {
+    const JSON_HEADERS = { ...AUTHORIZED, 'content-type': 'application/json' };
+    const preview = (origin: string, body: unknown, headers: Record<string, string> = JSON_HEADERS) =>
+      send(origin, '/api/basket/preview', { method: 'POST', headers, body: JSON.stringify(body) });
+
+    it('When it is posted as JSON Then each module is described, and nothing is written', async () => {
+      const projectFolder = tmpDirForTest();
+      const { server } = await launch(undefined, projectFolder);
+
+      const reply = await preview(server.origin, { modules: ['init', 'typescript', 'vitest'] });
+
+      expect(reply.status).toBe(200);
+      expect(reply.body.canApply).toBe(true);
+      expect(
+        reply.body.steps.map(({ slug, outcome }: { slug: string; outcome: string }) => `${slug}:${outcome}`),
+      ).toEqual(['init:ready', 'typescript:ready', 'vitest:ready']);
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it.each(['application/json', 'application/json; charset=utf-8', 'Application/JSON;charset=UTF-8'])(
+      'When the content type is %s Then it is accepted',
+      async (contentType) => {
+        const { server } = await launch();
+
+        const reply = await preview(
+          server.origin,
+          { modules: ['init'] },
+          { ...AUTHORIZED, 'content-type': contentType },
+        );
+
+        expect(reply.status).toBe(200);
+      },
+    );
+
+    it.each([
+      ['text/plain', { ...AUTHORIZED, 'content-type': 'text/plain' }],
+      ['a form', { ...AUTHORIZED, 'content-type': 'application/x-www-form-urlencoded' }],
+      ['a type that only starts like JSON', { ...AUTHORIZED, 'content-type': 'application/jsonp' }],
+      ['no content type', AUTHORIZED],
+    ])('When the body is %s Then it is refused: only JSON is read', async (_case, headers) => {
+      const { server } = await launch();
+
+      const reply = await preview(server.origin, { modules: ['init'] }, headers);
+
+      expect(reply).toMatchObject({ status: 415, body: { error: 'the content type must be application/json' } });
+    });
+
+    it.each(['', '{', 'not json', '{"modules": ["init"]} trailing'])(
+      'When the body is %j Then it is not valid JSON',
+      async (body) => {
+        const { server } = await launch();
+
+        const reply = await send(server.origin, '/api/basket/preview', { method: 'POST', headers: JSON_HEADERS, body });
+
+        expect(reply).toMatchObject({ status: 400, body: { error: 'the body is not valid JSON' } });
+      },
+    );
+
+    it('When the body is valid JSON but not what is expected Then the route says what is wrong', async () => {
+      const { server } = await launch();
+
+      const reply = await preview(server.origin, { modules: [] });
+
+      expect(reply).toMatchObject({
+        status: 400,
+        body: { error: '"modules" must be a non-empty list of module names' },
+      });
+    });
+
+    it('When a module is unknown Then it is an unprocessable request, naming it', async () => {
+      const { server } = await launch();
+
+      const reply = await preview(server.origin, { modules: ['nope'] });
+
+      expect(reply).toMatchObject({ status: 422, body: { error: 'Unknown module: nope' } });
+    });
+
+    it('When the body, sent in one piece, is larger than the limit Then it is refused, and the connection is closed', async () => {
+      const { server } = await launch();
+
+      const reply = await send(server.origin, '/api/basket/preview', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ modules: ['init'], padding: 'x'.repeat(70_000) }),
+      });
+
+      expect(reply).toMatchObject({ status: 413, body: { error: 'the body is too large' } });
+      expect(reply.headers['connection']).toBe('close');
+    });
+
+    it('When a body without announced length grows past the limit Then it is refused too, and the connection is closed', async () => {
+      const { server } = await launch();
+      const piece = 'x'.repeat(10_000);
+
+      const reply = await send(server.origin, '/api/basket/preview', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        chunks: ['{"modules":["init"],"padding":"', ...Array(8).fill(piece), '"}'],
+      });
+
+      expect(reply).toMatchObject({ status: 413, body: { error: 'the body is too large' } });
+    });
+
+    describe('at the limit', () => {
+      const LIMIT = 64 * 1024;
+      /** A valid JSON document of exactly `bytes` bytes. */
+      const document = (bytes: number) => {
+        const frame = '{"modules":["init"],"padding":""}';
+        return `{"modules":["init"],"padding":"${'x'.repeat(bytes - frame.length)}"}`;
+      };
+      const chunked = (origin: string, text: string) =>
+        send(origin, '/api/basket/preview', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          chunks: [text.slice(0, 1_000), text.slice(1_000)],
+        });
+
+      it('When the body is exactly as large as the limit Then it is read', async () => {
+        const { server } = await launch();
+
+        expect((await chunked(server.origin, document(LIMIT))).status).toBe(200);
+      });
+
+      it('When the body is one byte larger than the limit Then it is refused', async () => {
+        const { server } = await launch();
+
+        expect((await chunked(server.origin, document(LIMIT + 1))).status).toBe(413);
+      });
+    });
+
+    it('When GET is used on the route Then the method that is allowed is told', async () => {
+      const { server } = await launch();
+
+      const reply = await send(server.origin, '/api/basket/preview');
+
+      expect(reply).toMatchObject({ status: 405, body: { error: 'method not allowed' } });
+      expect(reply.headers['allow']).toBe('POST');
+    });
+
+    it('When POST is used on a route that reads Then it is refused before its body is looked at', async () => {
+      const { server } = await launch();
+
+      const reply = await send(server.origin, '/api/modules', {
+        method: 'POST',
+        headers: { ...AUTHORIZED, 'content-type': 'text/plain' },
+        body: 'whatever',
+      });
+
+      expect(reply.status).toBe(405);
+      expect(reply.headers['allow']).toBe('GET');
+    });
+
+    it('When POST is used on a route that does not exist Then it is not found', async () => {
+      const { server } = await launch();
+
+      const reply = await send(server.origin, '/api/basket/apply', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: '{}',
+      });
+
+      expect(reply.status).toBe(404);
+    });
+
+    it('When the token is missing Then the body is not even looked at', async () => {
+      const { server } = await launch();
+
+      const reply = await preview(server.origin, { modules: ['nope'] }, { 'content-type': 'application/json' });
+
+      expect(reply.status).toBe(401);
+    });
+
+    it('When another site posts it Then it is refused, with the right token', async () => {
+      const { server } = await launch();
+
+      const reply = await preview(
+        server.origin,
+        { modules: ['init'] },
+        { ...JSON_HEADERS, origin: 'https://evil.example' },
+      );
+
+      expect(reply).toMatchObject({ status: 403, body: { error: 'unexpected Origin header' } });
     });
   });
 

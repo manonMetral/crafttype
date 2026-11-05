@@ -17,6 +17,7 @@ import { FileSystemModulesHistory } from '../infrastructure/secondary/FileSystem
 import { FileSystemNodePackagesVersionsReader } from '../infrastructure/secondary/FileSystemNodePackagesVersionsReader.js';
 import { FileSystemProjectFiles } from '../infrastructure/secondary/FileSystemProjectFiles.js';
 import { MustacheTemplateRenderer } from '../infrastructure/secondary/MustacheTemplateRenderer.js';
+import { OverlayProjectSimulator } from '../infrastructure/secondary/OverlayProjectSimulator.js';
 import { NodePathNormalizer } from '../infrastructure/secondary/NodePathNormalizer.js';
 import { resourcesRoot } from '../infrastructure/secondary/resourcesRoot.js';
 import { SemverVersionComparator } from '../infrastructure/secondary/SemverVersionComparator.js';
@@ -877,6 +878,7 @@ describe('ModulesApplicationService', () => {
         },
         versions: new SemverVersionComparator(),
         paths: new NodePathNormalizer(),
+        simulator: new OverlayProjectSimulator(files),
         clock,
       });
       const projectFolder = tmpDirForTest();

@@ -5,6 +5,7 @@ import { FileSystemModulesHistory } from './shared/module/infrastructure/seconda
 import { FileSystemModuleResourcesReader } from './shared/module/infrastructure/secondary/FileSystemModuleResourcesReader.js';
 import { FileSystemNodePackagesVersionsReader } from './shared/module/infrastructure/secondary/FileSystemNodePackagesVersionsReader.js';
 import { FileSystemProjectFiles } from './shared/module/infrastructure/secondary/FileSystemProjectFiles.js';
+import { OverlayProjectSimulator } from './shared/module/infrastructure/secondary/OverlayProjectSimulator.js';
 import { NodePathNormalizer } from './shared/module/infrastructure/secondary/NodePathNormalizer.js';
 import { MustacheTemplateRenderer } from './shared/module/infrastructure/secondary/MustacheTemplateRenderer.js';
 import { SemverVersionComparator } from './shared/module/infrastructure/secondary/SemverVersionComparator.js';
@@ -32,6 +33,7 @@ export const createModulesApplicationService = (
     history: new FileSystemModulesHistory(files),
     versions: new SemverVersionComparator(),
     paths: new NodePathNormalizer(),
+    simulator: new OverlayProjectSimulator(files),
     clock: options.clock ?? (() => new Date()),
   });
 };
