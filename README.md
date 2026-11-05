@@ -104,13 +104,26 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 
 ## Local interface (in progress)
 
-`crafttype ui` starts the API of a local interface to browse the catalog and the state of a project. For now it is read only and has no page: the tree and the basket come next.
+`crafttype ui` starts a local interface to browse the catalog and the state of a project, and opens it in the browser. The page is a first skeleton (it lists the modules by group): the tree, the basket and the forms come next. Nothing is written to the project yet.
 
 ```bash
-npx crafttype ui [--port <number>] [--project-folder <folder>]
+npx crafttype ui [--port <number>] [--project-folder <folder>] [--no-open]
 ```
 
-It listens on `127.0.0.1` only (this machine), on port 4242 unless `--port` says otherwise (`--port 0` lets the system choose), and describes the current folder unless `--project-folder` says otherwise. It prints a token: every request must send it as `Authorization: Bearer <token>` (use `curl`: a browser address bar cannot send a header, and typing the address there answers "missing or invalid token"), and a request whose `Host` or `Origin` header is not the local server's is refused, so that a web page open in your browser cannot use it.
+It listens on `127.0.0.1` only (this machine), on port 4242 unless `--port` says otherwise (`--port 0` lets the system choose), and describes the current folder unless `--project-folder` says otherwise. `--no-open` leaves the browser alone: the address to open is printed (`Open: http://127.0.0.1:4242/?token=...`).
+
+The page is built separately (Vue 3 and Vite, in `web/`). From a clone, build it once, then run `npm run ui`; without it, only the API answers and the command says so. The npm package does not carry the page yet.
+
+```bash
+npm run web:install && npm run web:build
+npm run ui
+```
+
+Security, since any web page open in your browser can send requests to `127.0.0.1`:
+
+- The page and its files are served without the token (they hold no secret), with a policy (`Content-Security-Policy`) that lets the page load only its own files, no frame, and no `Referer`. The address the browser opens carries the token; the page keeps it for the tab and removes it from the address at once.
+- The API requires the token as `Authorization: Bearer <token>` (use `curl`: a browser address bar cannot send a header, and typing an API address there answers "missing or invalid token"). A request whose `Host` or `Origin` header is not the local server's is refused, so that a web page of another site cannot use it.
+- The files of the page are read from `web/dist` only: a path that leaves it (`..`, an encoded slash, a link pointing outside) is not found.
 
 | Route | Answers |
 |---|---|

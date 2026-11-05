@@ -42,6 +42,21 @@ npm run ci:generate   # generates a complete application with all the modules, t
 
 The GitHub CI runs the same commands on Node 22.12.0 and 24.11.0. A pull request must be green to be merged.
 
+## Working on the page of the local interface
+
+The page of `crafttype ui` is a Vue 3 and Vite application in `web/`, with its own `package.json`. Its tooling needs Node `^22.22.2 || ^24.15.0 || >=26` (see `web/package.json`), which is more than CraftType itself: the users get the page already built.
+
+```bash
+npm run web:install        # npm ci in web/
+npm run web:build          # builds web/dist, which `crafttype ui` serves
+npm run web:typecheck      # vue-tsc
+npm run web:test           # tests with coverage (at least 90 %)
+npm --prefix web run dev   # rebuilds web/dist at each change; reload the page
+npm run ui -- --no-open    # then open the address it prints
+```
+
+`web/` uses TypeScript 6 while the rest of the repository uses 7: `vue-tsc` does not work with TypeScript 7 yet (the same limit as in the projects CraftType generates). The Prettier of the repository formats `web/` too (`npm run format`). The GitHub CI has a job for the page.
+
 ## Node compatibility policy
 
 CraftType itself and generated projects do not have the same minimum Node version.
