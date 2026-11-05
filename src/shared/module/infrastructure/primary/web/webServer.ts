@@ -3,10 +3,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net';
 import type { ModulesApplicationService } from '../../../application/ModulesApplicationService.js';
 import { classify } from '../failures.js';
-import { handleApi, type ApiResponse } from './api.js';
+import { apiRoute, type ApiResponse } from './api.js';
 
 /** The interface writes to the disk (soon): it listens on this machine only, never on the network. */
 const LOOPBACK = '127.0.0.1';
+/** A basket of modules with their properties is a few hundred bytes: this leaves room, and stops a page that floods. */
+const MAX_BODY_BYTES = 64 * 1024;
+const JSON_CONTENT_TYPE = /^application\/json\s*(?:;.*)?$/i;
 const LOCAL_HOST = /^(?:127\.0\.0\.1|localhost)(?::\d{1,5})?$/;
 
 export interface WebServerOptions {
@@ -40,8 +43,10 @@ export const startWebServer = (
 ): Promise<WebServer> =>
   new Promise((resolve, reject) => {
     const server = createServer((request, response) => {
-      const { status, body } = answer(request, service, token, projectFolder);
-      send(response, status, body, status === 405 ? { Allow: 'GET' } : {});
+      // `answer` always settles with a response: whatever fails inside is turned into one.
+      void answer(request, service, token, projectFolder).then(({ status, body, headers }) =>
+        send(response, status, body, headers),
+      );
     });
     server.once('error', reject);
     server.listen(port, LOOPBACK, () => {
@@ -61,12 +66,12 @@ export const startWebServer = (
     });
   });
 
-const answer = (
+const answer = async (
   request: IncomingMessage,
   service: ModulesApplicationService,
   token: string,
   projectFolder: string,
-): ApiResponse => {
+): Promise<ApiResponse> => {
   const { host, origin, authorization } = request.headers;
   if (host === undefined || !LOCAL_HOST.test(host)) {
     return refusal(403, 'unexpected Host header');
@@ -77,21 +82,65 @@ const answer = (
   if (!hasToken(authorization, token)) {
     return refusal(401, 'missing or invalid token', TOKEN_HINT);
   }
-  if (request.method !== 'GET') {
-    return refusal(405, 'method not allowed');
-  }
-
   // `request.url` is always set for a request received by a server.
   const target = parseTarget(request.url as string, host);
   if (target === undefined) {
     return refusal(400, 'invalid request target');
   }
 
+  const route = apiRoute(service, projectFolder, target.pathname);
+  if (route === undefined) {
+    return refusal(404, 'not found');
+  }
+  if (!route.methods.includes(String(request.method))) {
+    return refusal(405, 'method not allowed', undefined, { Allow: route.methods.join(', ') });
+  }
+
   try {
-    return handleApi(service, projectFolder, target) ?? refusal(404, 'not found');
+    // The body is read once the route is known and the caller is trusted: before that, nothing it sends is looked at.
+    const read = request.method === 'POST' ? await readJson(request) : NO_BODY;
+    return read.ok ? route.handle({ url: target, body: read.json }) : read.refusal;
   } catch (error) {
     return failure(error);
   }
+};
+
+type BodyRead = { readonly ok: true; readonly json: unknown } | { readonly ok: false; readonly refusal: ApiResponse };
+
+const NO_BODY: BodyRead = { ok: true, json: undefined };
+
+const readJson = async (request: IncomingMessage): Promise<BodyRead> => {
+  if (!JSON_CONTENT_TYPE.test(request.headers['content-type'] ?? '')) {
+    return unreadable(415, 'the content type must be application/json');
+  }
+  const text = await readText(request);
+  if (text === undefined) {
+    return unreadable(413, 'the body is too large');
+  }
+  try {
+    return { ok: true, json: JSON.parse(text) };
+  } catch {
+    return unreadable(400, 'the body is not valid JSON');
+  }
+};
+
+const unreadable = (status: number, error: string): BodyRead => ({
+  ok: false,
+  refusal: refusal(status, error, undefined, status === 413 ? { Connection: 'close' } : {}),
+});
+
+/** The body as text, or `undefined` once it is past the limit. The connection is kept, to answer on it. */
+const readText = async (request: IncomingMessage): Promise<string | undefined> => {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of request.iterator({ destroyOnReturn: false })) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_BODY_BYTES) {
+      return undefined;
+    }
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString('utf8');
 };
 
 /** The target as a URL, if it is a path of this server: `//other-host/path` and the address of another host are not. */
@@ -105,9 +154,15 @@ const parseTarget = (target: string, host: string): URL | undefined => {
   }
 };
 
-const refusal = (status: number, error: string, hint?: string): ApiResponse => ({
+const refusal = (
+  status: number,
+  error: string,
+  hint?: string,
+  headers: Readonly<Record<string, string>> = {},
+): ApiResponse => ({
   status,
   body: hint === undefined ? { error } : { error, hint },
+  headers,
 });
 
 /** What someone who typed the address in a browser needs to read: the page does not exist yet, and cannot send a header. */
@@ -134,7 +189,12 @@ const failure = (error: unknown): ApiResponse => {
   }
 };
 
-const send = (response: ServerResponse, status: number, body: unknown, headers: Record<string, string>): void => {
+const send = (
+  response: ServerResponse,
+  status: number,
+  body: unknown,
+  headers: Readonly<Record<string, string>> = {},
+): void => {
   response.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
