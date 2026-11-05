@@ -53,3 +53,12 @@ export interface ModulesHistory {
 export interface VersionComparator {
   keepsExistingVersion(existing: string, wanted: string): boolean;
 }
+
+/**
+ * Port: an isolated copy of a project, to try modules on before applying them for real. What the modules write goes
+ * to `files` and is recorded in `history`; both read what the real project holds, and nothing reaches it. Each call
+ * starts from the real project again.
+ */
+export interface ProjectSimulator {
+  start(): { readonly files: ProjectFiles; readonly history: ModulesHistory };
+}
