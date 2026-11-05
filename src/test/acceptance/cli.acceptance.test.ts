@@ -5,6 +5,7 @@ import { createModulesApplicationService } from '../../composition.js';
 import type { ModulesApplicationService } from '../../shared/module/application/ModulesApplicationService.js';
 import { CraftTypeError } from '../../shared/module/domain/errors.js';
 import { runCli } from '../../shared/module/infrastructure/primary/cli.js';
+import { startWebServer } from '../../shared/module/infrastructure/primary/web/webServer.js';
 import { databaseModuleResources } from '../../shared/test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../shared/test/ModuleAssertions.js';
 
@@ -658,6 +659,70 @@ describe('CLI', () => {
 
       expect(code).toBe(1);
       expect(output).toBe('Error: the extension failed');
+    });
+  });
+  describe('ui', () => {
+    const runUiCommand = async (...argv: string[]) => {
+      const lines: { stream: 'stdout' | 'stderr'; line: string }[] = [];
+      const code = await runCli(['ui', ...argv], createModulesApplicationService(), {
+        out: (line) => lines.push({ stream: 'stdout', line }),
+        err: (line) => lines.push({ stream: 'stderr', line }),
+        version: VERSION,
+      });
+      const of = (stream: 'stdout' | 'stderr') =>
+        lines
+          .filter((entry) => entry.stream === stream)
+          .map(({ line }) => line)
+          .join('\n');
+      return { code, stdout: of('stdout'), stderr: of('stderr') };
+    };
+
+    it('is listed in the usage of the tool', () => {
+      expect(run('--help').stdout).toContain('crafttype ui');
+    });
+
+    it('prints its own usage', async () => {
+      const { code, stdout } = await runUiCommand('--help');
+
+      expect(code).toBe(0);
+      expect(stdout).toContain('crafttype ui [--port <number>] [--project-folder <folder>]');
+    });
+
+    it('names the option of a wrong port', async () => {
+      const { code, stdout, stderr } = await runUiCommand('--port', 'abc');
+
+      expect(code).toBe(1);
+      expect(stdout).toBe('');
+      expect(stderr).toBe('Error: Invalid option --port: an integer from 0 to 65535 is expected');
+    });
+
+    it('refuses an option it does not know, and shows the usage', async () => {
+      const { code, stderr } = await runUiCommand('--nope');
+
+      expect(code).toBe(1);
+      expect(stderr).toContain('Error: unknown option: --nope');
+      expect(stderr).toContain('Usage:');
+    });
+
+    it('says which port is taken instead of starting twice', async () => {
+      const taken = await startWebServer(createModulesApplicationService(), {
+        port: 0,
+        token: 'x',
+        projectFolder: tmpDirForTest(),
+        onError: () => {},
+      });
+      try {
+        const port = new URL(taken.origin).port;
+
+        const { code, stderr } = await runUiCommand('--port', port);
+
+        expect(code).toBe(1);
+        expect(stderr).toBe(
+          `Error: Invalid option --port: port ${port} is already in use (choose another one, or 0 to let the system choose a free one)`,
+        );
+      } finally {
+        await taken.close();
+      }
     });
   });
 });

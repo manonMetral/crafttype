@@ -30,6 +30,7 @@
     "build": "tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "cli": "tsx src/shared/module/infrastructure/primary/main.ts",
+    "ui": "tsx src/shared/module/infrastructure/primary/main.ts ui",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

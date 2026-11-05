@@ -26,7 +26,7 @@ npm run cli -- apply init --project-folder ../my-app --project-name my-app
 npm run cli -- apply typescript --project-folder ../my-app
 ```
 
-`npm run cli --` is the equivalent of `npx crafttype` for the sources (it runs `tsx` on `src/`). The modules and their order are in the [README](README.md#usage-with-npx).
+`npm run cli --` is the equivalent of `npx crafttype` for the sources (it runs `tsx` on `src/`). `npm run ui -- --port 0 --project-folder ../my-app` starts the API of the local interface. The modules and their order are in the [README](README.md#usage-with-npx).
 
 ## Checking your changes
 

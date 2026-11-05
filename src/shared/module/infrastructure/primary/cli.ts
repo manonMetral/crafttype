@@ -2,15 +2,18 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { ApplyResult, ModulesApplicationService } from '../../application/ModulesApplicationService.js';
 import { describeConflict, describeChange, type ConflictPolicy, type DecidedChange } from '../../domain/ChangePlan.js';
-import { isDomainError, MissingModuleDependenciesError, type DomainError } from '../../domain/errors.js';
+import { MissingModuleDependenciesError, type DomainError } from '../../domain/errors.js';
 import type { ModulePropertiesDefinition, PropertyDefinition, PropertyValue } from '../../domain/ModuleProperties.js';
-import { describeSystemError, isSystemError } from './systemErrors.js';
+import { classify } from './failures.js';
+import { runUi } from './uiCommand.js';
 
 const USAGE = `Usage:
   crafttype list
   crafttype apply <module> --project-folder <folder> [--<property> <value> ...]
                   [--force | --skip-conflicts] [--dry-run]
   crafttype apply <module> --help
+  crafttype ui [--port <number>] [--project-folder <folder>]
+  crafttype ui --help
   crafttype --help
   crafttype --version
 
@@ -28,8 +31,16 @@ export interface CliIo {
   readonly version: string;
 }
 
-/** Primary adapter: translates the command line into calls to the application service. */
-export const runCli = (argv: readonly string[], service: ModulesApplicationService, io: CliIo): number => {
+/**
+ * Primary adapter: translates the command line into calls to the application service.
+ * `ui` starts a server and answers once it listens (the process then stays alive, nothing here stops it), the other
+ * commands answer at once.
+ */
+export const runCli = (
+  argv: readonly string[],
+  service: ModulesApplicationService,
+  io: CliIo,
+): number | Promise<number> => {
   const { out, err } = io;
   const [command, ...rest] = argv;
 
@@ -43,6 +54,9 @@ export const runCli = (argv: readonly string[], service: ModulesApplicationServi
         return 0;
       case 'apply':
         return apply(rest, service, io);
+      case 'ui':
+        // The errors of an asynchronous command do not reach the `catch` below: they are handled here.
+        return runUi(rest, service, io).catch((error: unknown) => fail(error, io));
       case undefined:
       case 'help':
       case '--help':
@@ -59,20 +73,27 @@ export const runCli = (argv: readonly string[], service: ModulesApplicationServi
         return 1;
     }
   } catch (error) {
-    if (isDomainError(error)) {
-      err(`Error: ${describe(error)}`);
+    return fail(error, io);
+  }
+};
+
+/** Prints an error the user can act on and returns the exit code; any other error is a bug and is thrown again. */
+const fail = (error: unknown, { err }: CliIo): number => {
+  if (isUsageError(error)) {
+    err(`Error: ${describeUsageError(error)}`);
+    err(USAGE);
+    return 1;
+  }
+  const failure = classify(error);
+  switch (failure.kind) {
+    case 'domain':
+      err(`Error: ${describe(failure.error)}`);
       return 1;
-    }
-    if (isUsageError(error)) {
-      err(`Error: ${describeUsageError(error)}`);
-      err(USAGE);
+    case 'system':
+      err(`Error: ${failure.message}`);
       return 1;
-    }
-    if (isSystemError(error)) {
-      err(`Error: ${describeSystemError(error)}`);
-      return 1;
-    }
-    throw error;
+    case 'unexpected':
+      throw failure.error;
   }
 };
 

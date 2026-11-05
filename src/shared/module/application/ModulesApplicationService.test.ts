@@ -1,6 +1,26 @@
-import { chmodSync, existsSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { allModuleResources } from '../../../generator/modules.js';
+import { FileSystemModuleResourcesReader } from '../infrastructure/secondary/FileSystemModuleResourcesReader.js';
+import { FileSystemModulesHistory } from '../infrastructure/secondary/FileSystemModulesHistory.js';
+import { FileSystemNodePackagesVersionsReader } from '../infrastructure/secondary/FileSystemNodePackagesVersionsReader.js';
+import { FileSystemProjectFiles } from '../infrastructure/secondary/FileSystemProjectFiles.js';
+import { MustacheTemplateRenderer } from '../infrastructure/secondary/MustacheTemplateRenderer.js';
+import { NodePathNormalizer } from '../infrastructure/secondary/NodePathNormalizer.js';
+import { resourcesRoot } from '../infrastructure/secondary/resourcesRoot.js';
+import { SemverVersionComparator } from '../infrastructure/secondary/SemverVersionComparator.js';
+import { ModulesApplicationService } from './ModulesApplicationService.js';
 import { createModulesApplicationService } from '../../../composition.js';
 import { databaseModuleResources } from '../../test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../test/ModuleAssertions.js';
@@ -779,6 +799,148 @@ describe('ModulesApplicationService', () => {
 
       expect(service.apply('init', { projectFolder }, { onConflict: 'overwrite' }).warnings).toEqual([]);
       expect(service.apply('fastify-server', { projectFolder }, { onConflict: 'skip' }).warnings).toEqual([]);
+    });
+  });
+
+  describe('state of a project', () => {
+    const project = (slug: string, properties: Record<string, string | number>) => ({
+      slug,
+      properties,
+      appliedAt: '2026-10-20T10:00:00.000Z',
+    });
+    const custom = (slug: string, definition: ModulePropertiesDefinition) =>
+      moduleResource()
+        .slug(slug)
+        .propertiesDefinition(definition)
+        .apiDoc('Test', `Module ${slug}`)
+        .standalone()
+        .tags('test')
+        .factory((properties) => moduleBuilder(properties).build());
+
+    it('has nothing applied in an empty folder, and proposes the default values', () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = join(tmpDirForTest(), 'My Shop');
+
+      const state = service.projectState(projectFolder);
+
+      expect(state.projectFolder).toBe(projectFolder);
+      expect(state.applied).toEqual([]);
+      expect(state.presets['init']).toEqual({ projectName: 'my-shop' });
+      expect(state.presets['fastify-server']).toEqual({ serverPort: 3000 });
+      expect(state.presets['typescript']).toEqual({});
+    });
+
+    it('lists the applied modules in the order of application', () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+      service.apply('init', { projectFolder, projectName: 'shop' });
+      service.apply('typescript', { projectFolder });
+
+      const { applied } = service.projectState(projectFolder);
+
+      expect(applied).toEqual([
+        { slug: 'init', properties: { projectName: 'shop' }, appliedAt: '2026-10-20T10:00:00.000Z' },
+        { slug: 'typescript', properties: {}, appliedAt: '2026-10-20T10:00:00.000Z' },
+      ]);
+    });
+
+    it('proposes the values already chosen in the project rather than the defaults', () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+      service.apply('init', { projectFolder, projectName: 'shop' });
+      for (const slug of ['typescript', 'vitest']) service.apply(slug, { projectFolder });
+      service.apply('fastify-server', { projectFolder, serverPort: 4100 });
+
+      const { presets } = service.projectState(projectFolder);
+
+      expect(presets['init']).toEqual({ projectName: 'shop' });
+      expect(presets['fastify-server']).toEqual({ serverPort: 4100 });
+      expect(presets['vue-app']).toEqual({ projectName: 'shop', serverPort: 4100 });
+    });
+
+    it('reads the history once, so that what is applied and what is proposed come from the same state', () => {
+      const root = resourcesRoot();
+      const files = new FileSystemProjectFiles();
+      const history = new FileSystemModulesHistory(files);
+      const reads: string[] = [];
+      const service = new ModulesApplicationService({
+        resources: allModuleResources(new FileSystemNodePackagesVersionsReader(root)),
+        files,
+        resourcesReader: new FileSystemModuleResourcesReader(root),
+        renderer: new MustacheTemplateRenderer(),
+        history: {
+          list: (folder) => {
+            reads.push(folder);
+            return history.list(folder);
+          },
+          record: (folder, applied) => history.record(folder, applied),
+        },
+        versions: new SemverVersionComparator(),
+        paths: new NodePathNormalizer(),
+        clock,
+      });
+      const projectFolder = tmpDirForTest();
+
+      service.projectState(projectFolder);
+
+      expect(reads).toEqual([projectFolder]);
+    });
+
+    it('reports an invalid history instead of ignoring it', () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+      mkdirSync(join(projectFolder, '.crafttype/modules'), { recursive: true });
+      writeFileSync(join(projectFolder, '.crafttype/modules/history.json'), '{"modules": 3}');
+
+      expect(() => service.projectState(projectFolder)).toThrow(InvalidProjectFileError);
+    });
+
+    it('proposes no value for a module whose mandatory property has no default', () => {
+      const withMandatory = custom(
+        'with-mandatory',
+        ModulePropertiesDefinition.create([
+          ...ModulePropertiesDefinition.builder().build().properties,
+          { key: 'owner', type: 'string', mandatory: true, description: 'Owner' },
+        ]),
+      );
+      const service = createModulesApplicationService({ clock, extraResources: [withMandatory] });
+
+      const { presets } = service.projectState(tmpDirForTest());
+
+      expect(presets['with-mandatory']).toEqual({});
+      expect(presets['init']).toEqual({ projectName: expect.any(String) });
+    });
+
+    it('proposes no value for a module whose recorded value is no longer valid', () => {
+      const service = createModulesApplicationService({ clock });
+      const projectFolder = tmpDirForTest();
+      mkdirSync(join(projectFolder, '.crafttype/modules'), { recursive: true });
+      writeFileSync(
+        join(projectFolder, '.crafttype/modules/history.json'),
+        JSON.stringify({ modules: [project('fastify-server', { serverPort: 70000 })] }),
+      );
+
+      const { presets } = service.projectState(projectFolder);
+
+      expect(presets['fastify-server']).toEqual({});
+      expect(presets['init']).toEqual({ projectName: expect.any(String) });
+    });
+
+    it('does not hide an unexpected error raised while computing the default values', () => {
+      const exploding = custom(
+        'exploding-default',
+        ModulePropertiesDefinition.builder()
+          .addString('flavor', {
+            description: 'Flavor',
+            defaultValue: () => {
+              throw new TypeError('bug in a default value');
+            },
+          })
+          .build(),
+      );
+      const service = createModulesApplicationService({ clock, extraResources: [exploding] });
+
+      expect(() => service.projectState(tmpDirForTest())).toThrow('bug in a default value');
     });
   });
 

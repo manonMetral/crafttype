@@ -102,6 +102,21 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 
 **Dependency versions.** A dependency already present in `package.json` with a version equal to, newer than or compatible with the catalog one (`^5.0.0` for `5.12.7`) is not a conflict: it is kept, even with `--force`, so that a project updated by Renovate never goes backwards. An older version, a tag (`latest`), a URL or a workspace reference remains a conflict.
 
+## Local interface (in progress)
+
+`crafttype ui` starts the API of a local interface to browse the catalog and the state of a project. For now it is read only and has no page: the tree and the basket come next.
+
+```bash
+npx crafttype ui [--port <number>] [--project-folder <folder>]
+```
+
+It listens on `127.0.0.1` only (this machine), on port 4242 unless `--port` says otherwise (`--port 0` lets the system choose), and describes the current folder unless `--project-folder` says otherwise. It prints a token: every request must send it as `Authorization: Bearer <token>` (use `curl`: a browser address bar cannot send a header, and typing the address there answers "missing or invalid token"), and a request whose `Host` or `Origin` header is not the local server's is refused, so that a web page open in your browser cannot use it.
+
+| Route | Answers |
+|---|---|
+| `GET /api/modules` | the catalog: for each module, its group, description, prerequisites, tags and properties |
+| `GET /api/project[?folder=<absolute path>]` | the modules applied in the project, and the value each module's properties would take |
+
 ## Code organization
 
 Each module is a "hexagon", as in Seed4J (see `documentation/hexagonal-architecture.md` in their repository):

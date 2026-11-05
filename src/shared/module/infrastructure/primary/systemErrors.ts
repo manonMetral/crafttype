@@ -4,7 +4,7 @@
  * recognized by its shape. Node sets a POSIX `code` (`EACCES`) and the failed `syscall` on every one of them, whereas
  * other errors that carry a `code` (`ERR_PARSE_ARGS_*`, `ERR_INVALID_ARG_TYPE`) have no `syscall`.
  */
-export type SystemError = Error & { code: string; syscall: string; path?: string };
+export type SystemError = Error & { code: string; syscall: string; path?: string; port?: number };
 
 export const isSystemError = (error: unknown): error is SystemError =>
   error instanceof Error &&
@@ -24,13 +24,26 @@ const REASONS: Readonly<Record<string, string>> = {
   EROFS: 'read-only file system',
   EEXIST: 'file already exists',
   EMFILE: 'too many open files',
+  EADDRINUSE: 'address already in use',
 };
 
 const WRITING_SYSCALLS = new Set(['mkdir', 'rename', 'unlink', 'write', 'copyfile', 'chmod']);
 
 /** One line, for example `cannot write /app/src/a.ts: permission denied (EACCES)`. */
-export const describeSystemError = ({ code, syscall, path }: SystemError): string => {
-  const action = WRITING_SYSCALLS.has(syscall) ? 'write' : 'access';
-  const where = path === undefined ? '' : ` ${path}`;
-  return `cannot ${action}${where}: ${REASONS[code] ?? 'system error'} (${code})`;
+export const describeSystemError = (error: SystemError): string =>
+  `cannot ${actionOf(error.syscall)}${placeOf(error)}: ${REASONS[error.code] ?? 'system error'} (${error.code})`;
+
+const actionOf = (syscall: string): string => {
+  if (syscall === 'listen') {
+    return 'listen';
+  }
+  return WRITING_SYSCALLS.has(syscall) ? 'write' : 'access';
+};
+
+/** Where it happened: the file, or the port of a server that cannot listen; nothing if the error does not say. */
+const placeOf = ({ path, port }: SystemError): string => {
+  if (path !== undefined) {
+    return ` ${path}`;
+  }
+  return port === undefined ? '' : ` on port ${port}`;
 };

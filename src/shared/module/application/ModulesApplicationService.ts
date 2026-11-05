@@ -50,6 +50,19 @@ export interface ApplyResult {
   readonly warnings: readonly string[];
 }
 
+/** What a project looks like to someone about to extend it: what is applied, and the values each module would take. */
+export interface ProjectState {
+  readonly projectFolder: string;
+  /** In the order of application. */
+  readonly applied: readonly AppliedModule[];
+  /**
+   * For each module of the catalog, the value of each of its properties if the module were applied now: the value
+   * already chosen in the project, else the default. A module whose values cannot be computed (a mandatory property
+   * without default, a recorded value that is no longer valid) has none.
+   */
+  readonly presets: Readonly<Record<ModuleSlug, KnownProperties>>;
+}
+
 /** Orchestration: no business rule here, only the chaining of ports. */
 export class ModulesApplicationService {
   constructor(private readonly dependencies: ModulesApplicationServiceDependencies) {}
@@ -64,6 +77,16 @@ export class ModulesApplicationService {
       throw new UnknownModuleError(slug);
     }
     return resource;
+  }
+
+  /** Read only: nothing is written, not even in a folder that does not exist yet. */
+  projectState(projectFolder: string): ProjectState {
+    const applied = this.dependencies.history.list(projectFolder);
+    const known = mergedProperties(applied);
+    const presets = Object.fromEntries(
+      this.dependencies.resources.map((resource) => [resource.slug, presetOf(resource, projectFolder, known)]),
+    );
+    return { projectFolder, applied, presets };
   }
 
   buildModule(
@@ -269,15 +292,10 @@ export class ModulesApplicationService {
     return recorded !== undefined && sameProperties(recorded.properties, properties);
   }
 
-  /** Properties already set by the applied modules; the most recent one wins. */
+  /** Properties already set by the applied modules of the project; the most recent one wins. */
   private knownProperties(projectFolder: PropertyValue | undefined): KnownProperties {
     const folder = String(projectFolder ?? '');
-    if (folder.trim() === '') {
-      return {};
-    }
-    return this.dependencies.history
-      .list(folder)
-      .reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
+    return folder.trim() === '' ? {} : mergedProperties(this.dependencies.history.list(folder));
   }
 
   private checkDependencies(resource: ModuleResource, properties: ModuleProperties): void {
@@ -289,6 +307,21 @@ export class ModulesApplicationService {
     }
   }
 }
+
+const mergedProperties = (applied: readonly AppliedModule[]): KnownProperties =>
+  applied.reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
+
+const presetOf = (resource: ModuleResource, projectFolder: string, known: KnownProperties): KnownProperties => {
+  try {
+    return resource.propertiesDefinition.resolve({ projectFolder }, known).values;
+  } catch (error) {
+    // The form of this module will ask for what is missing or wrong; the other modules are not concerned.
+    if (error instanceof CraftTypeError) {
+      return {};
+    }
+    throw error;
+  }
+};
 
 const sameProperties = (left: KnownProperties, right: KnownProperties): boolean => {
   const keys = Object.keys(left);
