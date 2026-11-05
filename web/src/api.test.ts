@@ -7,9 +7,13 @@ describe('API client', () => {
   });
 
   const answering = (status: number, body: unknown) => {
-    const calls: { path: string; headers: HeadersInit | undefined }[] = [];
+    const calls: { path: string; headers: HeadersInit | undefined; method?: string | undefined; body?: unknown }[] = [];
     const fetchJson = (async (path: string, init?: RequestInit) => {
-      calls.push({ path, headers: init?.headers });
+      calls.push({
+        path,
+        headers: init?.headers,
+        ...(init?.method === undefined ? {} : { method: init.method, body: init.body }),
+      });
       return new Response(JSON.stringify(body), { status });
     }) as typeof fetch;
     return { calls, fetchJson };
@@ -47,6 +51,38 @@ describe('API client', () => {
     await createApi('secret', fetchJson).project('/my projects/a&b?c#d');
 
     expect(calls[0]?.path).toBe('/api/project?folder=%2Fmy%20projects%2Fa%26b%3Fc%23d');
+  });
+
+  it('asks for the preview of a basket by posting it as JSON, with the token', async () => {
+    const answer = { projectFolder: '/p', steps: [], canApply: true };
+    const { calls, fetchJson } = answering(200, answer);
+    const request = {
+      modules: ['init', 'typescript'],
+      properties: { projectName: 'shop' },
+      onConflict: 'skip' as const,
+    };
+
+    const preview = await createApi('secret', fetchJson).preview(request);
+
+    expect(preview).toEqual(answer);
+    expect(calls).toEqual([
+      {
+        path: '/api/basket/preview',
+        headers: { Authorization: 'Bearer secret', 'Content-Type': 'application/json' },
+        method: 'POST',
+        body: JSON.stringify(request),
+      },
+    ]);
+  });
+
+  it('turns what the server refuses in a preview into an error, with its reason', async () => {
+    const { fetchJson } = answering(422, { error: 'Unknown module: nope' });
+
+    const failure = await createApi('secret', fetchJson)
+      .preview({ modules: ['nope'] })
+      .catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ name: 'ApiError', message: 'Unknown module: nope', status: 422 });
   });
 
   it('turns a refusal into an error with what the server said, and its hint', async () => {
