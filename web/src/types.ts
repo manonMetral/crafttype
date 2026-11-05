@@ -28,3 +28,50 @@ export interface ProjectState {
   /** For each module, the value each of its properties would take. */
   readonly presets: Readonly<Record<string, Readonly<Record<string, PropertyValue>>>>;
 }
+
+export type ConflictPolicy = 'fail' | 'skip' | 'overwrite';
+
+export type Decision = 'create' | 'edit' | 'unchanged' | 'keep' | 'overwrite' | 'skip' | 'conflict';
+
+export interface ChangeInfo {
+  readonly kind: string;
+  readonly target: string;
+  readonly decision: Decision;
+  /** Readable: the file, or the package.json entry with the existing value against the module's. */
+  readonly description: string;
+}
+
+export interface ReportInfo {
+  readonly created: number;
+  readonly edited: number;
+  readonly replaced: number;
+  readonly unchanged: number;
+  readonly kept: number;
+  readonly skipped: number;
+  readonly conflicts: number;
+}
+
+/** `ready`: it would apply. `conflict`: an existing item differs. `blocked`: it cannot. `not-run`: an earlier step stopped the basket. */
+export type StepInfo =
+  | {
+      readonly slug: string;
+      readonly outcome: 'ready' | 'conflict';
+      readonly report: ReportInfo;
+      readonly warnings: readonly string[];
+      readonly changes: readonly ChangeInfo[];
+    }
+  | { readonly slug: string; readonly outcome: 'blocked'; readonly error: string; readonly missing: readonly string[] }
+  | { readonly slug: string; readonly outcome: 'not-run'; readonly after: string };
+
+export interface PreviewRequest {
+  readonly projectFolder?: string;
+  readonly modules: readonly string[];
+  readonly properties?: Readonly<Record<string, PropertyValue>>;
+  readonly onConflict?: ConflictPolicy;
+}
+
+export interface BasketPreview {
+  readonly projectFolder: string;
+  readonly steps: readonly StepInfo[];
+  readonly canApply: boolean;
+}
