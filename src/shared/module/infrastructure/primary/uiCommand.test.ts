@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../../../composition.js';
 import { InvalidPropertyError } from '../../domain/errors.js';
 import { tmpDirForTest } from '../../../test/ModuleAssertions.js';
-import { DEFAULT_PORT, runUi, UI_USAGE } from './uiCommand.js';
+import { DEFAULT_PORT, runUi, UI_USAGE, type UiDependencies } from './uiCommand.js';
 import { startWebServer, type WebServer, type WebServerOptions } from './web/webServer.js';
 
 describe('crafttype ui', () => {
@@ -12,9 +12,19 @@ describe('crafttype ui', () => {
   const errors: string[] = [];
   const io = { out: (line: string) => lines.push(line), err: (line: string) => errors.push(line) };
   const output = () => lines.splice(0).join('\n');
+  const opened: string[] = [];
   beforeEach(() => {
     lines.length = 0;
     errors.length = 0;
+    opened.length = 0;
+  });
+  /** No page is built, and no browser is opened, unless a test says otherwise. */
+  const deps = (overrides: UiDependencies = {}): UiDependencies => ({
+    front: () => undefined,
+    open: (url) => {
+      opened.push(url);
+    },
+    ...overrides,
   });
 
   /** Stands in for the server: records how it was started, listens on nothing. */
@@ -31,7 +41,7 @@ describe('crafttype ui', () => {
     it('When it runs Then the server starts on the default port, for the current folder, with a secret token', async () => {
       const { started, start } = fakeStart();
 
-      const code = await runUi([], service, io, start);
+      const code = await runUi([], service, io, deps({ start }));
 
       expect(code).toBe(0);
       expect(started).toEqual([
@@ -47,7 +57,7 @@ describe('crafttype ui', () => {
 
     it('When the server fails while it runs Then the failure is shown and nothing stops', async () => {
       const { started, start } = fakeStart();
-      await runUi([], service, io, start);
+      await runUi([], service, io, deps({ start }));
 
       started[0]?.onError(new Error('accept EMFILE'));
 
@@ -57,8 +67,8 @@ describe('crafttype ui', () => {
     it('When it runs twice Then each run has its own token', async () => {
       const { started, start } = fakeStart();
 
-      await runUi([], service, io, start);
-      await runUi([], service, io, start);
+      await runUi([], service, io, deps({ start }));
+      await runUi([], service, io, deps({ start }));
 
       expect(started[0]?.token).not.toBe(started[1]?.token);
     });
@@ -66,7 +76,7 @@ describe('crafttype ui', () => {
     it('When it runs Then it tells where it listens, for which folder, and how to call it', async () => {
       const { started, start } = fakeStart();
 
-      await runUi([], service, io, start);
+      await runUi([], service, io, deps({ start }));
 
       const token = started[0]?.token;
       expect(output()).toBe(
@@ -75,9 +85,83 @@ describe('crafttype ui', () => {
           `Project folder: ${process.cwd()}`,
           `Token: ${token}`,
           `Try: curl -H "Authorization: Bearer ${token}" http://127.0.0.1:4242/api/modules`,
-          'There is no page yet: opened in a browser, the address answers "missing or invalid token", since a browser cannot send the token. Use curl for now.',
+          'The page is not built (from a clone: npm run web:build), so only the API answers. Opened in a browser, the address answers "missing or invalid token", since a browser cannot send the token.',
         ].join('\n'),
       );
+    });
+  });
+
+  describe('Given the page is built', () => {
+    const page = '/package/web/dist';
+    const built = () => deps({ front: () => page });
+
+    it('When it runs Then the server serves the page and the browser opens on an address that carries the token', async () => {
+      const { started, start } = fakeStart();
+
+      await runUi([], service, io, { ...built(), start });
+
+      expect(started[0]).toMatchObject({ webRoot: page });
+      expect(opened).toEqual([`http://127.0.0.1:4242/?token=${started[0]?.token}`]);
+    });
+
+    it('When it runs Then it prints the address to open, and no longer says that there is no page', async () => {
+      const { started, start } = fakeStart();
+
+      await runUi([], service, io, { ...built(), start });
+
+      const token = started[0]?.token;
+      expect(output()).toBe(
+        [
+          'CraftType API listening on http://127.0.0.1:4242 (read only, this machine only). Stop it with Ctrl+C.',
+          `Project folder: ${process.cwd()}`,
+          `Open: http://127.0.0.1:4242/?token=${token}`,
+          `Token: ${token}`,
+          `Try: curl -H "Authorization: Bearer ${token}" http://127.0.0.1:4242/api/modules`,
+        ].join('\n'),
+      );
+    });
+
+    it('When --no-open is given Then the page is served and the address printed, but the browser is left alone', async () => {
+      const { started, start } = fakeStart();
+
+      await runUi(['--no-open'], service, io, { ...built(), start });
+
+      expect(started[0]).toMatchObject({ webRoot: page });
+      expect(opened).toEqual([]);
+      expect(output()).toContain(`Open: http://127.0.0.1:4242/?token=${started[0]?.token}`);
+    });
+
+    it('When the server cannot start Then no browser is opened', async () => {
+      const refusing = (async () => {
+        throw new Error('boom');
+      }) as typeof startWebServer;
+
+      await expect(runUi([], service, io, { ...built(), start: refusing })).rejects.toThrow('boom');
+
+      expect(opened).toEqual([]);
+    });
+  });
+
+  describe('Given the page is not built', () => {
+    it('When it runs Then only the API is served, no browser is opened, and the output says why', async () => {
+      const { started, start } = fakeStart();
+
+      await runUi([], service, io, deps({ start }));
+
+      expect(started[0]).not.toHaveProperty('webRoot');
+      expect(opened).toEqual([]);
+      const text = output();
+      expect(text).not.toContain('Open:');
+      expect(text).toContain('The page is not built');
+    });
+
+    it('When --no-open is given Then it changes nothing', async () => {
+      const { started, start } = fakeStart();
+
+      await runUi(['--no-open'], service, io, deps({ start }));
+
+      expect(started[0]).not.toHaveProperty('webRoot');
+      expect(opened).toEqual([]);
     });
   });
 
@@ -85,7 +169,7 @@ describe('crafttype ui', () => {
     it('When a port and a folder are given Then they are used, the folder as an absolute path', async () => {
       const { started, start } = fakeStart();
 
-      await runUi(['--port', '0', '--project-folder', 'some/folder'], service, io, start);
+      await runUi(['--port', '0', '--project-folder', 'some/folder'], service, io, deps({ start }));
 
       expect(started[0]).toMatchObject({ port: 0, projectFolder: resolve('some/folder') });
     });
@@ -95,8 +179,8 @@ describe('crafttype ui', () => {
       async (port) => {
         const { started, start } = fakeStart();
 
-        await expect(runUi(['--port', port], service, io, start)).rejects.toThrow(InvalidPropertyError);
-        await expect(runUi(['--port', port], service, io, start)).rejects.toMatchObject({
+        await expect(runUi(['--port', port], service, io, deps({ start }))).rejects.toThrow(InvalidPropertyError);
+        await expect(runUi(['--port', port], service, io, deps({ start }))).rejects.toMatchObject({
           key: 'port',
           reason: 'an integer from 0 to 65535 is expected',
         });
@@ -107,7 +191,7 @@ describe('crafttype ui', () => {
     it.each(['0', '1', '65535'])('When the port is %s Then it is accepted', async (port) => {
       const { started, start } = fakeStart();
 
-      await runUi(['--port', port], service, io, start);
+      await runUi(['--port', port], service, io, deps({ start }));
 
       expect(started[0]?.port).toBe(Number(port));
     });
@@ -122,7 +206,7 @@ describe('crafttype ui', () => {
         throw taken;
       }) as typeof startWebServer;
 
-      await expect(runUi([], service, io, refusing)).rejects.toMatchObject({
+      await expect(runUi([], service, io, deps({ start: refusing }))).rejects.toMatchObject({
         key: 'port',
         reason: 'port 4242 is already in use (choose another one, or 0 to let the system choose a free one)',
       });
@@ -140,18 +224,18 @@ describe('crafttype ui', () => {
         throw error;
       }) as typeof startWebServer;
 
-      await expect(runUi([], service, io, refusing)).rejects.toBe(error);
+      await expect(runUi([], service, io, deps({ start: refusing }))).rejects.toBe(error);
     });
 
     it('When help is asked Then the usage is printed and nothing starts', async () => {
       const { started, start } = fakeStart();
 
-      expect(await runUi(['--help'], service, io, start)).toBe(0);
-      expect(await runUi(['-h'], service, io, start)).toBe(0);
+      expect(await runUi(['--help'], service, io, deps({ start }))).toBe(0);
+      expect(await runUi(['-h'], service, io, deps({ start }))).toBe(0);
 
       expect(started).toEqual([]);
       expect(output()).toBe(`${UI_USAGE}\n${UI_USAGE}`);
-      expect(UI_USAGE).toContain('crafttype ui [--port <number>] [--project-folder <folder>]');
+      expect(UI_USAGE).toContain('crafttype ui [--port <number>] [--project-folder <folder>] [--no-open]');
     });
   });
 
@@ -161,10 +245,17 @@ describe('crafttype ui', () => {
       const projectFolder = tmpDirForTest();
       service.apply('init', { projectFolder, projectName: 'shop' });
       try {
-        await runUi(['--port', '0', '--project-folder', projectFolder], service, io, async (...args) => {
-          server = await startWebServer(...args);
-          return server;
-        });
+        await runUi(
+          ['--port', '0', '--project-folder', projectFolder],
+          service,
+          io,
+          deps({
+            start: async (...args) => {
+              server = await startWebServer(...args);
+              return server;
+            },
+          }),
+        );
         const text = output();
         const origin = /listening on (http:\/\/127\.0\.0\.1:\d+)/.exec(text)?.[1] as string;
         const token = /^Token: (.+)$/m.exec(text)?.[1] as string;

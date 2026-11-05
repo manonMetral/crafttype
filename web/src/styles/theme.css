@@ -1,0 +1,38 @@
+/* White, violet and gray. Every pair of text and background below reaches 4.5:1 (WCAG AA), see theme.test.ts. */
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f3f4f6;
+  --color-border: #d1d5db;
+  --color-text: #1f2937;
+  --color-muted: #4b5563;
+  --color-primary: #6d28d9;
+  --color-primary-strong: #5b21b6;
+  --color-primary-soft: #ede9fe;
+  --color-on-primary: #ffffff;
+  --color-danger: #b91c1c;
+  --radius: 8px;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font);
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+code {
+  font-family: var(--font-mono);
+}
