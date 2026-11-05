@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { ApplyResult, ModulesApplicationService } from '../../application/ModulesApplicationService.js';
-import { describeConflict, describeChange, type ConflictPolicy, type DecidedChange } from '../../domain/ChangePlan.js';
+import { describeConflict, describeDecided, type ConflictPolicy, type DecidedChange } from '../../domain/ChangePlan.js';
 import { MissingModuleDependenciesError, type DomainError } from '../../domain/errors.js';
 import type { ModulePropertiesDefinition, PropertyDefinition, PropertyValue } from '../../domain/ModuleProperties.js';
 import { classify } from './failures.js';
@@ -222,9 +222,7 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
   if (dryRun) {
     out(`Dry run of module ${slug} in ${projectFolder} (nothing is written):`);
     for (const change of changes) {
-      out(
-        `  ${LABELS[change.decision].padEnd(10)} ${hasConflictingContent(change) ? describeConflict(change) : describeChange(change)}`,
-      );
+      out(`  ${LABELS[change.decision].padEnd(10)} ${describeDecided(change)}`);
     }
     out(counts.conflicts > 0 ? `${summary}, conflicts: ${counts.conflicts}\n${CONFLICT_HINT}` : summary);
     warnings.forEach((warning) => out(`Warning: ${warning}`));
@@ -243,9 +241,6 @@ const report = (result: ApplyResult, projectFolder: string, out: (line: string) 
   warnings.forEach((warning) => out(`Warning: ${warning}`));
   return 0;
 };
-
-const hasConflictingContent = ({ decision }: DecidedChange): boolean =>
-  decision === 'conflict' || decision === 'overwrite' || decision === 'skip' || decision === 'keep';
 
 const CONFLICT_HINT = 'Run again with --skip-conflicts to keep the existing items or --force to replace them.';
 

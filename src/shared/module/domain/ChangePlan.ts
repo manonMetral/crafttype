@@ -51,6 +51,16 @@ export const describeConflict = (change: PlannedChange): string =>
     ? describeChange(change)
     : `${describeChange(change)} (existing: ${change.current}, module: ${change.next})`;
 
+/**
+ * What to tell about a decided change: the existing value against the module's where the decision is about
+ * replacing, keeping or refusing it, else just the element.
+ */
+export const describeDecided = (change: DecidedChange): string =>
+  hasConflictingContent(change) ? describeConflict(change) : describeChange(change);
+
+const hasConflictingContent = ({ decision }: DecidedChange): boolean =>
+  decision === 'conflict' || decision === 'overwrite' || decision === 'skip' || decision === 'keep';
+
 /** What a module would change in a project, before anything is written. */
 export class ChangePlan {
   constructor(
