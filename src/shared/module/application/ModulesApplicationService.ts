@@ -6,7 +6,13 @@ import {
   type DecidedChange,
   type PlannedChange,
 } from '../domain/ChangePlan.js';
-import { CraftTypeError, MissingModuleDependenciesError, NeedleError, UnknownModuleError } from '../domain/errors.js';
+import {
+  CraftTypeError,
+  InvalidPropertyError,
+  MissingModuleDependenciesError,
+  NeedleError,
+  UnknownModuleError,
+} from '../domain/errors.js';
 import { PACKAGE_JSON_PATH, PackageJsonDocument } from '../domain/PackageJsonDocument.js';
 import { insertAtNeedle, needleToken, type FileEdit } from '../domain/needles.js';
 import type { KnownProperties, ModuleProperties, PropertyValue, RawProperties } from '../domain/ModuleProperties.js';
@@ -19,6 +25,7 @@ import type {
   ModuleResourcesReader,
   PathNormalizer,
   ProjectFiles,
+  ProjectSimulator,
   TemplateRenderer,
   VersionComparator,
 } from '../domain/ports.js';
@@ -31,6 +38,7 @@ export interface ModulesApplicationServiceDependencies {
   readonly history: ModulesHistory;
   readonly versions: VersionComparator;
   readonly paths: PathNormalizer;
+  readonly simulator: ProjectSimulator;
   readonly clock: () => Date;
 }
 
@@ -63,6 +71,44 @@ export interface ProjectState {
   readonly presets: Readonly<Record<ModuleSlug, KnownProperties>>;
 }
 
+/** The modules to apply together, in the project folder, with the values of the properties they share. */
+export interface BasketRequest {
+  readonly projectFolder: string;
+  readonly modules: readonly ModuleSlug[];
+  /** By key, for all the modules of the basket: each one takes those it declares. */
+  readonly properties?: Readonly<Record<string, PropertyValue>>;
+  /** One policy for the whole basket (`fail` by default). */
+  readonly onConflict?: ConflictPolicy;
+}
+
+/**
+ * `ready`: the module would apply. `conflict`: it cannot, an existing item differs and the policy is `fail`.
+ * `blocked`: it cannot (a prerequisite is missing, a value is wrong...). `not-run`: an earlier module stopped the basket.
+ */
+export type BasketStep =
+  | {
+      readonly slug: ModuleSlug;
+      readonly outcome: 'ready' | 'conflict';
+      readonly changes: readonly DecidedChange[];
+      readonly report: ApplyReport;
+      readonly warnings: readonly string[];
+    }
+  | {
+      readonly slug: ModuleSlug;
+      readonly outcome: 'blocked';
+      readonly error: string;
+      /** The prerequisites that are neither applied nor in the basket, if that is why. */
+      readonly missing: readonly ModuleSlug[];
+    }
+  | { readonly slug: ModuleSlug; readonly outcome: 'not-run'; readonly after: ModuleSlug };
+
+export interface BasketPreview {
+  readonly projectFolder: string;
+  readonly steps: readonly BasketStep[];
+  /** Every module is ready: applying the basket for real would do what the steps say. */
+  readonly canApply: boolean;
+}
+
 /** Orchestration: no business rule here, only the chaining of ports. */
 export class ModulesApplicationService {
   constructor(private readonly dependencies: ModulesApplicationServiceDependencies) {}
@@ -87,6 +133,68 @@ export class ModulesApplicationService {
       this.dependencies.resources.map((resource) => [resource.slug, presetOf(resource, projectFolder, known)]),
     );
     return { projectFolder, applied, presets };
+  }
+
+  /**
+   * Plays the basket on a copy of the project, in the order the catalog lists the modules (after the modules they
+   * depend on), and says what each module would do. Nothing is written, not even in the history.
+   * The first module that cannot be applied stops the basket, like it would when applying: the others are not run.
+   */
+  previewBasket({ projectFolder, modules, properties = {}, onConflict = 'fail' }: BasketRequest): BasketPreview {
+    const resources = this.inCatalogOrder(modules);
+    this.checkBasketProperties(resources, properties);
+
+    const { files, history } = this.dependencies.simulator.start();
+    const simulation = new ModulesApplicationService({ ...this.dependencies, files, history });
+
+    const steps: BasketStep[] = [];
+    for (const resource of resources) {
+      const stopper = steps.find(({ outcome }) => outcome !== 'ready');
+      steps.push(
+        stopper === undefined
+          ? simulation.tryStep(resource, { projectFolder, ...propertiesDeclaredBy(resource, properties) }, onConflict)
+          : { slug: resource.slug, outcome: 'not-run', after: stopper.slug },
+      );
+    }
+    return { projectFolder, steps, canApply: steps.every(({ outcome }) => outcome === 'ready') };
+  }
+
+  /** The module is played for real on the simulation, so that the following ones see what it wrote. */
+  private tryStep(resource: ModuleResource, raw: RawProperties, onConflict: ConflictPolicy): BasketStep {
+    const { slug } = resource;
+    try {
+      const { changes, report, warnings } = this.apply(slug, raw, { onConflict, dryRun: true });
+      if (report.conflicts > 0) {
+        return { slug, outcome: 'conflict', changes, report, warnings };
+      }
+      this.apply(slug, raw, { onConflict });
+      return { slug, outcome: 'ready', changes, report, warnings };
+    } catch (error) {
+      if (!(error instanceof CraftTypeError)) {
+        throw error;
+      }
+      const missing = error instanceof MissingModuleDependenciesError ? error.missing : [];
+      return { slug, outcome: 'blocked', error: error.message, missing };
+    }
+  }
+
+  private inCatalogOrder(slugs: readonly ModuleSlug[]): ModuleResource[] {
+    const wanted = new Set(slugs.map((slug) => this.find(slug).slug));
+    return this.dependencies.resources.filter(({ slug }) => wanted.has(slug));
+  }
+
+  private checkBasketProperties(
+    resources: readonly ModuleResource[],
+    properties: Readonly<Record<string, PropertyValue>>,
+  ): void {
+    const declared = new Set(
+      resources.flatMap(({ propertiesDefinition }) => propertiesDefinition.custom.map(({ key }) => key)),
+    );
+    for (const key of Object.keys(properties)) {
+      if (!declared.has(key)) {
+        throw new InvalidPropertyError(key, 'not supported by any module of the basket');
+      }
+    }
   }
 
   buildModule(
@@ -307,6 +415,12 @@ export class ModulesApplicationService {
     }
   }
 }
+
+/** Only the properties the module declares (the ones it does not know are refused); a value not given is `undefined`. */
+const propertiesDeclaredBy = (
+  { propertiesDefinition }: ModuleResource,
+  properties: Readonly<Record<string, PropertyValue>>,
+): RawProperties => Object.fromEntries(propertiesDefinition.custom.map(({ key }) => [key, properties[key]]));
 
 const mergedProperties = (applied: readonly AppliedModule[]): KnownProperties =>
   applied.reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
