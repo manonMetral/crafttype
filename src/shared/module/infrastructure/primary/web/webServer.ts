@@ -75,7 +75,7 @@ const answer = (
     return refusal(403, 'unexpected Origin header');
   }
   if (!hasToken(authorization, token)) {
-    return refusal(401, 'missing or invalid token');
+    return refusal(401, 'missing or invalid token', TOKEN_HINT);
   }
   if (request.method !== 'GET') {
     return refusal(405, 'method not allowed');
@@ -105,7 +105,14 @@ const parseTarget = (target: string, host: string): URL | undefined => {
   }
 };
 
-const refusal = (status: number, error: string): ApiResponse => ({ status, body: { error } });
+const refusal = (status: number, error: string, hint?: string): ApiResponse => ({
+  status,
+  body: hint === undefined ? { error } : { error, hint },
+});
+
+/** What someone who typed the address in a browser needs to read: the page does not exist yet, and cannot send a header. */
+const TOKEN_HINT =
+  'send the token printed by crafttype ui as "Authorization: Bearer <token>" (a browser address bar cannot, and there is no page yet)';
 
 /** Compares digests, so that the comparison takes the same time whatever the length of what was sent. */
 const hasToken = (authorization: string | undefined, token: string): boolean =>

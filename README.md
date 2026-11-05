@@ -110,7 +110,7 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 npx crafttype ui [--port <number>] [--project-folder <folder>]
 ```
 
-It listens on `127.0.0.1` only (this machine), on port 4242 unless `--port` says otherwise (`--port 0` lets the system choose), and describes the current folder unless `--project-folder` says otherwise. It prints a token: every request must send it as `Authorization: Bearer <token>`, and a request whose `Host` or `Origin` header is not the local server's is refused, so that a web page open in your browser cannot use it.
+It listens on `127.0.0.1` only (this machine), on port 4242 unless `--port` says otherwise (`--port 0` lets the system choose), and describes the current folder unless `--project-folder` says otherwise. It prints a token: every request must send it as `Authorization: Bearer <token>` (use `curl`: a browser address bar cannot send a header, and typing the address there answers "missing or invalid token"), and a request whose `Host` or `Origin` header is not the local server's is refused, so that a web page open in your browser cannot use it.
 
 | Route | Answers |
 |---|---|

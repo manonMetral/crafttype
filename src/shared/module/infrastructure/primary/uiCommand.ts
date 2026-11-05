@@ -55,6 +55,9 @@ export const runUi = async (
   out(`Project folder: ${projectFolder}`);
   out(`Token: ${token}`);
   out(`Try: curl -H "Authorization: Bearer ${token}" ${server.origin}/api/modules`);
+  out(
+    'There is no page yet: opened in a browser, the address answers "missing or invalid token", since a browser cannot send the token. Use curl for now.',
+  );
   return 0;
 };
 

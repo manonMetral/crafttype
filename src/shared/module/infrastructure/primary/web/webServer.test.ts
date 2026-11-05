@@ -205,6 +205,26 @@ describe('local web server', () => {
       expect(reply).toMatchObject({ status: 401, body: { error: 'missing or invalid token' } });
     });
 
+    it('When the address is typed in a browser Then the refusal says how to send the token', async () => {
+      const { server } = await launch();
+
+      const reply = await send(server.origin, '/api/modules', { headers: { accept: 'text/html' } });
+
+      expect(reply.status).toBe(401);
+      expect(reply.body).toEqual({
+        error: 'missing or invalid token',
+        hint: 'send the token printed by crafttype ui as "Authorization: Bearer <token>" (a browser address bar cannot, and there is no page yet)',
+      });
+    });
+
+    it('When the host is refused Then there is no hint about the token', async () => {
+      const { server } = await launch();
+
+      const reply = await send(server.origin, '/api/modules', { headers: { host: 'evil.example' } });
+
+      expect(reply.body).toEqual({ error: 'unexpected Host header' });
+    });
+
     it('When the page is served under another host name (DNS rebinding) Then it is refused, with the right token', async () => {
       const { server } = await launch();
 

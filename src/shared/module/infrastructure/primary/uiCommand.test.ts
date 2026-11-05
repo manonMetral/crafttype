@@ -75,6 +75,7 @@ describe('crafttype ui', () => {
           `Project folder: ${process.cwd()}`,
           `Token: ${token}`,
           `Try: curl -H "Authorization: Bearer ${token}" http://127.0.0.1:4242/api/modules`,
+          'There is no page yet: opened in a browser, the address answers "missing or invalid token", since a browser cannot send the token. Use curl for now.',
         ].join('\n'),
       );
     });
