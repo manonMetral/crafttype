@@ -15,8 +15,10 @@ import BasketPanel from './BasketPanel.vue';
 import { folderForName } from './folder';
 import ModuleDetails from './ModuleDetails.vue';
 import ModuleTree from './ModuleTree.vue';
+import ViewSwitch from './ViewSwitch.vue';
 import AppliedResult from './AppliedResult.vue';
 import PreviewResult from './PreviewResult.vue';
+import PrerequisiteGraph from './PrerequisiteGraph.vue';
 import type {
   ApplyResult,
   BasketPreview,
@@ -25,6 +27,7 @@ import type {
   ModuleInfo,
   ProjectState,
   PropertyValue,
+  View,
 } from './types';
 import styles from './App.module.css';
 
@@ -55,6 +58,8 @@ const folderProblem = ref<Problem>();
 
 const basket = ref<Basket>([]);
 const selected = ref<string>();
+/** The prerequisites first: they show what the project can have, and what the basket would unlock. */
+const view = ref<View>('prerequisites');
 /** What was typed in the options: a value that was cleared stays cleared, it is not filled in again. */
 const edited = ref<Record<string, PropertyValue | undefined>>({});
 const policy = ref<ConflictPolicy>('fail');
@@ -288,16 +293,26 @@ onMounted(async () => {
       <span v-if="problem.hint" :class="styles.hint">{{ problem.hint }}</span>
     </p>
     <p v-else-if="loading" role="status">Loading…</p>
-    <div v-else :class="styles.layout">
+    <div v-else :class="[styles.layout, view === 'prerequisites' && styles.layoutGraph]">
       <section :class="styles.treeColumn" aria-label="Catalog">
         <h2>Modules</h2>
+        <ViewSwitch v-model:view="view" />
         <ModuleTree
+          v-if="view === 'groups'"
           :groups="groups"
           :applied="applied"
           :in-basket="inBasket"
           :selected="selected"
           @select="selected = $event"
           @toggle="toggle"
+        />
+        <PrerequisiteGraph
+          v-else
+          :modules="everything.modules"
+          :applied="applied"
+          :in-basket="inBasket"
+          :selected="selected"
+          @select="selected = $event"
         />
       </section>
       <ModuleDetails :module="shown" :applied="applied" :in-basket="inBasket" :also-adds="alsoAdds" @toggle="toggle" />

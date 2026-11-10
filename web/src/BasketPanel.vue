@@ -42,7 +42,8 @@ const typed = (event: Event, type: SharedProperty['type']): PropertyValue | unde
   <section :class="styles.basket" aria-label="Basket">
     <h2>Basket ({{ items.length }})</h2>
     <p v-if="items.length === 0" :class="styles.empty">
-      Nothing in the basket. Choose modules in the tree: Space adds the module that has the focus.
+      Nothing in the basket. Choose a module, then add it with the button of its details (in the tree, Space adds the
+      module that has the focus).
     </p>
     <ul v-else :class="styles.items">
       <li v-for="item in items" :key="item.slug" :class="styles.item">

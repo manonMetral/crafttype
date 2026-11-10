@@ -1,0 +1,109 @@
+.graph {
+  min-width: 0;
+}
+.scroll {
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+.canvas {
+  position: relative;
+}
+.edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.edge {
+  fill: none;
+  stroke: var(--color-muted);
+  stroke-width: 1.5;
+}
+.edge[data-chain='unrelated'] {
+  opacity: 0.35;
+}
+.edge[data-chain='prerequisites'],
+.edge[data-chain='dependents'] {
+  stroke: var(--color-primary);
+  stroke-width: 2.5;
+}
+.arrow {
+  fill: var(--color-muted);
+}
+.arrowOn {
+  fill: var(--color-primary);
+}
+.node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.125rem;
+  width: 160px;
+  height: 60px;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.node:hover {
+  background: var(--color-surface);
+}
+.node[data-state='applied'] {
+  background: var(--color-surface);
+}
+.node[data-state='in-basket'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.node[data-relation='prerequisite'],
+.node[data-relation='dependent'] {
+  border-color: var(--color-primary);
+  border-width: 2px;
+}
+.node[data-relation='dependent'] {
+  border-style: dashed;
+}
+.node[data-relation='selected'] {
+  border-color: var(--color-primary-strong);
+  border-width: 3px;
+  background: var(--color-primary-soft);
+}
+.name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.state {
+  padding: 0 0.375rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+.hidden,
+.relation {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.note {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.waiting {
+  margin: 0 0 0.5rem;
+  color: var(--color-primary-strong);
+}

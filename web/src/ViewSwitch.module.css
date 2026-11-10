@@ -1,0 +1,22 @@
+.switch {
+  display: inline-flex;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.option {
+  padding: 0.375rem 0.75rem;
+  border: 0;
+  background: var(--color-bg);
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.option + .option {
+  border-left: 1px solid var(--color-primary);
+}
+.option[aria-pressed='true'] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
