@@ -12,6 +12,7 @@ export class AuthFactory {
       .addFile(SOURCE.file('jwt.ts'), `${AUTH}/jwt.ts`)
       .addFile(SOURCE.file('jwt.test.ts'), `${AUTH}/jwt.test.ts`)
       .addFile(SOURCE.file('authentication.ts'), `${AUTH}/authentication.ts`)
+      .addFile(SOURCE.file('authentication.test.ts'), `${AUTH}/authentication.test.ts`)
       .addFile(SOURCE.file('authRoutes.ts'), `${AUTH}/authRoutes.ts`)
       .addFile(SOURCE.file('authRoutes.test.ts'), `${AUTH}/authRoutes.test.ts`)
       .insertAtNeedle(`${SERVER}/app.ts`, 'app-imports', "import { registerAuthRoutes } from './auth/authRoutes.js';")
