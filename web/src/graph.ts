@@ -1,7 +1,11 @@
-/** What the graph needs to know about a module: its name, and the modules it needs. */
+/** What the graph needs to know about a module: its name, the modules it needs, and its capabilities. */
 export interface GraphModule {
   readonly slug: string;
   readonly dependsOn: readonly string[];
+  /** The capabilities it needs: any module that provides each one will do. */
+  readonly requires: readonly string[];
+  /** What it brings. A project has at most one module per capability. */
+  readonly provides: readonly string[];
 }
 
 /** In pixels: the nodes are placed from these, so that the links can be drawn without measuring the page. */
@@ -41,11 +45,23 @@ export interface GraphLayout {
 
 type Needs = (slug: string) => readonly string[];
 
-/** What each module needs among the modules of the catalog: no duplicate, nothing the catalog does not have. */
+/** The modules of the catalog that bring a capability. */
+const providersOf = (modules: readonly GraphModule[], capability: string): string[] =>
+  modules.filter(({ provides }) => provides.includes(capability)).map(({ slug }) => slug);
+
+/**
+ * What each module needs among the modules of the catalog: the modules it depends on, and every module that could
+ * provide a capability it requires. No duplicate, nothing the catalog does not have, and no module for itself.
+ */
 const needsOf = (modules: readonly GraphModule[]): Needs => {
   const known = new Set(modules.map(({ slug }) => slug));
   const needs = new Map(
-    modules.map(({ slug, dependsOn }) => [slug, [...new Set(dependsOn)].filter((need) => known.has(need))]),
+    modules.map(({ slug, dependsOn, requires }) => [
+      slug,
+      [...new Set([...dependsOn, ...requires.flatMap((capability) => providersOf(modules, capability))])].filter(
+        (need) => known.has(need) && need !== slug,
+      ),
+    ]),
   );
   // Called for the modules of the catalog only: each one has its entry.
   return (slug) => needs.get(slug) as readonly string[];
@@ -113,16 +129,22 @@ export const directPrerequisites = (modules: readonly GraphModule[]): ReadonlyMa
 };
 
 /**
- * The modules that can be used now: the ones the project or the basket already has (`active`), and the ones whose
- * prerequisites all are. The others wait: nothing can apply them until what they need is there.
+ * The modules that can be used now: the ones the project or the basket already has (`active`), and the ones that can be
+ * added: everything they need is there (the modules they depend on, and a module for each capability they require), and
+ * no other module brings a capability they provide. The others wait, or are kept out: nothing can apply them.
  */
 export const availableModules = (modules: readonly GraphModule[], active: ReadonlySet<string>): ReadonlySet<string> => {
-  const needs = needsOf(modules);
-  return new Set(
-    modules
-      .filter(({ slug }) => active.has(slug) || needs(slug).every((need) => active.has(need)))
-      .map(({ slug }) => slug),
-  );
+  const known = new Set(modules.map(({ slug }) => slug));
+  const canBeAdded = ({ slug, dependsOn, requires, provides }: GraphModule): boolean =>
+    dependsOn.every((need) => !known.has(need) || active.has(need)) &&
+    requires.every((capability) => {
+      const providers = providersOf(modules, capability);
+      return providers.length === 0 || providers.some((provider) => active.has(provider));
+    }) &&
+    !provides.some((capability) =>
+      providersOf(modules, capability).some((other) => other !== slug && active.has(other)),
+    );
+  return new Set(modules.filter((module) => active.has(module.slug) || canBeAdded(module)).map(({ slug }) => slug));
 };
 
 export interface Relations {

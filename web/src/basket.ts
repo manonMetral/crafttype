@@ -10,26 +10,70 @@ export type Basket = readonly BasketEntry[];
 const find = (catalog: Catalog, slug: string): ModuleInfo | undefined =>
   catalog.modules.find((module) => module.slug === slug);
 
+/** The modules of the catalog that bring a capability, in the order of the catalog. */
+const providersOf = (catalog: Catalog, capability: string): readonly ModuleInfo[] =>
+  catalog.modules.filter(({ provides }) => provides.includes(capability));
+
+export interface Exclusion {
+  readonly capability: string;
+  /** The module, in the project or in the basket, that brings the capability already. */
+  readonly by: string;
+}
+
+/**
+ * The module that keeps another one out: a project has at most one module for a capability, so a module that provides
+ * what the project or the basket already has from another module cannot be added.
+ */
+export const exclusionOf = (
+  catalog: Catalog,
+  applied: ReadonlySet<string>,
+  basket: Basket,
+  slug: string,
+): Exclusion | undefined => {
+  const inBasket = new Set(basket.map((entry) => entry.slug));
+  for (const capability of find(catalog, slug)?.provides ?? []) {
+    const by = providersOf(catalog, capability).find(
+      (provider) => provider.slug !== slug && (applied.has(provider.slug) || inBasket.has(provider.slug)),
+    );
+    if (by !== undefined) {
+      return { capability, by: by.slug };
+    }
+  }
+  return undefined;
+};
+
 /**
  * Puts a module in the basket, chosen, with what it needs and the project does not have, flagged as added
- * automatically. What was taken out by hand is not brought back by the modules that already needed it.
+ * automatically. What was taken out by hand is not brought back by the modules that already needed it. A capability
+ * is brought by its module when only one provides it: when several do, the person chooses, so none is added. A module
+ * that another module of the project or of the basket keeps out is not added.
  */
 export const addModule = (catalog: Catalog, applied: ReadonlySet<string>, basket: Basket, slug: string): Basket => {
   const wanted = find(catalog, slug);
-  if (wanted === undefined || applied.has(slug)) {
+  if (wanted === undefined || applied.has(slug) || exclusionOf(catalog, applied, basket, slug) !== undefined) {
     return basket;
   }
   const entries = new Map(basket.map((entry) => [entry.slug, entry]));
   entries.set(slug, { slug, auto: false });
 
+  const bring = (module: ModuleInfo): void => {
+    entries.set(module.slug, { slug: module.slug, auto: true });
+    addPrerequisitesOf(module);
+  };
   const addPrerequisitesOf = (module: ModuleInfo): void => {
     for (const dependency of module.dependsOn) {
       const known = find(catalog, dependency);
-      if (applied.has(dependency) || entries.has(dependency) || known === undefined) {
-        continue;
+      if (!applied.has(dependency) && !entries.has(dependency) && known !== undefined) {
+        bring(known);
       }
-      entries.set(dependency, { slug: dependency, auto: true });
-      addPrerequisitesOf(known);
+    }
+    for (const capability of module.requires) {
+      const providers = providersOf(catalog, capability);
+      const there = providers.some(({ slug: provider }) => applied.has(provider) || entries.has(provider));
+      const [only] = providers;
+      if (!there && providers.length === 1 && only !== undefined) {
+        bring(only);
+      }
     }
   };
   addPrerequisitesOf(wanted);
@@ -42,14 +86,23 @@ export const removeModule = (catalog: Catalog, basket: Basket, slug: string): Ba
     return basket;
   }
   const remaining = basket.filter((entry) => entry.slug !== slug);
+  const inRemaining = new Set(remaining.map((entry) => entry.slug));
 
   const needed = new Set<string>();
+  const need = (module: string): void => {
+    if (!needed.has(module)) {
+      needed.add(module);
+      visit(module);
+    }
+  };
   const visit = (module: string): void => {
-    for (const dependency of find(catalog, module)?.dependsOn ?? []) {
-      if (!needed.has(dependency)) {
-        needed.add(dependency);
-        visit(dependency);
-      }
+    const known = find(catalog, module);
+    known?.dependsOn.forEach(need);
+    // What brings a capability the module requires: the modules of the basket that provide it.
+    for (const capability of known?.requires ?? []) {
+      providersOf(catalog, capability)
+        .filter((provider) => inRemaining.has(provider.slug))
+        .forEach((provider) => need(provider.slug));
     }
   };
   remaining.filter(({ auto }) => !auto).forEach(({ slug: chosen }) => visit(chosen));
@@ -63,6 +116,40 @@ export const inCatalogOrder = (catalog: Catalog, basket: Basket): Basket => {
   return catalog.modules.flatMap(({ slug }) => entries.get(slug) ?? []);
 };
 
+export interface Need {
+  /** A module, or a capability with the module that brings it (`front: vue-app`) or those that could. */
+  readonly name: string;
+  readonly status: 'applied' | 'in-basket' | 'missing';
+}
+
+/**
+ * What a module needs, each as the project has it, the basket holds it, or neither: the modules it depends on, then the
+ * capabilities it requires. A capability is met by any module that provides it, the one of the project first.
+ */
+export const listNeeds = (
+  catalog: Catalog,
+  applied: ReadonlySet<string>,
+  inBasket: ReadonlySet<string>,
+  module: ModuleInfo,
+): readonly Need[] => {
+  const modules = module.dependsOn.map((slug): Need => ({
+    name: slug,
+    status: applied.has(slug) ? 'applied' : inBasket.has(slug) ? 'in-basket' : 'missing',
+  }));
+  const capabilities = module.requires.map((capability): Need => {
+    const providers = providersOf(catalog, capability).map(({ slug }) => slug);
+    const there = providers.find((slug) => applied.has(slug));
+    const brought = providers.find((slug) => inBasket.has(slug));
+    if (there !== undefined) {
+      return { name: `${capability}: ${there}`, status: 'applied' };
+    }
+    return brought !== undefined
+      ? { name: `${capability}: ${brought}`, status: 'in-basket' }
+      : { name: `${capability}: ${providers.join(' or ')}`, status: 'missing' };
+  });
+  return [...modules, ...capabilities];
+};
+
 /** What a module of the basket needs, that the project does not have and the basket does not bring. */
 export const missingPrerequisites = (
   catalog: Catalog,
@@ -70,10 +157,14 @@ export const missingPrerequisites = (
   basket: Basket,
   slug: string,
 ): readonly string[] => {
+  const module = find(catalog, slug);
+  if (module === undefined) {
+    return [];
+  }
   const inBasket = new Set(basket.map((entry) => entry.slug));
-  return (find(catalog, slug)?.dependsOn ?? []).filter(
-    (dependency) => !applied.has(dependency) && !inBasket.has(dependency),
-  );
+  return listNeeds(catalog, applied, inBasket, module)
+    .filter(({ status }) => status === 'missing')
+    .map(({ name }) => name);
 };
 
 export interface SharedProperty extends PropertyInfo {

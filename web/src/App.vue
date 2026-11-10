@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ApiError, type Api } from './api';
 import {
   addModule,
+  exclusionOf,
   inCatalogOrder,
   missingPrerequisites,
   presetValues,
@@ -117,6 +118,10 @@ const request = computed(() =>
 );
 
 const shown = computed(() => catalog.value?.modules.find(({ slug }) => slug === selected.value));
+/** The module that keeps the module that is looked at out of the project: it brings a capability this one provides. */
+const excludedBy = computed(() =>
+  selected.value === undefined ? undefined : exclusionOf(everything.value, applied.value, basket.value, selected.value),
+);
 /** What putting the module that is looked at in the basket would bring with it. */
 const alsoAdds = computed(() =>
   selected.value === undefined
@@ -331,7 +336,15 @@ onMounted(async () => {
           @add="add"
         />
       </section>
-      <ModuleDetails :module="shown" :applied="applied" :in-basket="inBasket" :also-adds="alsoAdds" @toggle="toggle" />
+      <ModuleDetails
+        :module="shown"
+        :modules="everything.modules"
+        :applied="applied"
+        :in-basket="inBasket"
+        :also-adds="alsoAdds"
+        :excluded-by="excludedBy"
+        @toggle="toggle"
+      />
       <div :class="styles.basketColumn">
         <BasketPanel
           :items="items"

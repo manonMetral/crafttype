@@ -54,6 +54,10 @@ const OUTCOME_LABEL = { ready: 'Ready', conflict: 'Conflict', blocked: 'Blocked'
           <p v-if="step.missing.length > 0" :class="styles.lacks">
             Needs {{ step.missing.join(', ') }}: add it to the basket.
           </p>
+          <p v-for="lacking in step.missingCapabilities" :key="lacking.capability" :class="styles.lacks">
+            Needs a module that provides {{ lacking.capability }} ({{ lacking.providers.join(' or ') }}): add one to the
+            basket.
+          </p>
         </template>
 
         <p v-else-if="step.outcome === 'not-run'" :class="styles.after">

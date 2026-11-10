@@ -42,6 +42,16 @@ describe('CLI', () => {
     expect(output).toContain('vue-app');
   });
 
+  it('says what each module needs and what it provides', () => {
+    const { output } = run('list');
+
+    const line = (slug: string) => output.split('\n').find((candidate) => candidate.startsWith(slug))!;
+    expect(line('vitest')).toMatch(/\(after: typescript\)$/);
+    expect(line('vue-app')).toMatch(/\(after: typescript; provides front\)$/);
+    expect(line('fetch-client')).toMatch(/\(after: vitest; needs front\)$/);
+    expect(line('init')).not.toMatch(/\((after|needs|provides)/);
+  });
+
   it('applies a module in a folder', () => {
     const projectFolder = tmpDirForTest();
 
@@ -60,6 +70,23 @@ describe('CLI', () => {
       [
         'Error: Module vitest requires these modules to be applied first: typescript',
         `Apply them first, for example: crafttype apply typescript --project-folder ${folder}`,
+      ].join('\n'),
+    );
+  });
+
+  it('suggests a module that brings the capability that is missing', () => {
+    const folder = tmpDirForTest();
+    for (const slug of ['init', 'typescript', 'vitest']) {
+      run('apply', slug, '--project-folder', folder);
+    }
+
+    const { code, output } = run('apply', 'fetch-client', '--project-folder', folder);
+
+    expect(code).toBe(1);
+    expect(output).toBe(
+      [
+        'Error: Module fetch-client requires these modules to be applied first: a module that provides front (vue-app)',
+        `Apply them first, for example: crafttype apply vue-app --project-folder ${folder}`,
       ].join('\n'),
     );
   });

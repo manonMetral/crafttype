@@ -59,14 +59,40 @@ export class InvalidPropertyDefinitionError extends CraftTypeError {
   }
 }
 
+/** A capability that no applied module provides, with the modules of the catalog that could. */
+export interface MissingCapability {
+  readonly capability: string;
+  readonly providers: readonly string[];
+}
+
 export class MissingModuleDependenciesError extends CraftTypeError {
   readonly kind = 'missing-module-dependencies' as const;
 
   constructor(
     slug: string,
     readonly missing: readonly string[],
+    readonly missingCapabilities: readonly MissingCapability[] = [],
   ) {
-    super(`Module ${slug} requires these modules to be applied first: ${missing.join(', ')}`);
+    const needs = [
+      ...missing,
+      ...missingCapabilities.map(
+        ({ capability, providers }) => `a module that provides ${capability} (${providers.join(' or ')})`,
+      ),
+    ];
+    super(`Module ${slug} requires these modules to be applied first: ${needs.join(', ')}`);
+  }
+}
+
+/** A project has at most one module for a capability (one front, for instance): another one already brings it. */
+export class CapabilityAlreadyProvidedError extends CraftTypeError {
+  readonly kind = 'capability-already-provided' as const;
+
+  constructor(
+    slug: string,
+    readonly capability: string,
+    readonly provider: string,
+  ) {
+    super(`Module ${slug} cannot be applied: ${capability} is already provided by ${provider}`);
   }
 }
 
@@ -140,6 +166,7 @@ export type DomainError =
   | PropertyAccessError
   | InvalidPropertyDefinitionError
   | MissingModuleDependenciesError
+  | CapabilityAlreadyProvidedError
   | UnknownPackageVersionError
   | DuplicateDestinationError
   | InvalidDestinationError

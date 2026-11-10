@@ -22,6 +22,34 @@ describe('module catalog', () => {
     }
   });
 
+  it('only requires capabilities that a module provides, declared before it', () => {
+    const position = new Map(resources.map(({ slug }, index) => [slug, index]));
+    for (const { slug, requires } of resources) {
+      for (const capability of requires) {
+        const providers = resources.filter(({ provides }) => provides.includes(capability));
+        expect(providers.length, `${slug} requires ${capability}, which nothing provides`).toBeGreaterThan(0);
+        for (const provider of providers) {
+          expect(
+            position.get(provider.slug) as number,
+            `${provider.slug} provides ${capability}, so it must be declared before ${slug}`,
+          ).toBeLessThan(position.get(slug) as number);
+        }
+      }
+    }
+  });
+
+  it('does not ask for a capability and a module that already provides it to be applied together', () => {
+    for (const { slug, dependsOn, provides } of resources) {
+      for (const dependency of dependsOn) {
+        const needed = resources.find((candidate) => candidate.slug === dependency)!;
+        expect(
+          needed.provides.some((capability) => provides.includes(capability)),
+          `${slug} depends on ${dependency}, and both provide the same capability`,
+        ).toBe(false);
+      }
+    }
+  });
+
   it.each(resources.map((resource) => [resource.slug, resource] as const))(
     'module %s builds with the default properties',
     (_slug, resource) => {

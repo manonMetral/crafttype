@@ -27,6 +27,8 @@ describe('API', () => {
         group: 'Init',
         description: 'Initializes the project (package.json, .gitignore, README)',
         dependsOn: [],
+        requires: [],
+        provides: [],
         tags: expect.arrayContaining([expect.any(String)]),
         properties: [
           {
@@ -45,11 +47,30 @@ describe('API', () => {
       expect(modules.find(({ slug }) => slug === 'auth')?.dependsOn).toEqual(['fastify-server', 'vitest']);
     });
 
+    it('gives the capabilities a module requires and provides, apart from the modules it needs', () => {
+      const { modules } = get('/api/modules')?.body as {
+        modules: { slug: string; dependsOn: string[]; requires: string[]; provides: string[] }[];
+      };
+      const module = (slug: string) => modules.find((candidate) => candidate.slug === slug);
+
+      expect(module('vue-app')).toMatchObject({ dependsOn: ['typescript'], requires: [], provides: ['front'] });
+      expect(module('fetch-client')).toMatchObject({ dependsOn: ['vitest'], requires: ['front'], provides: [] });
+    });
+
     it('sends data only: nothing of what makes a module run', () => {
       const { modules } = get('/api/modules')?.body as { modules: { properties: object[] }[] };
 
       for (const module of modules) {
-        expect(Object.keys(module)).toEqual(['slug', 'group', 'description', 'dependsOn', 'tags', 'properties']);
+        expect(Object.keys(module)).toEqual([
+          'slug',
+          'group',
+          'description',
+          'dependsOn',
+          'requires',
+          'provides',
+          'tags',
+          'properties',
+        ]);
         for (const property of module.properties) {
           expect(Object.keys(property)).toEqual(['key', 'type', 'mandatory', 'description']);
         }
@@ -181,7 +202,13 @@ describe('API', () => {
 
       expect((response?.body as { steps: unknown[] }).steps).toEqual([
         expect.objectContaining({ slug: 'init', outcome: 'ready' }),
-        { slug: 'vitest', outcome: 'blocked', error: expect.stringContaining('typescript'), missing: ['typescript'] },
+        {
+          slug: 'vitest',
+          outcome: 'blocked',
+          error: expect.stringContaining('typescript'),
+          missing: ['typescript'],
+          missingCapabilities: [],
+        },
         { slug: 'prettier', outcome: 'not-run', after: 'vitest' },
       ]);
     });
@@ -321,6 +348,7 @@ describe('API', () => {
               outcome: 'blocked',
               error: expect.stringContaining('typescript'),
               missing: ['typescript'],
+              missingCapabilities: [],
             },
             { slug: 'prettier', outcome: 'not-run', after: 'vitest' },
           ],
