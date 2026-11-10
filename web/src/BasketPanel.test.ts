@@ -33,7 +33,7 @@ const flag: SharedProperty = {
 type Props = InstanceType<typeof BasketPanel>['$props'];
 const show = (props: Partial<Props> = {}) =>
   mount(BasketPanel, {
-    props: { items, properties: [], values: {}, policy: 'fail', loading: false, ...props },
+    props: { items, properties: [], values: {}, policy: 'fail', loading: false, busy: false, ...props },
   });
 
 describe('basket', () => {
@@ -198,6 +198,13 @@ describe('basket', () => {
 
       expect(page.get('button.preview').attributes('disabled')).toBeDefined();
       expect(page.get('button.preview').text()).toBe('Previewing…');
+    });
+
+    it('cannot be asked while the basket is being written, and still says Preview', () => {
+      const page = show({ busy: true });
+
+      expect(page.get('button.preview').attributes('disabled')).toBeDefined();
+      expect(page.get('button.preview').text()).toBe('Preview');
     });
   });
 });

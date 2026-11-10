@@ -1,0 +1,48 @@
+.done h2 {
+  margin: 0 0 0.5rem;
+}
+.summary {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+}
+.done ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius);
+}
+.head,
+.report,
+.warning {
+  margin: 0 0 0.25rem;
+}
+.slug {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.warning {
+  color: var(--color-danger);
+}
+.done ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+  list-style: none;
+}
+.decision {
+  display: inline-block;
+  min-width: 5.5rem;
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
+.what {
+  font-family: var(--font-mono);
+}

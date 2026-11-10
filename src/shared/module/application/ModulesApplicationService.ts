@@ -110,6 +110,14 @@ export interface BasketPreview {
   readonly canApply: boolean;
 }
 
+/**
+ * `applied`: every module was written and recorded, `steps` says what each one did. `refused`: the basket cannot apply
+ * (the preview says why) and nothing was written.
+ */
+export type BasketApplication =
+  | { readonly outcome: 'applied'; readonly projectFolder: string; readonly steps: readonly ApplyResult[] }
+  | { readonly outcome: 'refused'; readonly preview: BasketPreview };
+
 /** Orchestration: no business rule here, only the chaining of ports. */
 export class ModulesApplicationService {
   private readonly dependencies: ModulesApplicationServiceDependencies;
@@ -165,6 +173,29 @@ export class ModulesApplicationService {
       );
     }
     return { projectFolder, steps, canApply: steps.every(({ outcome }) => outcome === 'ready') };
+  }
+
+  /**
+   * Applies the basket to the project, module after module, in the order of the preview. The basket is played on a
+   * copy first: if it cannot apply (a conflict, a missing prerequisite, a wrong value), nothing is written, not even
+   * the modules that would have been ready.
+   * A failure of the file system while writing can still leave the project partly written: the modules written before
+   * it stay recorded, the error is not hidden, and applying the rest again completes the project.
+   */
+  applyBasket(request: BasketRequest): BasketApplication {
+    const preview = this.previewBasket(request);
+    if (!preview.canApply) {
+      return { outcome: 'refused', preview };
+    }
+
+    const { projectFolder, modules, properties = {}, onConflict = 'fail' } = request;
+    const steps: ApplyResult[] = [];
+    for (const resource of this.inCatalogOrder(modules)) {
+      steps.push(
+        this.apply(resource.slug, { projectFolder, ...propertiesDeclaredBy(resource, properties) }, { onConflict }),
+      );
+    }
+    return { outcome: 'applied', projectFolder, steps };
   }
 
   /** The module is played for real on the simulation, so that the following ones see what it wrote. */

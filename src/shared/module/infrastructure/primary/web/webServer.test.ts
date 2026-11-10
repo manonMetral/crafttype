@@ -355,7 +355,7 @@ describe('local web server', () => {
     it('When POST is used on a route that does not exist Then it is not found', async () => {
       const { server } = await launch();
 
-      const reply = await send(server.origin, '/api/basket/apply', {
+      const reply = await send(server.origin, '/api/basket/unknown', {
         method: 'POST',
         headers: JSON_HEADERS,
         body: '{}',
@@ -383,6 +383,116 @@ describe('local web server', () => {
 
       expect(reply).toMatchObject({ status: 403, body: { error: 'unexpected Origin header' } });
     });
+  });
+
+  describe('Given a basket to apply', () => {
+    const JSON_HEADERS = { ...AUTHORIZED, 'content-type': 'application/json' };
+    const apply = (origin: string, body: unknown, headers: Record<string, string> = JSON_HEADERS) =>
+      send(origin, '/api/basket/apply', { method: 'POST', headers, body: JSON.stringify(body) });
+
+    it('When it is posted as JSON Then the modules are written, and each one is described', async () => {
+      const { server, projectFolder } = await launch();
+
+      const reply = await apply(server.origin, {
+        modules: ['init', 'typescript'],
+        properties: { projectName: 'shop' },
+      });
+
+      expect(reply.status).toBe(200);
+      expect(reply.body.outcome).toBe('applied');
+      expect(reply.body.steps.map(({ slug }: { slug: string }) => slug)).toEqual(['init', 'typescript']);
+      expect(readdirSync(projectFolder)).toEqual(expect.arrayContaining(['package.json', 'tsconfig.json']));
+    });
+
+    it('When the basket cannot apply Then it is answered like the preview, and nothing is written', async () => {
+      const { server, projectFolder } = await launch();
+
+      const reply = await apply(server.origin, { modules: ['init', 'vitest'] });
+
+      expect(reply.status).toBe(200);
+      expect(reply.body).toMatchObject({ outcome: 'refused', preview: { canApply: false } });
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it('When the token is missing Then nothing is written', async () => {
+      const { server, projectFolder } = await launch();
+
+      const reply = await apply(server.origin, { modules: ['init'] }, { 'content-type': 'application/json' });
+
+      expect(reply.status).toBe(401);
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it('When another site posts it Then it is refused with the right token, and nothing is written', async () => {
+      const { server, projectFolder } = await launch();
+
+      const reply = await apply(
+        server.origin,
+        { modules: ['init'] },
+        { ...JSON_HEADERS, origin: 'https://evil.example' },
+      );
+
+      expect(reply).toMatchObject({ status: 403, body: { error: 'unexpected Origin header' } });
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it('When the page is asked under another host name (DNS rebinding) Then it is refused, and nothing is written', async () => {
+      const { server, projectFolder } = await launch();
+
+      const reply = await send(server.origin, '/api/basket/apply', {
+        method: 'POST',
+        headers: { ...JSON_HEADERS, host: 'evil.example' },
+        body: JSON.stringify({ modules: ['init'] }),
+      });
+
+      expect(reply).toMatchObject({ status: 403, body: { error: 'unexpected Host header' } });
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it('When the content type is not JSON Then it is refused, and nothing is written', async () => {
+      const { server, projectFolder } = await launch();
+
+      const reply = await apply(
+        server.origin,
+        { modules: ['init'] },
+        { ...AUTHORIZED, 'content-type': 'application/x-www-form-urlencoded' },
+      );
+
+      expect(reply.status).toBe(415);
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it('When GET is used on the route Then the method that is allowed is told, and nothing is written', async () => {
+      const { server, projectFolder } = await launch();
+
+      const reply = await send(server.origin, '/api/basket/apply');
+
+      expect(reply).toMatchObject({ status: 405, body: { error: 'method not allowed' } });
+      expect(reply.headers['allow']).toBe('POST');
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it('When a module is unknown Then it is an unprocessable request, and nothing is written', async () => {
+      const { server, projectFolder } = await launch();
+
+      const reply = await apply(server.origin, { modules: ['init', 'nope'] });
+
+      expect(reply).toMatchObject({ status: 422, body: { error: 'Unknown module: nope' } });
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+      'When the system refuses to write Then it says so on one line',
+      async () => {
+        const { server, projectFolder } = await launch();
+        chmodSync(projectFolder, 0o500);
+
+        const reply = await apply(server.origin, { modules: ['init'] });
+
+        expect(reply.status).toBe(422);
+        expect(reply.body.error).toMatch(/permission denied \(EACCES\)$/);
+      },
+    );
   });
 
   describe('Given the page is built', () => {
@@ -436,7 +546,7 @@ describe('local web server', () => {
     it('When the API is asked without the token Then it is still refused', async () => {
       const { server } = await launchWithPage();
 
-      for (const path of ['/api/modules', '/api/project', '/api/unknown', '/api/basket/preview']) {
+      for (const path of ['/api/modules', '/api/project', '/api/unknown', '/api/basket/preview', '/api/basket/apply']) {
         expect((await send(server.origin, path, { headers: NO_HEADERS })).status, path).toBe(401);
       }
     });

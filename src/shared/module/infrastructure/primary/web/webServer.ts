@@ -6,7 +6,7 @@ import { classify } from '../failures.js';
 import { apiRoute, type ApiResponse } from './api.js';
 import { serveStatic } from './staticFiles.js';
 
-/** The interface writes to the disk (soon): it listens on this machine only, never on the network. */
+/** The interface writes to the disk: it listens on this machine only, never on the network. */
 const LOOPBACK = '127.0.0.1';
 /** A basket of modules with their properties is a few hundred bytes: this leaves room, and stops a page that floods. */
 const MAX_BODY_BYTES = 64 * 1024;

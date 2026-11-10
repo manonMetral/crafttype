@@ -1,6 +1,12 @@
 import { isAbsolute } from 'node:path';
-import type { BasketStep, ModulesApplicationService } from '../../../application/ModulesApplicationService.js';
-import { describeDecided, type ConflictPolicy } from '../../../domain/ChangePlan.js';
+import type {
+  ApplyResult,
+  BasketPreview,
+  BasketRequest,
+  BasketStep,
+  ModulesApplicationService,
+} from '../../../application/ModulesApplicationService.js';
+import { describeDecided, type ConflictPolicy, type DecidedChange } from '../../../domain/ChangePlan.js';
 import type { PropertyValue } from '../../../domain/ModuleProperties.js';
 
 export interface ApiResponse {
@@ -41,6 +47,8 @@ export const apiRoute = (
       };
     case '/api/basket/preview':
       return { methods: ['POST'], handle: ({ body }) => preview(service, defaultProjectFolder, body) };
+    case '/api/basket/apply':
+      return { methods: ['POST'], handle: ({ body }) => apply(service, defaultProjectFolder, body) };
     default:
       return undefined;
   }
@@ -85,33 +93,65 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isPropertyValue = (value: unknown): value is PropertyValue =>
   typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
-/** Plays the basket on a copy of the project: nothing is written, whatever the answer. */
-const preview = (service: ModulesApplicationService, defaultProjectFolder: string, body: unknown): ApiResponse => {
+type BasketRead =
+  { readonly ok: true; readonly basket: BasketRequest } | { readonly ok: false; readonly response: ApiResponse };
+
+/** The basket the body describes, or the answer that says what is wrong with it. */
+const readBasket = (defaultProjectFolder: string, body: unknown): BasketRead => {
+  const refuse = (error: string): BasketRead => ({ ok: false, response: badRequest(error) });
   if (!isRecord(body)) {
-    return badRequest('the body must be a JSON object');
+    return refuse('the body must be a JSON object');
   }
   const { modules, properties = {}, onConflict = 'fail', projectFolder = defaultProjectFolder } = body;
   if (!Array.isArray(modules) || modules.length === 0 || !modules.every((slug) => typeof slug === 'string')) {
-    return badRequest('"modules" must be a non-empty list of module names');
+    return refuse('"modules" must be a non-empty list of module names');
   }
   if (!isRecord(properties) || !Object.values(properties).every(isPropertyValue)) {
-    return badRequest('"properties" must be an object of texts, numbers and booleans');
+    return refuse('"properties" must be an object of texts, numbers and booleans');
   }
   if (!POLICIES.includes(onConflict as ConflictPolicy)) {
-    return badRequest('"onConflict" must be "fail", "skip" or "overwrite"');
+    return refuse('"onConflict" must be "fail", "skip" or "overwrite"');
   }
   if (typeof projectFolder !== 'string' || !isAbsolute(projectFolder)) {
-    return badRequest(ABSOLUTE_FOLDER);
+    return refuse(ABSOLUTE_FOLDER);
   }
-
-  const result = service.previewBasket({
-    projectFolder,
-    modules,
-    properties: properties as Record<string, PropertyValue>,
-    onConflict: onConflict as ConflictPolicy,
-  });
-  return { status: 200, body: { ...result, steps: result.steps.map(describeStep) } };
+  return {
+    ok: true,
+    basket: {
+      projectFolder,
+      modules,
+      properties: properties as Record<string, PropertyValue>,
+      onConflict: onConflict as ConflictPolicy,
+    },
+  };
 };
+
+/** Plays the basket on a copy of the project: nothing is written, whatever the answer. */
+const preview = (service: ModulesApplicationService, defaultProjectFolder: string, body: unknown): ApiResponse => {
+  const read = readBasket(defaultProjectFolder, body);
+  return read.ok ? { status: 200, body: describePreview(service.previewBasket(read.basket)) } : read.response;
+};
+
+/**
+ * Writes the basket to the project. A basket that cannot apply is not an error of the request: it is answered like
+ * the preview, with `outcome: "refused"`, and nothing is written.
+ */
+const apply = (service: ModulesApplicationService, defaultProjectFolder: string, body: unknown): ApiResponse => {
+  const read = readBasket(defaultProjectFolder, body);
+  if (!read.ok) {
+    return read.response;
+  }
+  const result = service.applyBasket(read.basket);
+  return {
+    status: 200,
+    body:
+      result.outcome === 'applied'
+        ? { outcome: result.outcome, projectFolder: result.projectFolder, steps: result.steps.map(describeApplied) }
+        : { outcome: result.outcome, preview: describePreview(result.preview) },
+  };
+};
+
+const describePreview = (preview: BasketPreview) => ({ ...preview, steps: preview.steps.map(describeStep) });
 
 /** The decisions, not the content of the files: the page shows what changes, the files can be big. */
 const describeStep = (step: BasketStep) =>
@@ -121,11 +161,21 @@ const describeStep = (step: BasketStep) =>
         outcome: step.outcome,
         report: step.report,
         warnings: step.warnings,
-        changes: step.changes.map((change) => ({
-          kind: change.kind,
-          target: change.target,
-          decision: change.decision,
-          description: describeDecided(change),
-        })),
+        changes: describeChanges(step.changes),
       }
     : step;
+
+const describeApplied = ({ slug, report, warnings, changes }: ApplyResult) => ({
+  slug,
+  report,
+  warnings,
+  changes: describeChanges(changes),
+});
+
+const describeChanges = (changes: readonly DecidedChange[]) =>
+  changes.map((change) => ({
+    kind: change.kind,
+    target: change.target,
+    decision: change.decision,
+    description: describeDecided(change),
+  }));

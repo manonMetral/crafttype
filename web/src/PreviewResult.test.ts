@@ -58,7 +58,8 @@ const preview = (steps: StepInfo[], canApply = false): BasketPreview => ({
   steps,
   canApply,
 });
-const show = (value: BasketPreview) => mount(PreviewResult, { props: { preview: value } });
+const show = (value: BasketPreview, props: { applying?: boolean; label?: string } = {}) =>
+  mount(PreviewResult, { props: { preview: value, ...props } });
 
 describe('result of the preview', () => {
   it('says that the basket would apply when every module is ready', () => {
@@ -213,5 +214,57 @@ describe('result of the preview', () => {
         .get('.step')
         .text(),
     ).toContain('after vitest');
+  });
+  describe('the button that writes the basket', () => {
+    it('is offered at the end, when every module is ready', () => {
+      const page = show(preview([ready], true));
+
+      const button = page.get('button.create');
+      expect(button.text()).toBe('Create the project');
+      expect(button.attributes('type')).toBe('button');
+      expect(button.attributes('disabled')).toBeUndefined();
+      expect(page.get('section').element.lastElementChild).toBe(button.element);
+    });
+
+    it.each([
+      ['a module is in conflict', [ready, conflict]],
+      ['a module is blocked', [ready, blocked, notRun]],
+    ])('is shown but cannot be pressed when %s: the summary above says why', async (_case, steps) => {
+      const page = show(preview(steps));
+
+      const button = page.get('button.create');
+      expect(button.text()).toBe('Create the project');
+      expect(button.attributes('disabled')).toBeDefined();
+      expect(button.attributes('aria-describedby')).toBe(page.get('[role="status"]').attributes('id'));
+      await button.trigger('click');
+      expect(page.emitted('apply')).toBeUndefined();
+    });
+
+    it('says what it does with the label it is given', () => {
+      expect(
+        show(preview([ready], true), { label: 'Add to the project' })
+          .get('button.create')
+          .text(),
+      ).toBe('Add to the project');
+    });
+
+    it('asks to write the basket when it is pressed', async () => {
+      const page = show(preview([ready], true));
+
+      await page.get('button.create').trigger('click');
+
+      expect(page.emitted('apply')).toHaveLength(1);
+    });
+
+    it('waits for the end of the writing, and cannot be pressed twice meanwhile', async () => {
+      const page = show(preview([ready], true), { applying: true });
+
+      const button = page.get('button.create');
+      expect(button.text()).toBe('Creating…');
+      expect(button.attributes('disabled')).toBeDefined();
+      expect(button.attributes('aria-busy')).toBe('true');
+      await button.trigger('click');
+      expect(page.emitted('apply')).toBeUndefined();
+    });
   });
 });

@@ -15,8 +15,17 @@ import BasketPanel from './BasketPanel.vue';
 import { folderForName } from './folder';
 import ModuleDetails from './ModuleDetails.vue';
 import ModuleTree from './ModuleTree.vue';
+import AppliedResult from './AppliedResult.vue';
 import PreviewResult from './PreviewResult.vue';
-import type { BasketPreview, Catalog, ConflictPolicy, ModuleInfo, ProjectState, PropertyValue } from './types';
+import type {
+  ApplyResult,
+  BasketPreview,
+  Catalog,
+  ConflictPolicy,
+  ModuleInfo,
+  ProjectState,
+  PropertyValue,
+} from './types';
 import styles from './App.module.css';
 
 const props = defineProps<{ api: Api | undefined }>();
@@ -55,6 +64,11 @@ const previewing = ref(false);
 const previewProblem = ref<Problem>();
 let latestPreview = 0;
 
+/** What was written when the basket was applied, until a new basket is started. */
+const done = ref<Extract<ApplyResult, { outcome: 'applied' }>>();
+const applying = ref(false);
+const applyProblem = ref<Problem>();
+
 const loading = computed(
   () => problem.value === undefined && (catalog.value === undefined || project.value === undefined),
 );
@@ -70,6 +84,9 @@ const groups = computed(() => {
   }
   return [...byName].map(([name, modules]) => ({ name, modules }));
 });
+
+/** Nothing is applied yet: the project is created. Otherwise it is extended. */
+const createLabel = computed(() => (project.value?.applied.length === 0 ? 'Create the project' : 'Add to the project'));
 
 const everything = computed(() => catalog.value ?? { modules: [] });
 const items = computed(() =>
@@ -111,6 +128,16 @@ watch(
   },
 );
 
+// The result of an application stays until the person starts another basket.
+watch(
+  () => basket.value.length,
+  (length) => {
+    if (length > 0) {
+      done.value = undefined;
+    }
+  },
+);
+
 const toggle = (slug: string): void => {
   basket.value = inBasket.value.has(slug)
     ? removeModule(everything.value, basket.value, slug)
@@ -149,6 +176,8 @@ const runPreview = async (): Promise<void> => {
   const current = ++latestPreview;
   previewing.value = true;
   previewProblem.value = undefined;
+  applyProblem.value = undefined;
+  done.value = undefined;
   try {
     const result = await (props.api as Api).preview(request.value);
     if (current === latestPreview) {
@@ -163,6 +192,35 @@ const runPreview = async (): Promise<void> => {
       previewing.value = false;
     }
   }
+};
+
+/**
+ * Writes the basket that is on screen, which is the one that was previewed: any change forgets the preview, and the
+ * button is only there with it. The project is read again whatever happens, since modules may have been written.
+ */
+const runApply = async (): Promise<void> => {
+  applying.value = true;
+  applyProblem.value = undefined;
+  try {
+    const result = await (props.api as Api).apply(request.value);
+    if (result.outcome === 'applied') {
+      done.value = result;
+      preview.value = undefined;
+    } else {
+      preview.value = result.preview;
+      applyProblem.value = {
+        message: 'Nothing was written: the basket can no longer be applied. See the modules above.',
+      };
+    }
+  } catch (error) {
+    applyProblem.value = {
+      ...describe(error),
+      hint: 'Some modules may already be applied (the tree shows which). Fix the cause, then create again: it completes the project.',
+    };
+  } finally {
+    applying.value = false;
+  }
+  await loadProject();
 };
 
 const loadProject = async (): Promise<void> => {
@@ -190,6 +248,12 @@ const loadProject = async (): Promise<void> => {
   }
 };
 
+/** The person asks for a folder: what was written in the previous one is no longer what is on screen. */
+const loadTyped = async (): Promise<void> => {
+  done.value = undefined;
+  await loadProject();
+};
+
 onBeforeUnmount(() => clearTimeout(reloadTimer));
 
 onMounted(async () => {
@@ -208,7 +272,7 @@ onMounted(async () => {
 <template>
   <header :class="styles.top">
     <h1 :class="styles.title">CraftType</h1>
-    <form v-if="project" :class="styles.folder" @submit.prevent="loadProject">
+    <form v-if="project" :class="styles.folder" @submit.prevent="loadTyped">
       <label for="folder">Project folder</label>
       <input id="folder" v-model="folderInput" name="folder" type="text" autocomplete="off" />
       <button type="submit">Load</button>
@@ -244,6 +308,7 @@ onMounted(async () => {
           :values="values"
           :policy="policy"
           :loading="previewing"
+          :busy="applying"
           @remove="remove"
           @update-value="edit"
           @update-policy="policy = $event"
@@ -253,7 +318,12 @@ onMounted(async () => {
           <strong>Error:</strong> {{ previewProblem.message }}
           <span v-if="previewProblem.hint" :class="styles.hint">{{ previewProblem.hint }}</span>
         </p>
-        <PreviewResult v-if="preview" :preview="preview" />
+        <PreviewResult v-if="preview" :preview="preview" :applying="applying" :label="createLabel" @apply="runApply" />
+        <p v-if="applyProblem" role="alert" :class="styles.alert">
+          <strong>Error:</strong> {{ applyProblem.message }}
+          <span v-if="applyProblem.hint" :class="styles.hint">{{ applyProblem.hint }}</span>
+        </p>
+        <AppliedResult v-if="done" :result="done" />
       </div>
     </div>
   </main>

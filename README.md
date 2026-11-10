@@ -104,12 +104,13 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 
 ## Local interface (in progress)
 
-`crafttype ui` starts a local interface to browse the catalog, build a basket of modules and preview what it would do, and opens it in the browser. Nothing is written to the project yet: applying the basket is the next step.
+`crafttype ui` starts a local interface to browse the catalog, build a basket of modules, preview what it would do, and create the project (or add the basket to it), and opens it in the browser.
 
 - **Tree**: the modules by group (arrows, Home and End move, Enter chooses a module, Space puts it in the basket, left and right close and open a group). Each module says whether the project already has it or the basket holds it, and what it needs, each prerequisite as applied, in the basket or missing.
 - **Basket**: a module is added with what it needs and the project does not have (flagged "Added automatically"); taking a module out also takes out what only it needed. A prerequisite taken out by hand leaves a warning on the module that needs it.
 - **Options**: the properties of the modules of the basket, each asked once (`projectName`, `serverPort`...), filled with what the project proposes, and one choice for conflicts (stop, keep what exists, replace what exists). Changing `projectName` moves the project folder along (its last segment becomes the name, and the project of that folder is loaded once the typing pauses); the preview is made for the folder shown in the field.
 - **Preview**: what each module would do, in the order they depend on, as `crafttype apply --dry-run` says it (created, modified, replaced...), with the conflicts, what blocks a module and what was not run.
+- **Create the project**: once the preview says that every module would apply, a button at the end of the preview writes the basket (it reads "Add to the project" when the project already has modules). It is there but cannot be pressed while the preview reports a conflict or a blocked module: the summary above says why, and the policy for conflicts is under the basket. A folder that already holds files, such as the one of a clone of CraftType, conflicts with `init`: type a project name, which moves the folder along, or load another folder. The preview is forgotten as soon as the basket, an option, the policy or the folder changes, so what is written is always what was previewed. The page then shows what each module did and reads the project again: the tree marks the modules as applied and the basket is empty. If the disk refuses midway, the page says so, the modules written before stay recorded, and creating again completes the project.
 
 ```bash
 npx crafttype ui [--port <number>] [--project-folder <folder>] [--no-open]
@@ -124,10 +125,13 @@ npm run web:install && npm run web:build
 npm run ui
 ```
 
+`npm run ui` serves what is in `web/dist`: after pulling, run `npm run web:install && npm run web:build` again, or the page is the one of the last build. If the build fails with `getCodeIdentity is not a function`, the dependencies of `web/` are not the ones of its lockfile: `npm run web:install` (which runs `npm ci`) fixes it.
+
 Security, since any web page open in your browser can send requests to `127.0.0.1`:
 
 - The page and its files are served without the token (they hold no secret), with a policy (`Content-Security-Policy`) that lets the page load only its own files, no frame, and no `Referer`. The address the browser opens carries the token; the page keeps it for the tab and removes it from the address at once.
 - The API requires the token as `Authorization: Bearer <token>` (use `curl`: a browser address bar cannot send a header, and typing an API address there answers "missing or invalid token"). A request whose `Host` or `Origin` header is not the local server's is refused, so that a web page of another site cannot use it.
+- `POST /api/basket/apply` writes to the folder the request names, so the token is what stands between a web page and your disk: keep the address that carries it to yourself.
 - The files of the page are read from `web/dist` only: a path that leaves it (`..`, an encoded slash, a link pointing outside) is not found.
 
 | Route | Answers |
@@ -135,8 +139,9 @@ Security, since any web page open in your browser can send requests to `127.0.0.
 | `GET /api/modules` | the catalog: for each module, its group, description, prerequisites, tags and properties |
 | `GET /api/project[?folder=<absolute path>]` | the modules applied in the project, and the value each module's properties would take |
 | `POST /api/basket/preview` | what a basket of modules would do, without writing anything (see below) |
+| `POST /api/basket/apply` | writes a basket of modules to the project, after playing it (see below) |
 
-`POST /api/basket/preview` takes a JSON body (`Content-Type: application/json`, 64 KiB at most):
+`POST /api/basket/preview` and `POST /api/basket/apply` take the same JSON body (`Content-Type: application/json`, 64 KiB at most):
 
 ```json
 {
@@ -150,6 +155,8 @@ Security, since any web page open in your browser can send requests to `127.0.0.
 Only `modules` is required. `properties` are shared by the whole basket: each module takes those it declares, and a property that no module of the basket declares is refused. `onConflict` is `fail` (default), `skip` or `overwrite`, for the whole basket, like `--skip-conflicts` and `--force`. `projectFolder` defaults to the folder the interface was launched in.
 
 The modules are played in the order the catalog lists them, which is after the modules they depend on, whatever the order of the request, on a copy of the project that lives in memory: the modules already applied count, and each module sees what the previous ones of the basket wrote. Each step answers `ready` (with the changes it would make, as the CLI's `--dry-run` does), `conflict` (an existing item differs and the policy is `fail`), `blocked` (a prerequisite is neither applied nor in the basket, a value is wrong...) or `not-run`: the first module that cannot be applied stops the basket, as it would when applying. `canApply` is true when every step is `ready`.
+
+`POST /api/basket/apply` plays the basket this way first, and writes it only if `canApply` is true: otherwise nothing is written, not even the modules that were ready, and the answer is `{ "outcome": "refused", "preview": ... }` with the preview above (status 200, since the request itself is fine). When it is written, the answer is `{ "outcome": "applied", "projectFolder": ..., "steps": [...] }`, each step giving the `report`, the `warnings` and the `changes` of a module, as the preview does. The modules are written one after the other, each recorded in the history of the project. A failure of the file system (permission denied, disk full...) answers with its reason and can leave the project partly written: the modules written before it stay recorded, and applying the basket again completes the project. The folder is created if it does not exist.
 
 ## Code organization
 
