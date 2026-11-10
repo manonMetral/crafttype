@@ -4,6 +4,8 @@ import { parseArgs } from 'node:util';
 import type { ModulesApplicationService } from '../../application/ModulesApplicationService.js';
 import { InvalidPropertyError } from '../../domain/errors.js';
 import { isSystemError } from './systemErrors.js';
+import { frontRoot } from './web/frontRoot.js';
+import { openBrowser } from './web/openBrowser.js';
 import { startWebServer } from './web/webServer.js';
 
 export const DEFAULT_PORT = 4242;
@@ -11,18 +13,28 @@ const MAX_PORT = 65_535;
 const TOKEN_BYTES = 24;
 
 export const UI_USAGE = `Usage:
-  crafttype ui [--port <number>] [--project-folder <folder>]
+  crafttype ui [--port <number>] [--project-folder <folder>] [--no-open]
 
-Starts the local interface's API on 127.0.0.1 (this machine only) and keeps it running until you stop it (Ctrl+C).
+Starts the local interface on 127.0.0.1 (this machine only), opens it in the browser, and keeps it running until you
+stop it (Ctrl+C).
   --port <number>           port to listen on (default: ${DEFAULT_PORT}; 0 lets the system choose a free one)
-  --project-folder <folder> project to describe (default: the current folder)`;
+  --project-folder <folder> project to describe (default: the current folder)
+  --no-open                 does not open the browser: the address to open is printed`;
+
+/** What `runUi` uses of the outside; the tests replace them. */
+export interface UiDependencies {
+  readonly start?: typeof startWebServer;
+  /** The folder of the built page, if it is built. */
+  readonly front?: () => string | undefined;
+  readonly open?: (url: string) => void;
+}
 
 /** Primary adapter of the local interface: the server runs as long as the process, so there is no result to wait for. */
 export const runUi = async (
   args: readonly string[],
   service: ModulesApplicationService,
   { out, err }: { readonly out: (line: string) => void; readonly err: (line: string) => void },
-  start: typeof startWebServer = startWebServer,
+  { start = startWebServer, front = frontRoot, open = openBrowser }: UiDependencies = {},
 ): Promise<number> => {
   const { values } = parseArgs({
     args: [...args],
@@ -30,6 +42,7 @@ export const runUi = async (
     options: {
       port: { type: 'string' },
       'project-folder': { type: 'string' },
+      'no-open': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -42,10 +55,12 @@ export const runUi = async (
   const projectFolder = resolve(values['project-folder'] ?? process.cwd());
   const token = randomBytes(TOKEN_BYTES).toString('base64url');
 
+  const webRoot = front();
   const server = await start(service, {
     port,
     token,
     projectFolder,
+    ...(webRoot === undefined ? {} : { webRoot }),
     onError: (error) => err(`Error: the server reported a failure and keeps running: ${error.message}`),
   }).catch((error: unknown) => {
     throw explainPortInUse(error, port);
@@ -53,11 +68,19 @@ export const runUi = async (
 
   out(`CraftType API listening on ${server.origin} (read only, this machine only). Stop it with Ctrl+C.`);
   out(`Project folder: ${projectFolder}`);
+  const page = `${server.origin}/?token=${token}`;
+  if (webRoot !== undefined) {
+    out(`Open: ${page}`);
+  }
   out(`Token: ${token}`);
   out(`Try: curl -H "Authorization: Bearer ${token}" ${server.origin}/api/modules`);
-  out(
-    'There is no page yet: opened in a browser, the address answers "missing or invalid token", since a browser cannot send the token. Use curl for now.',
-  );
+  if (webRoot === undefined) {
+    out(
+      'The page is not built (from a clone: npm run web:build), so only the API answers. Opened in a browser, the address answers "missing or invalid token", since a browser cannot send the token.',
+    );
+  } else if (values['no-open'] !== true) {
+    open(page);
+  }
   return 0;
 };
 

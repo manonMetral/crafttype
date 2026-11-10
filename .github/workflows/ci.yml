@@ -32,6 +32,22 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
 
+  web:
+    name: Page of the local interface
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          # The tooling of the page (vue-tsc, vite) needs a newer Node than CraftType itself, see web/package.json.
+          node-version: 26.13.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - run: npm run typecheck --prefix web
+      - run: npm run test:coverage --prefix web
+      - run: npm run build --prefix web
+
   generate:
     name: Full generated application
     needs: build

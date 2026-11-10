@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { request, Agent, type IncomingHttpHeaders } from 'node:http';
 import { connect } from 'node:net';
 import { networkInterfaces } from 'node:os';
@@ -49,7 +49,7 @@ const send = (
           resolve({
             status: response.statusCode ?? 0,
             headers: response.headers,
-            body: text === '' ? undefined : JSON.parse(text),
+            body: parse(text, String(response.headers['content-type'])),
           }),
         );
       },
@@ -68,6 +68,10 @@ const rawExchange = (port: number, text: string): Promise<string> =>
     socket.on('end', () => resolve(answer));
     socket.on('error', reject);
   });
+
+/** What the server sent: JSON is parsed, a page is left as text. */
+const parse = (text: string, contentType: string): any =>
+  text === '' ? undefined : contentType.includes('json') ? JSON.parse(text) : text;
 
 interface RequestOptions {
   readonly method?: string;
@@ -94,12 +98,14 @@ describe('local web server', () => {
     service: ModulesApplicationService = createModulesApplicationService({ clock }),
     projectFolder = tmpDirForTest(),
     port = 0,
+    webRoot?: string,
   ) => {
     const server = await startWebServer(service, {
       port,
       token: TOKEN,
       projectFolder,
       onError: (error) => reported.push(error),
+      ...(webRoot === undefined ? {} : { webRoot }),
     });
     started.push(server);
     return { server, projectFolder, service };
@@ -376,6 +382,128 @@ describe('local web server', () => {
       );
 
       expect(reply).toMatchObject({ status: 403, body: { error: 'unexpected Origin header' } });
+    });
+  });
+
+  describe('Given the page is built', () => {
+    const NO_HEADERS = {};
+    const built = () => {
+      const base = tmpDirForTest();
+      const root = join(base, 'dist');
+      mkdirSync(join(root, 'assets'), { recursive: true });
+      writeFileSync(join(root, 'index.html'), '<!doctype html><title>CraftType</title>');
+      writeFileSync(join(root, 'assets', 'app.js'), 'console.log("app")');
+      writeFileSync(join(base, 'secret.txt'), 'secret');
+      return root;
+    };
+    const launchWithPage = async () => {
+      const root = built();
+      return { ...(await launch(undefined, undefined, 0, root)), root };
+    };
+
+    it('When the page is asked without any token Then it is served: it holds no secret', async () => {
+      const { server } = await launchWithPage();
+
+      const reply = await send(server.origin, '/', { headers: NO_HEADERS });
+
+      expect(reply.status).toBe(200);
+      expect(reply.body).toContain('<title>CraftType</title>');
+      expect(reply.headers['content-type']).toBe('text/html; charset=utf-8');
+    });
+
+    it('When the address carries the token Then the page is served all the same, and kept from sharing the address', async () => {
+      const { server } = await launchWithPage();
+
+      const reply = await send(server.origin, `/?token=${TOKEN}`, { headers: NO_HEADERS });
+
+      expect(reply.status).toBe(200);
+      expect(reply.headers['referrer-policy']).toBe('no-referrer');
+      expect(reply.headers['content-security-policy']).toContain("default-src 'none'");
+      expect(reply.headers['cache-control']).toBe('no-store');
+      expect(reply.headers['x-content-type-options']).toBe('nosniff');
+    });
+
+    it('When a file of the page is asked Then it is served with its type', async () => {
+      const { server } = await launchWithPage();
+
+      const reply = await send(server.origin, '/assets/app.js', { headers: NO_HEADERS });
+
+      expect(reply.status).toBe(200);
+      expect(reply.body).toBe('console.log("app")');
+      expect(reply.headers['content-type']).toBe('text/javascript; charset=utf-8');
+    });
+
+    it('When the API is asked without the token Then it is still refused', async () => {
+      const { server } = await launchWithPage();
+
+      for (const path of ['/api/modules', '/api/project', '/api/unknown', '/api/basket/preview']) {
+        expect((await send(server.origin, path, { headers: NO_HEADERS })).status, path).toBe(401);
+      }
+    });
+
+    it('When the page is asked under another host name (DNS rebinding) Then it is refused', async () => {
+      const { server } = await launchWithPage();
+
+      const reply = await send(server.origin, '/', { headers: { host: 'evil.example' } });
+
+      expect(reply).toMatchObject({ status: 403, body: { error: 'unexpected Host header' } });
+    });
+
+    it('When a file does not exist Then it is not found, whatever the caller', async () => {
+      const { server } = await launchWithPage();
+
+      expect(await send(server.origin, '/missing.js', { headers: NO_HEADERS })).toMatchObject({
+        status: 404,
+        body: { error: 'not found' },
+      });
+    });
+
+    it.each(['/..%2Fsecret.txt', '/%2e%2e%2fsecret.txt', '/assets/..%2f..%2fsecret.txt', '/..%5Csecret.txt', '/%00'])(
+      'When the path tries to leave the site (%s) Then nothing is served',
+      async (path) => {
+        const { server } = await launchWithPage();
+
+        const reply = await send(server.origin, path, { headers: NO_HEADERS });
+
+        expect(reply.status).toBe(404);
+        expect(JSON.stringify(reply.body)).not.toContain('secret');
+      },
+    );
+
+    it('When something other than a read is asked on the site Then the token is needed, and there is nothing to write', async () => {
+      const { server } = await launchWithPage();
+      const json = { ...AUTHORIZED, 'content-type': 'application/json' };
+
+      expect((await send(server.origin, '/', { method: 'POST', headers: NO_HEADERS, body: '{}' })).status).toBe(401);
+      expect((await send(server.origin, '/', { method: 'POST', headers: json, body: '{}' })).status).toBe(404);
+    });
+
+    it('When the address is not a path of this server Then it is a bad request, as for the API', async () => {
+      const { server } = await launchWithPage();
+
+      const reply = await send(server.origin, '//evil.example/index.html', { headers: NO_HEADERS });
+
+      expect(reply).toMatchObject({ status: 400, body: { error: 'invalid request target' } });
+    });
+
+    it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+      'When the system refuses to read a file Then it says so, as it does for the project',
+      async () => {
+        const { server, root } = await launchWithPage();
+        chmodSync(join(root, 'assets', 'app.js'), 0o000);
+
+        const reply = await send(server.origin, '/assets/app.js', { headers: NO_HEADERS });
+
+        expect(reply.status).toBe(422);
+        expect(reply.body.error).toMatch(/^cannot access .*app\.js: permission denied \(EACCES\)$/);
+      },
+    );
+
+    it('When no page is built Then nothing changes: the root needs the token like the rest', async () => {
+      const { server } = await launch();
+
+      expect((await send(server.origin, '/', { headers: NO_HEADERS })).status).toBe(401);
+      expect((await send(server.origin, '/')).status).toBe(404);
     });
   });
 

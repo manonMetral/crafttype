@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import type { ModulesApplicationService } from '../../../application/ModulesApplicationService.js';
 import { classify } from '../failures.js';
 import { apiRoute, type ApiResponse } from './api.js';
+import { serveStatic } from './staticFiles.js';
 
 /** The interface writes to the disk (soon): it listens on this machine only, never on the network. */
 const LOOPBACK = '127.0.0.1';
@@ -19,6 +20,8 @@ export interface WebServerOptions {
   readonly token: string;
   /** Folder described when the request names none. */
   readonly projectFolder: string;
+  /** Folder of the built page: served without the token, which the page itself needs. Without it, there is no page. */
+  readonly webRoot?: string;
   /** Failures of the server once it runs (the system refuses a connection...): reported, they do not stop it. */
   readonly onError: (error: Error) => void;
 }
@@ -39,12 +42,12 @@ export interface WebServer {
  */
 export const startWebServer = (
   service: ModulesApplicationService,
-  { port, token, projectFolder, onError }: WebServerOptions,
+  { port, token, projectFolder, webRoot, onError }: WebServerOptions,
 ): Promise<WebServer> =>
   new Promise((resolve, reject) => {
     const server = createServer((request, response) => {
       // `answer` always settles with a response: whatever fails inside is turned into one.
-      void answer(request, service, token, projectFolder).then(({ status, body, headers }) =>
+      void answer(request, { service, token, projectFolder, webRoot }).then(({ status, body, headers }) =>
         send(response, status, body, headers),
       );
     });
@@ -66,11 +69,16 @@ export const startWebServer = (
     });
   });
 
+interface Context {
+  readonly service: ModulesApplicationService;
+  readonly token: string;
+  readonly projectFolder: string;
+  readonly webRoot: string | undefined;
+}
+
 const answer = async (
   request: IncomingMessage,
-  service: ModulesApplicationService,
-  token: string,
-  projectFolder: string,
+  { service, token, projectFolder, webRoot }: Context,
 ): Promise<ApiResponse> => {
   const { host, origin, authorization } = request.headers;
   if (host === undefined || !LOCAL_HOST.test(host)) {
@@ -79,13 +87,24 @@ const answer = async (
   if (origin !== undefined && origin !== `http://${host}`) {
     return refusal(403, 'unexpected Origin header');
   }
-  if (!hasToken(authorization, token)) {
-    return refusal(401, 'missing or invalid token', TOKEN_HINT);
-  }
+
   // `request.url` is always set for a request received by a server.
   const target = parseTarget(request.url as string, host);
   if (target === undefined) {
     return refusal(400, 'invalid request target');
+  }
+
+  // The page is read without the token: it holds no secret, and it is what reads the token from the address.
+  if (webRoot !== undefined && request.method === 'GET' && !target.pathname.startsWith('/api/')) {
+    try {
+      return serveStatic(webRoot, target.pathname) ?? refusal(404, 'not found');
+    } catch (error) {
+      return failure(error);
+    }
+  }
+
+  if (!hasToken(authorization, token)) {
+    return refusal(401, 'missing or invalid token', TOKEN_HINT);
   }
 
   const route = apiRoute(service, projectFolder, target.pathname);
@@ -201,5 +220,5 @@ const send = (
     'X-Content-Type-Options': 'nosniff',
     ...headers,
   });
-  response.end(JSON.stringify(body));
+  response.end(Buffer.isBuffer(body) ? body : JSON.stringify(body));
 };
