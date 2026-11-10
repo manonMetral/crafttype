@@ -897,35 +897,43 @@ describe('ModulesApplicationService', () => {
       expect(() => service.projectState(projectFolder)).toThrow(InvalidProjectFileError);
     });
 
-    it('proposes no value for a module whose mandatory property has no default', () => {
+    it('proposes no value for a mandatory property without default, and the values of the other properties', () => {
       const withMandatory = custom(
         'with-mandatory',
-        ModulePropertiesDefinition.create([
-          ...ModulePropertiesDefinition.builder().build().properties,
-          { key: 'owner', type: 'string', mandatory: true, description: 'Owner' },
-        ]),
+        ModulePropertiesDefinition.builder()
+          .addString('owner', { description: 'Owner', mandatory: true })
+          .addString('flavor', { description: 'Flavor', defaultValue: 'vanilla' })
+          .build(),
       );
-      const service = createModulesApplicationService({ clock, extraResources: [withMandatory] });
+      const onlyMandatory = custom(
+        'only-mandatory',
+        ModulePropertiesDefinition.builder().addString('owner', { description: 'Owner', mandatory: true }).build(),
+      );
+      const service = createModulesApplicationService({ clock, extraResources: [withMandatory, onlyMandatory] });
 
       const { presets } = service.projectState(tmpDirForTest());
 
-      expect(presets['with-mandatory']).toEqual({});
+      expect(presets['with-mandatory']).toEqual({ flavor: 'vanilla' });
+      expect(presets['only-mandatory']).toEqual({});
       expect(presets['init']).toEqual({ projectName: expect.any(String) });
     });
 
-    it('proposes no value for a module whose recorded value is no longer valid', () => {
+    it('proposes no value for a recorded value that is no longer valid, and the values of the other properties', () => {
       const service = createModulesApplicationService({ clock });
       const projectFolder = tmpDirForTest();
       mkdirSync(join(projectFolder, '.crafttype/modules'), { recursive: true });
       writeFileSync(
         join(projectFolder, '.crafttype/modules/history.json'),
-        JSON.stringify({ modules: [project('fastify-server', { serverPort: 70000 })] }),
+        JSON.stringify({
+          modules: [project('init', { projectName: 'shop' }), project('fastify-server', { serverPort: 70000 })],
+        }),
       );
 
       const { presets } = service.projectState(projectFolder);
 
       expect(presets['fastify-server']).toEqual({});
-      expect(presets['init']).toEqual({ projectName: expect.any(String) });
+      expect(presets['vue-app']).toEqual({ projectName: 'shop' });
+      expect(presets['init']).toEqual({ projectName: 'shop' });
     });
 
     it('does not hide an unexpected error raised while computing the default values', () => {

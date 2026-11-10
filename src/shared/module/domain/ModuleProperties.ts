@@ -128,6 +128,26 @@ export class ModulePropertiesDefinition {
     return moduleProperties(projectFolder, values);
   }
 
+  /**
+   * The value each property would take without an explicit value: the one already set in the project (`known`),
+   * else the default value. A property that cannot be resolved (mandatory without a value, or a value that is
+   * invalid) is left out, so that the others keep theirs and the caller can ask for the missing or wrong one.
+   * Without a project folder there is nothing to propose.
+   */
+  presets(projectFolder: string, known: KnownProperties = {}): KnownProperties {
+    if (projectFolder.trim() === '') {
+      return frozenRecord({});
+    }
+    return frozenRecord(
+      Object.fromEntries(
+        this.custom.flatMap((definition) => {
+          const value = presetValue(definition, known[definition.key], projectFolder);
+          return value === undefined ? [] : [[definition.key, value]];
+        }),
+      ),
+    );
+  }
+
   /** The properties this module declares, to record in the project history. */
   portable(properties: ModuleProperties): KnownProperties {
     const declared = new Set<string>(this.custom.map(({ key }) => key));
@@ -234,6 +254,22 @@ const resolveValue = (
     throw new InvalidPropertyError(key, reason);
   }
   return value;
+};
+
+/** `undefined` when the property has no value or cannot take the one it was given; other errors are not hidden. */
+const presetValue = (
+  definition: PropertyDefinition,
+  candidate: PropertyValue | undefined,
+  projectFolder: string,
+): PropertyValue | undefined => {
+  try {
+    return resolveValue(definition, candidate, projectFolder);
+  } catch (error) {
+    if (error instanceof MissingPropertyError || error instanceof InvalidPropertyError) {
+      return undefined;
+    }
+    throw error;
+  }
 };
 
 const DECIMAL = /^-?\d+(?:\.\d+)?$/;
