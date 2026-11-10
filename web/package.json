@@ -22,9 +22,12 @@
     "@vitest/coverage-v8": "5.1.0",
     "@vue/test-utils": "2.5.1",
     "happy-dom": "21.0.4",
-    "typescript": "7.0.2",
+    "typescript": "npm:typescript-native-bridge@6.0.3-bridge.19.tsgo.7.0.2",
     "vite": "8.3.7",
     "vitest": "5.1.0",
     "vue-tsc": "3.3.14"
+  },
+  "overrides": {
+    "typescript": "$typescript"
   }
 }

@@ -55,7 +55,7 @@ npm --prefix web run dev   # rebuilds web/dist at each change; reload the page
 npm run ui -- --no-open    # then open the address it prints
 ```
 
-`web/` uses TypeScript 6 while the rest of the repository uses 7: `vue-tsc` does not work with TypeScript 7 yet (the same limit as in the projects CraftType generates). The Prettier of the repository formats `web/` too (`npm run format`). The GitHub CI has a job for the page.
+`web/` type-checks with `vue-tsc` on [`typescript-native-bridge`](https://github.com/johnsoncodehk/typescript-native-bridge), while the rest of the repository uses TypeScript 7: `vue-tsc` needs the classic TypeScript API, which `typescript@7` does not provide (the same limit as in the projects CraftType generates). The bridge is a `typescript` replacement that runs the checker on tsgo, the engine of TypeScript 7. In `web/package.json`, `typescript` is an npm alias pinned to an exact bridge version (the version names the TypeScript API it keeps and the tsgo version behind it), and `overrides` makes `vue-tsc` resolve the same package. Go back to a plain `typescript` once `vue-tsc` supports TypeScript 7 itself (planned with the content mappers of TypeScript 7.1). The Prettier of the repository formats `web/` too (`npm run format`). The GitHub CI has a job for the page.
 
 ## Node compatibility policy
 
