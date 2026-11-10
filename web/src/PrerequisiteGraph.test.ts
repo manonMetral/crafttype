@@ -9,9 +9,16 @@ const mod = (slug: string, ...dependsOn: string[]): ModuleInfo => ({
   group: 'Group',
   description: `Adds ${slug}`,
   dependsOn,
+  requires: [],
+  provides: [],
   tags: [],
   properties: [],
 });
+const modWith = (
+  slug: string,
+  dependsOn: string[],
+  { requires = [], provides = [] }: { requires?: string[]; provides?: string[] },
+): ModuleInfo => ({ ...mod(slug, ...dependsOn), requires, provides });
 
 const modules: readonly ModuleInfo[] = [
   mod('init'),
@@ -331,6 +338,74 @@ describe('graph of the prerequisites', () => {
       const page = show({ applied: new Set(['init']), selected: 'docker' });
 
       expect(page.findAll('[aria-current]')).toHaveLength(0);
+    });
+  });
+
+  describe('capabilities', () => {
+    const fronts: readonly ModuleInfo[] = [
+      mod('init'),
+      mod('typescript', 'init'),
+      mod('vitest', 'typescript'),
+      modWith('vue-app', ['typescript'], { provides: ['front'] }),
+      modWith('react-app', ['typescript'], { provides: ['front'] }),
+      mod('pinia', 'vue-app'),
+      modWith('fetch-client', ['vitest'], { requires: ['front'] }),
+    ];
+    const shown = (page: ReturnType<typeof show>) => page.findAll('button.node').map((b) => b.attributes('data-slug'));
+    const links = (page: ReturnType<typeof show>) =>
+      page.findAll('path.edge').map((edge) => `${edge.attributes('data-from')}>${edge.attributes('data-to')}`);
+    const description = (page: ReturnType<typeof show>, slug: string) =>
+      page.get(`#${node(page, slug).attributes('aria-describedby')}`).text();
+
+    it('shows every module that provides a capability side by side, while none is chosen', () => {
+      const page = show({ modules: fronts, applied: new Set(['init', 'typescript']) });
+
+      expect(shown(page)).toEqual(expect.arrayContaining(['vue-app', 'react-app']));
+      expect(shown(page)).not.toContain('fetch-client');
+    });
+
+    it('shows only the module that provides it once one is in the basket or in the project', () => {
+      const inBasket = show({
+        modules: fronts,
+        applied: new Set(['init', 'typescript']),
+        inBasket: new Set(['vue-app']),
+      });
+      const applied = show({ modules: fronts, applied: new Set(['init', 'typescript', 'react-app']) });
+
+      expect(shown(inBasket)).toContain('vue-app');
+      expect(shown(inBasket)).not.toContain('react-app');
+      expect(shown(applied)).toContain('react-app');
+      expect(shown(applied)).not.toContain('vue-app');
+    });
+
+    it('shows the module that requires a capability once a module provides it and what it needs is there', () => {
+      const page = show({ modules: fronts, applied: new Set(['init', 'typescript', 'vitest', 'vue-app']) });
+
+      expect(shown(page)).toContain('fetch-client');
+      expect(links(page)).toEqual(expect.arrayContaining(['vitest>fetch-client', 'vue-app>fetch-client']));
+    });
+
+    it('links the module that requires a capability to each module that provides it, when both are shown', () => {
+      const page = show({ modules: fronts, applied: new Set(fronts.map(({ slug }) => slug)) });
+
+      expect(links(page)).toEqual(expect.arrayContaining(['vue-app>fetch-client', 'react-app>fetch-client']));
+    });
+
+    it('tells a screen reader what a module needs, with the capabilities, and what needs it', () => {
+      const page = show({ modules: fronts, applied: new Set(fronts.map(({ slug }) => slug)) });
+
+      expect(description(page, 'fetch-client')).toBe('Needs vitest, front (vue-app or react-app). Needed by nothing.');
+      expect(description(page, 'vue-app')).toBe('Needs typescript. Needed by pinia, fetch-client.');
+      expect(description(page, 'react-app')).toBe('Needs typescript. Needed by fetch-client.');
+    });
+
+    it('does not draw the module that is kept out when another one is chosen', async () => {
+      const page = show({ modules: fronts, applied: new Set(['init', 'typescript']), selected: 'vue-app' });
+
+      await page.setProps({ inBasket: new Set(['vue-app']) });
+
+      expect(shown(page)).not.toContain('react-app');
+      expect(page.get('.waiting').text()).toContain('more');
     });
   });
 

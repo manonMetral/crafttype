@@ -1,25 +1,24 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { listNeeds, type Exclusion } from './basket';
 import type { ModuleInfo } from './types';
 import styles from './ModuleDetails.module.css';
 
 const props = defineProps<{
   module: ModuleInfo | undefined;
+  /** The whole catalog, to know which modules bring a capability this one requires. */
+  modules: readonly ModuleInfo[];
   applied: ReadonlySet<string>;
   inBasket: ReadonlySet<string>;
   /** What putting this module in the basket would bring with it: the prerequisites the project does not have. */
   alsoAdds: readonly string[];
+  /** The module that brings a capability this one provides already: this one cannot be added. */
+  excludedBy: Exclusion | undefined;
 }>();
 defineEmits<{ toggle: [slug: string] }>();
 
 const STATUS_LABEL = { applied: 'applied', 'in-basket': 'in basket', missing: 'missing' } as const;
 
-const needs = computed(() =>
-  (props.module?.dependsOn ?? []).map((slug) => {
-    const status = props.applied.has(slug) ? 'applied' : props.inBasket.has(slug) ? 'in-basket' : 'missing';
-    return { slug, status, label: STATUS_LABEL[status] };
-  }),
-);
+const needsOf = (module: ModuleInfo) => listNeeds({ modules: props.modules }, props.applied, props.inBasket, module);
 </script>
 
 <template>
@@ -36,10 +35,10 @@ const needs = computed(() =>
       </p>
 
       <h3>Prerequisites</h3>
-      <p v-if="needs.length === 0">Needs nothing.</p>
+      <p v-if="needsOf(module).length === 0">Needs nothing.</p>
       <ul v-else>
-        <li v-for="need in needs" :key="need.slug" :class="styles.need" :data-status="need.status">
-          <code>{{ need.slug }}</code> ({{ need.label }})
+        <li v-for="need in needsOf(module)" :key="need.name" :class="styles.need" :data-status="need.status">
+          <code>{{ need.name }}</code> ({{ STATUS_LABEL[need.status] }})
         </li>
       </ul>
 
@@ -55,6 +54,9 @@ const needs = computed(() =>
       </ul>
 
       <p v-if="applied.has(module.slug)" :class="styles.applied">This module is already applied in the project.</p>
+      <p v-else-if="excludedBy" :class="styles.excluded">
+        Cannot be added: {{ excludedBy.capability }} is already provided by {{ excludedBy.by }}.
+      </p>
       <template v-else>
         <p v-if="alsoAdds.length > 0 && !inBasket.has(module.slug)" :class="styles.also">
           It also adds what it needs and the project does not have: {{ alsoAdds.join(', ') }}.

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
+import { listNeeds } from './basket';
 import type { ModuleInfo } from './types';
 import styles from './ModuleTree.module.css';
 
@@ -18,6 +19,9 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [slug: string]; toggle: [slug: string] }>();
 
 const STATUS_LABEL = { applied: 'applied', 'in-basket': 'in basket', missing: 'missing' } as const;
+
+/** Every module, for the capabilities: what a module requires is brought by any module that provides it. */
+const catalog = computed(() => ({ modules: props.groups.flatMap(({ modules }) => modules) }));
 
 const collapsed = ref(new Set<string>());
 const focusKey = ref('');
@@ -39,11 +43,7 @@ const stop = computed(() => (visible.value.includes(focusKey.value) ? focusKey.v
 const groupOf = (key: string): string | undefined =>
   props.groups.find(({ modules }) => modules.some(({ slug }) => moduleKey(slug) === key))?.name;
 
-const needs = (module: ModuleInfo) =>
-  module.dependsOn.map((slug) => {
-    const status = props.applied.has(slug) ? 'applied' : props.inBasket.has(slug) ? 'in-basket' : 'missing';
-    return { slug, status, label: STATUS_LABEL[status] };
-  });
+const needs = (module: ModuleInfo) => listNeeds(catalog.value, props.applied, props.inBasket, module);
 
 const toggleGroup = (name: string): void => {
   const next = new Set(collapsed.value);
@@ -150,10 +150,10 @@ const onKey = (event: KeyboardEvent, from: string): void => {
           <span v-if="applied.has(module.slug)" :class="[styles.state, styles.stateApplied]">Applied</span>
           <span v-else-if="inBasket.has(module.slug)" :class="[styles.state, styles.stateBasket]">In basket</span>
           <span :class="styles.moduleDescription">{{ module.description }}</span>
-          <span v-if="module.dependsOn.length > 0" :class="styles.needs">
+          <span v-if="needs(module).length > 0" :class="styles.needs">
             Needs:
-            <span v-for="need in needs(module)" :key="need.slug" :class="styles.need" :data-status="need.status">
-              {{ need.slug }} ({{ need.label }})
+            <span v-for="need in needs(module)" :key="need.name" :class="styles.need" :data-status="need.status">
+              {{ need.name }} ({{ STATUS_LABEL[need.status] }})
             </span>
           </span>
         </li>

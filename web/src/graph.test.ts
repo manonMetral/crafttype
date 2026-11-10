@@ -13,7 +13,12 @@ import {
   type GraphModule,
 } from './graph';
 
-const mod = (slug: string, ...dependsOn: string[]): GraphModule => ({ slug, dependsOn });
+const mod = (slug: string, ...dependsOn: string[]): GraphModule => ({ slug, dependsOn, requires: [], provides: [] });
+const modWith = (
+  slug: string,
+  dependsOn: string[],
+  { requires = [], provides = [] }: { requires?: string[]; provides?: string[] },
+): GraphModule => ({ slug, dependsOn, requires, provides });
 
 /** The shape of the catalog: a module needs some of the modules before it, and some of those need each other. */
 const catalog: readonly GraphModule[] = [
@@ -267,6 +272,75 @@ describe('layout of the available modules only', () => {
       width: 2 * PADDING,
       height: full.height,
       levels: 0,
+    });
+  });
+});
+
+describe('capabilities', () => {
+  /** Two modules bring a front; `fetch-client` needs one (and `vitest`), `pinia` needs `vue-app` itself. */
+  const fronts: readonly GraphModule[] = [
+    mod('init'),
+    mod('typescript', 'init'),
+    mod('vitest', 'typescript'),
+    modWith('vue-app', ['typescript'], { provides: ['front'] }),
+    modWith('react-app', ['typescript'], { provides: ['front'] }),
+    mod('pinia', 'vue-app'),
+    modWith('fetch-client', ['vitest'], { requires: ['front'] }),
+  ];
+
+  it('puts a module that requires a capability after every module that could provide it', () => {
+    expect(levels(fronts)).toMatchObject({ 'vue-app': 2, 'react-app': 2, vitest: 2, 'fetch-client': 3 });
+  });
+
+  it('links a module that requires a capability to each module that provides it, besides the modules it needs', () => {
+    const needs = directPrerequisites(fronts).get('fetch-client');
+
+    expect([...(needs ?? [])].sort()).toEqual(['react-app', 'vitest', 'vue-app']);
+  });
+
+  it('has no link for a capability that no module provides, nor from a module to itself', () => {
+    expect(edgesOf([modWith('a', [], { requires: ['nothing'] })])).toEqual([]);
+    expect(edgesOf([modWith('a', [], { requires: ['x'], provides: ['x'] })])).toEqual([]);
+  });
+
+  it('gives, as the prerequisites of a module, the modules that could provide a capability it requires', () => {
+    const { prerequisites } = relationsOf(fronts, 'fetch-client');
+
+    expect([...prerequisites].sort()).toEqual(['init', 'react-app', 'typescript', 'vitest', 'vue-app']);
+  });
+
+  it('gives, as the dependents of a module that provides a capability, the modules that require it', () => {
+    const { dependents } = relationsOf(fronts, 'vue-app');
+
+    expect([...dependents].sort()).toEqual(['fetch-client', 'pinia']);
+  });
+
+  describe('available modules', () => {
+    const available = (active: string[]) => [...availableModules(fronts, new Set(active))].sort();
+
+    it('offer every provider of a capability once what they need is there', () => {
+      expect(available(['init', 'typescript'])).toEqual(['init', 'react-app', 'typescript', 'vitest', 'vue-app']);
+    });
+
+    it('wait for a module that provides a capability they require, and for the modules they need', () => {
+      expect(available(['init', 'typescript', 'vitest'])).not.toContain('fetch-client');
+      expect(available(['init', 'typescript', 'vue-app'])).not.toContain('fetch-client');
+      expect(available(['init', 'typescript', 'vitest', 'react-app'])).toContain('fetch-client');
+    });
+
+    it('leave out the other providers of a capability once one is active: there is one per project', () => {
+      expect(available(['init', 'typescript', 'vue-app'])).not.toContain('react-app');
+      expect(available(['init', 'typescript', 'react-app'])).not.toContain('vue-app');
+    });
+
+    it('keep a provider that is active, even when another is too', () => {
+      expect(available(['init', 'typescript', 'vue-app', 'react-app'])).toEqual(
+        expect.arrayContaining(['vue-app', 'react-app']),
+      );
+    });
+
+    it('do not wait for a capability that no module provides', () => {
+      expect([...availableModules([modWith('a', [], { requires: ['nothing'] })], new Set())]).toEqual(['a']);
     });
   });
 });
