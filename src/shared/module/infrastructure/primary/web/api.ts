@@ -57,11 +57,13 @@ export const apiRoute = (
 const ABSOLUTE_FOLDER = 'the folder must be an absolute path';
 
 const catalog = (service: ModulesApplicationService) => ({
-  modules: service.list().map(({ slug, apiDoc, dependsOn, tags, propertiesDefinition }) => ({
+  modules: service.list().map(({ slug, apiDoc, dependsOn, requires, provides, tags, propertiesDefinition }) => ({
     slug,
     group: apiDoc.group,
     description: apiDoc.operation,
     dependsOn,
+    requires,
+    provides,
     tags,
     properties: propertiesDefinition.custom.map(({ key, type, mandatory, description }) => ({
       key,

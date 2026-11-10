@@ -13,6 +13,7 @@ export const createVueAppModuleResource = (versions: NodePackagesVersionsReader)
     .propertiesDefinition(ModulePropertiesDefinition.builder().addProjectName().addServerPort().build())
     .apiDoc('Frontend', 'Adds a Vue.js application with Vite')
     .dependsOn('typescript')
+    .provides('front')
     .tags('webapp')
     .factory((properties) => modules.buildModule(properties));
 };
