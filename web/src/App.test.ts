@@ -118,7 +118,7 @@ describe('page of the local interface', () => {
       await open();
 
       expect(page!.get<HTMLInputElement>('input[name="folder"]').element.value).toBe('/work/shop');
-      const groups = page!.findAll('[aria-level="1"]').map((group) => group.get('.group-name').text());
+      const groups = page!.findAll('[aria-level="1"]').map((group) => group.get('.groupName').text());
       expect(groups).toEqual(['Init', 'TypeScript', 'Tests', 'Quality', 'Server']);
     });
 
@@ -327,7 +327,7 @@ describe('page of the local interface', () => {
 
       await preview();
 
-      const alert = page!.get('.basket-column [role="alert"]').text();
+      const alert = page!.get('.basketColumn [role="alert"]').text();
       expect(alert).toContain('Unknown module: nope');
       expect(alert).toContain('check the catalog');
       expect(page!.find('.result').exists()).toBe(false);
@@ -341,10 +341,10 @@ describe('page of the local interface', () => {
       await addFromDetails('init');
 
       await preview();
-      expect(page!.get('.basket-column [role="alert"]').text()).toContain('Failed to fetch');
+      expect(page!.get('.basketColumn [role="alert"]').text()).toContain('Failed to fetch');
 
       await preview();
-      expect(page!.find('.basket-column [role="alert"]').exists()).toBe(false);
+      expect(page!.find('.basketColumn [role="alert"]').exists()).toBe(false);
       expect(page!.find('.result').exists()).toBe(true);
     });
 
