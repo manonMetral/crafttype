@@ -23,6 +23,7 @@ describe('AuthFactory', () => {
         'src/server/auth/jwt.ts',
         'src/server/auth/jwt.test.ts',
         'src/server/auth/authentication.ts',
+        'src/server/auth/authentication.test.ts',
         'src/server/auth/authRoutes.ts',
         'src/server/auth/authRoutes.test.ts',
       )

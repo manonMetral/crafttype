@@ -1,0 +1,80 @@
+.result h2 {
+  margin: 0 0 0.5rem;
+}
+.summary {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  color: var(--color-danger);
+}
+.summary.ok {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+}
+.result ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+}
+.step[data-outcome='ready'] {
+  border-left-color: var(--color-primary);
+}
+.step[data-outcome='conflict'],
+.step[data-outcome='blocked'] {
+  border-left-color: var(--color-danger);
+}
+.head,
+.report,
+.hint,
+.warning,
+.error,
+.lacks,
+.after {
+  margin: 0 0 0.25rem;
+}
+.slug {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.outcome {
+  margin-left: 0.5rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 0.8125rem;
+}
+.hint,
+.after {
+  color: var(--color-muted);
+}
+.warning,
+.error {
+  color: var(--color-danger);
+}
+.result ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+  list-style: none;
+}
+.decision {
+  display: inline-block;
+  min-width: 5.5rem;
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
+.change[data-decision='conflict'] .decision {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+.what {
+  font-family: var(--font-mono);
+}

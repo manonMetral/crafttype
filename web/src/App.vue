@@ -17,6 +17,7 @@ import ModuleDetails from './ModuleDetails.vue';
 import ModuleTree from './ModuleTree.vue';
 import PreviewResult from './PreviewResult.vue';
 import type { BasketPreview, Catalog, ConflictPolicy, ModuleInfo, ProjectState, PropertyValue } from './types';
+import styles from './App.module.css';
 
 const props = defineProps<{ api: Api | undefined }>();
 
@@ -201,26 +202,26 @@ onMounted(async () => {
 </script>
 
 <template>
-  <header class="top">
-    <h1>CraftType</h1>
-    <form v-if="project" class="folder" @submit.prevent="loadProject">
+  <header :class="styles.top">
+    <h1 :class="styles.title">CraftType</h1>
+    <form v-if="project" :class="styles.folder" @submit.prevent="loadProject">
       <label for="folder">Project folder</label>
       <input id="folder" v-model="folderInput" name="folder" type="text" autocomplete="off" />
       <button type="submit">Load</button>
     </form>
-    <p v-if="folderProblem" role="alert" class="alert">
+    <p v-if="folderProblem" role="alert" :class="styles.alert">
       <strong>Error:</strong> {{ folderProblem.message }}
-      <span v-if="folderProblem.hint" class="hint">{{ folderProblem.hint }}</span>
+      <span v-if="folderProblem.hint" :class="styles.hint">{{ folderProblem.hint }}</span>
     </p>
   </header>
-  <main>
-    <p v-if="problem" role="alert" class="alert">
+  <main :class="styles.main">
+    <p v-if="problem" role="alert" :class="styles.alert">
       <strong>Error:</strong> {{ problem.message }}
-      <span v-if="problem.hint" class="hint">{{ problem.hint }}</span>
+      <span v-if="problem.hint" :class="styles.hint">{{ problem.hint }}</span>
     </p>
     <p v-else-if="loading" role="status">Loading…</p>
-    <div v-else class="layout">
-      <section class="tree-column" aria-label="Catalog">
+    <div v-else :class="styles.layout">
+      <section :class="styles.treeColumn" aria-label="Catalog">
         <h2>Modules</h2>
         <ModuleTree
           :groups="groups"
@@ -232,7 +233,7 @@ onMounted(async () => {
         />
       </section>
       <ModuleDetails :module="shown" :applied="applied" :in-basket="inBasket" :also-adds="alsoAdds" @toggle="toggle" />
-      <div class="basket-column">
+      <div :class="styles.basketColumn">
         <BasketPanel
           :items="items"
           :properties="properties"
@@ -244,79 +245,12 @@ onMounted(async () => {
           @update-policy="policy = $event"
           @preview="runPreview"
         />
-        <p v-if="previewProblem" role="alert" class="alert">
+        <p v-if="previewProblem" role="alert" :class="styles.alert">
           <strong>Error:</strong> {{ previewProblem.message }}
-          <span v-if="previewProblem.hint" class="hint">{{ previewProblem.hint }}</span>
+          <span v-if="previewProblem.hint" :class="styles.hint">{{ previewProblem.hint }}</span>
         </p>
         <PreviewResult v-if="preview" :preview="preview" />
       </div>
     </div>
   </main>
 </template>
-
-<style scoped>
-.top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 1rem;
-  padding: 0.75rem 1.5rem;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-h1 {
-  margin: 0;
-  font-size: 1.25rem;
-  color: var(--color-primary);
-}
-.folder {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-}
-.folder input {
-  flex: 1;
-  min-width: 12rem;
-  padding: 0.375rem 0.5rem;
-  border: 1px solid var(--color-muted);
-  border-radius: var(--radius);
-  font: inherit;
-  font-family: var(--font-mono);
-}
-.folder button {
-  padding: 0.375rem 0.75rem;
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius);
-  background: var(--color-bg);
-  color: var(--color-primary);
-  font: inherit;
-  cursor: pointer;
-}
-main {
-  padding: 1.5rem;
-}
-.layout {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-  gap: 1.5rem;
-  align-items: start;
-}
-.tree-column h2 {
-  margin: 0 0 0.5rem;
-}
-.basket-column {
-  display: grid;
-  gap: 1rem;
-}
-.alert {
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius);
-  color: var(--color-danger);
-}
-.hint {
-  display: block;
-  color: var(--color-muted);
-}
-</style>

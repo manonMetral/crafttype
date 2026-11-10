@@ -1,0 +1,64 @@
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}
+.folder {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+.folder input {
+  flex: 1;
+  min-width: 12rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--color-muted);
+  border-radius: var(--radius);
+  font: inherit;
+  font-family: var(--font-mono);
+}
+.folder button {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.main {
+  padding: 1.5rem;
+}
+.layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+.treeColumn h2 {
+  margin: 0 0 0.5rem;
+}
+.basketColumn {
+  display: grid;
+  gap: 1rem;
+}
+.alert {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  color: var(--color-danger);
+}
+.hint {
+  display: block;
+  color: var(--color-muted);
+}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
 import type { ModuleInfo } from './types';
+import styles from './ModuleTree.module.css';
 
 interface Group {
   readonly name: string;
@@ -119,7 +120,7 @@ const onKey = (event: KeyboardEvent, from: string): void => {
 </script>
 
 <template>
-  <ul ref="tree" role="tree" aria-label="Modules" class="tree">
+  <ul ref="tree" role="tree" aria-label="Modules" :class="styles.tree">
     <li
       v-for="group in groups"
       :key="group.name"
@@ -128,10 +129,10 @@ const onKey = (event: KeyboardEvent, from: string): void => {
       :aria-expanded="!collapsed.has(group.name)"
       :tabindex="stop === groupKey(group.name) ? 0 : -1"
       :data-key="groupKey(group.name)"
-      class="group"
+      :class="styles.group"
       @keydown.self="onKey($event, groupKey(group.name))"
     >
-      <span class="group-name" @click="toggleGroup(group.name)">{{ group.name }}</span>
+      <span :class="styles.groupName" @click="toggleGroup(group.name)">{{ group.name }}</span>
       <ul v-if="!collapsed.has(group.name)" role="group">
         <li
           v-for="module in group.modules"
@@ -141,18 +142,17 @@ const onKey = (event: KeyboardEvent, from: string): void => {
           :aria-selected="selected === module.slug"
           :tabindex="stop === moduleKey(module.slug) ? 0 : -1"
           :data-key="moduleKey(module.slug)"
-          class="module"
-          :class="{ selected: selected === module.slug }"
+          :class="[styles.module, selected === module.slug && styles.selected]"
           @click.stop="choose(module.slug)"
           @keydown.stop="onKey($event, moduleKey(module.slug))"
         >
-          <span class="module-name">{{ module.slug }}</span>
-          <span v-if="applied.has(module.slug)" class="state state-applied">Applied</span>
-          <span v-else-if="inBasket.has(module.slug)" class="state state-basket">In basket</span>
-          <span class="module-description">{{ module.description }}</span>
-          <span v-if="module.dependsOn.length > 0" class="needs">
+          <span :class="styles.moduleName">{{ module.slug }}</span>
+          <span v-if="applied.has(module.slug)" :class="[styles.state, styles.stateApplied]">Applied</span>
+          <span v-else-if="inBasket.has(module.slug)" :class="[styles.state, styles.stateBasket]">In basket</span>
+          <span :class="styles.moduleDescription">{{ module.description }}</span>
+          <span v-if="module.dependsOn.length > 0" :class="styles.needs">
             Needs:
-            <span v-for="need in needs(module)" :key="need.slug" class="need" :data-status="need.status">
+            <span v-for="need in needs(module)" :key="need.slug" :class="styles.need" :data-status="need.status">
               {{ need.slug }} ({{ need.label }})
             </span>
           </span>
@@ -161,79 +161,3 @@ const onKey = (event: KeyboardEvent, from: string): void => {
     </li>
   </ul>
 </template>
-
-<style scoped>
-.tree,
-.tree ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.group {
-  margin-bottom: 0.5rem;
-}
-.group-name {
-  display: block;
-  padding: 0.25rem 0.5rem;
-  font-weight: 600;
-  color: var(--color-muted);
-  cursor: pointer;
-}
-.group-name::before {
-  content: '▾ ';
-}
-.group[aria-expanded='false'] > .group-name::before {
-  content: '▸ ';
-}
-.module {
-  display: block;
-  margin: 0.125rem 0 0.125rem 0.75rem;
-  padding: 0.375rem 0.5rem;
-  border-left: 3px solid transparent;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.module:hover {
-  background: var(--color-surface);
-}
-.module.selected {
-  border-left-color: var(--color-primary);
-  background: var(--color-primary-soft);
-}
-.module-name {
-  font-family: var(--font-mono);
-  font-weight: 600;
-}
-.module-description {
-  display: block;
-  color: var(--color-muted);
-}
-.state {
-  margin-left: 0.5rem;
-  padding: 0 0.5rem;
-  border-radius: 999px;
-  font-size: 0.8125rem;
-}
-.state-applied {
-  background: var(--color-surface);
-  color: var(--color-muted);
-  border: 1px solid var(--color-border);
-}
-.state-basket {
-  background: var(--color-primary-soft);
-  color: var(--color-primary-strong);
-  border: 1px solid var(--color-primary);
-}
-.needs {
-  display: block;
-  font-size: 0.8125rem;
-  color: var(--color-muted);
-}
-.need {
-  margin-right: 0.5rem;
-  font-family: var(--font-mono);
-}
-.need[data-status='missing'] {
-  text-decoration: underline dashed;
-}
-</style>

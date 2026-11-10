@@ -168,3 +168,32 @@ describe('ChangePlan', () => {
     });
   });
 });
+
+describe('ChangePlan immutability', () => {
+  it('is not affected by a later change to the array it was built from', () => {
+    const source = [created];
+    const plan = new ChangePlan(source, keepingNothing);
+
+    source.push(unchanged);
+
+    expect(plan.changes).toEqual([created]);
+  });
+
+  it('exposes changes that cannot be modified', () => {
+    const plan = new ChangePlan([created], keepingNothing);
+
+    expect(() => (plan.changes as PlannedChange[]).push(unchanged)).toThrow(TypeError);
+  });
+
+  it('leaves the plan and the planned changes unchanged when it decides or resolves', () => {
+    const planned = [created, fileConflict];
+    const snapshot = structuredClone(planned);
+    const plan = new ChangePlan(planned, keepingNothing);
+
+    plan.decide('overwrite');
+    plan.resolve('overwrite');
+
+    expect(planned).toEqual(snapshot);
+    expect(plan.changes).toEqual(snapshot);
+  });
+});

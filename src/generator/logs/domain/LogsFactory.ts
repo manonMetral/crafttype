@@ -7,7 +7,8 @@ const SERVER = 'src/server';
 export class LogsFactory {
   /**
    * Configures the logger and the request id of `buildApp` through the `app-imports`,
-   * `app-server-options` and `app-plugins` needles of fastify-server.
+   * `app-server-options-parts` and `app-plugins` needles of fastify-server. The options are composed from parts, never
+   * modified once built.
    */
   buildModule(properties: ModuleProperties): CraftModule {
     return moduleBuilder(properties)
@@ -20,13 +21,8 @@ export class LogsFactory {
       )
       .insertAtNeedle(
         `${SERVER}/app.ts`,
-        'app-server-options',
-        [
-          'if (options.logger !== false) {',
-          '  serverOptions.logger = loggerOptions();',
-          '}',
-          'serverOptions.genReqId = genReqId;',
-        ].join('\n'),
+        'app-server-options-parts',
+        ['options.logger === false ? {} : { logger: loggerOptions() },', '{ genReqId },'].join('\n'),
       )
       .insertAtNeedle(`${SERVER}/app.ts`, 'app-plugins', 'echoRequestId(app);')
       .build();

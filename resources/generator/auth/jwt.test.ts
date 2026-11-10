@@ -14,6 +14,20 @@ describe('createJwtService', () => {
     });
   });
 
+  it('refuses to sign a token that verify would reject', () => {
+    const jwt = createJwtService('secret');
+
+    expect(() => jwt.sign({ sub: 'alice', role: '' })).toThrow(
+      'Invalid JWT role: expected a non-empty string',
+    );
+    expect(() => jwt.sign({ sub: 'alice', role: '   ' })).toThrow(
+      'Invalid JWT role: expected a non-empty string',
+    );
+    expect(() => jwt.sign({ sub: ' ' })).toThrow(
+      'Invalid JWT subject: expected a non-empty string',
+    );
+  });
+
   it('rejects an expired token', () => {
     let now = 10_000;
     const jwt = createJwtService('secret', 1, () => now);

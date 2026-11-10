@@ -1,12 +1,26 @@
 import { buildApp } from './app.js';
 // crafttype-needle-main-imports
 
-const settings = {
+interface Settings {
+  readonly port: number;
+  readonly host: string;
+}
+
+const defaults: Settings = {
   port: {{serverPort}},
   host: '127.0.0.1',
 };
 
+// Each step completes the settings it receives and returns new ones: none of them modifies its input.
+const settingsSteps: readonly ((settings: Settings) => Settings)[] = [
+  // crafttype-needle-main-settings-steps
+];
+
 try {
+  const settings = settingsSteps.reduce(
+    (current, step) => step(current),
+    defaults,
+  );
   // crafttype-needle-main-settings
   const app = buildApp();
   await app.listen(settings);

@@ -149,11 +149,13 @@ Needles placed by the catalog today:
 | `src/webapp/main.ts` | `main-plugins` | `app.use(...)` before `app.mount` |
 | `src/webapp/App.vue` | `app-template` | content of the application's `<main>` (`<RouterView />`...) |
 | `src/server/app.ts` | `app-imports` | imports of `buildApp` |
-| `src/server/app.ts` | `app-server-options` | completes `serverOptions` before `Fastify(serverOptions)` (logger, request id generation...) |
+| `src/server/app.ts` | `app-server-options-parts` | an element of the `serverOptionsParts` array: a `FastifyServerOptions` object (logger, request id generation...). The parts are merged in order, a later one wins, and nothing mutates the result |
+| `src/server/app.ts` | `app-server-options` | statements after the options are merged, before `Fastify(serverOptions)` |
 | `src/server/app.ts` | `app-plugins` | hooks and plugins, right after the application is created |
 | `src/server/app.ts` | `app-routes` | route plugins (after `app-plugins`, so plugins like OpenAPI can observe them) |
 | `src/server/main.ts` | `main-imports` | entry point imports |
-| `src/server/main.ts` | `main-settings` | start of the startup `try`: code that adjusts `settings` (port, address) or prepares the server. Its errors are printed as a message, without a stack trace |
+| `src/server/main.ts` | `main-settings-steps` | an element of the `settingsSteps` array: a function `(settings) => settings` that completes the settings (port, address) and returns new ones, without modifying its input. The steps run in order inside the startup `try` |
+| `src/server/main.ts` | `main-settings` | statements run once `settings` is computed, to prepare the server. Their errors, like those of the steps, are printed as a message, without a stack trace |
 
 Needles are comments that stay in the generated code. The engine does not parse the code (no AST): it suits additions at places planned in advance, not the rewriting of arbitrary code.
 

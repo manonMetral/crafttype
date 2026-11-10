@@ -2,7 +2,15 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import type { FastifyInstance } from 'fastify';
 
-const LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'];
+const LEVELS: readonly string[] = [
+  'fatal',
+  'error',
+  'warn',
+  'info',
+  'debug',
+  'trace',
+  'silent',
+];
 const REQUEST_ID_HEADER = 'x-request-id';
 // A client-supplied id ends up in the logs: it is only reused when short and free of unusual characters.
 const VALID_REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/;

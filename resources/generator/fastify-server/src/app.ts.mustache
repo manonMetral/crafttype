@@ -4,10 +4,18 @@ import Fastify, {
 } from 'fastify';
 // crafttype-needle-app-imports
 
-export function buildApp(options: { logger?: boolean } = {}): FastifyInstance {
-  const serverOptions: FastifyServerOptions = {
-    logger: options.logger ?? true,
-  };
+export function buildApp(
+  options: { readonly logger?: boolean } = {},
+): FastifyInstance {
+  // The server options are merged from parts, in order (a later part wins): none is modified once built.
+  const serverOptionsParts: readonly FastifyServerOptions[] = [
+    { logger: options.logger ?? true },
+    // crafttype-needle-app-server-options-parts
+  ];
+  const serverOptions = serverOptionsParts.reduce<FastifyServerOptions>(
+    (merged, part) => ({ ...merged, ...part }),
+    {},
+  );
   // crafttype-needle-app-server-options
   const app = Fastify(serverOptions);
   // crafttype-needle-app-plugins

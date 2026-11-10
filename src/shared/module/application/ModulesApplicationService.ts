@@ -19,6 +19,7 @@ import type { KnownProperties, ModuleProperties, PropertyValue, RawProperties } 
 import type { ModuleResource, ModuleSlug } from '../domain/ModuleResource.js';
 import type { CraftModule } from '../domain/CraftModule.js';
 import { normalizeDestinations } from '../domain/destinations.js';
+import { frozenCopy } from '../domain/frozen.js';
 import type {
   AppliedModule,
   ModulesHistory,
@@ -111,7 +112,11 @@ export interface BasketPreview {
 
 /** Orchestration: no business rule here, only the chaining of ports. */
 export class ModulesApplicationService {
-  constructor(private readonly dependencies: ModulesApplicationServiceDependencies) {}
+  private readonly dependencies: ModulesApplicationServiceDependencies;
+
+  constructor(dependencies: ModulesApplicationServiceDependencies) {
+    this.dependencies = { ...dependencies, resources: frozenCopy(dependencies.resources) };
+  }
 
   list(): readonly ModuleResource[] {
     return this.dependencies.resources;
