@@ -104,7 +104,12 @@ A module applied with `--skip-conflicts` is recorded in the history with the pro
 
 ## Local interface (in progress)
 
-`crafttype ui` starts a local interface to browse the catalog and the state of a project, and opens it in the browser. The page is a first skeleton (it lists the modules by group): the tree, the basket and the forms come next. Nothing is written to the project yet.
+`crafttype ui` starts a local interface to browse the catalog, build a basket of modules and preview what it would do, and opens it in the browser. Nothing is written to the project yet: applying the basket is the next step.
+
+- **Tree**: the modules by group (arrows, Home and End move, Enter chooses a module, Space puts it in the basket, left and right close and open a group). Each module says whether the project already has it or the basket holds it, and what it needs, each prerequisite as applied, in the basket or missing.
+- **Basket**: a module is added with what it needs and the project does not have (flagged "Added automatically"); taking a module out also takes out what only it needed. A prerequisite taken out by hand leaves a warning on the module that needs it.
+- **Options**: the properties of the modules of the basket, each asked once (`projectName`, `serverPort`...), filled with what the project proposes, and one choice for conflicts (stop, keep what exists, replace what exists). Changing `projectName` moves the project folder along (its last segment becomes the name, and the project of that folder is loaded once the typing pauses); the preview is made for the folder shown in the field.
+- **Preview**: what each module would do, in the order they depend on, as `crafttype apply --dry-run` says it (created, modified, replaced...), with the conflicts, what blocks a module and what was not run.
 
 ```bash
 npx crafttype ui [--port <number>] [--project-folder <folder>] [--no-open]
