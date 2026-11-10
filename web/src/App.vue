@@ -15,8 +15,10 @@ import BasketPanel from './BasketPanel.vue';
 import { folderForName } from './folder';
 import ModuleDetails from './ModuleDetails.vue';
 import ModuleTree from './ModuleTree.vue';
+import ViewSwitch from './ViewSwitch.vue';
 import AppliedResult from './AppliedResult.vue';
 import PreviewResult from './PreviewResult.vue';
+import PrerequisiteGraph from './PrerequisiteGraph.vue';
 import type {
   ApplyResult,
   BasketPreview,
@@ -25,6 +27,7 @@ import type {
   ModuleInfo,
   ProjectState,
   PropertyValue,
+  View,
 } from './types';
 import styles from './App.module.css';
 
@@ -34,9 +37,14 @@ interface Problem {
   message: string;
   hint?: string | undefined;
 }
+/** A route the server does not know: it was started before an update, and is older than the page that asks. */
+const NOT_KNOWN = 404;
+const OLDER_SERVER =
+  'The server does not know this request: it is older than this page. Stop it, update or build CraftType, and start crafttype ui again.';
+
 const describe = (error: unknown): Problem =>
   error instanceof ApiError
-    ? { message: error.message, hint: error.hint }
+    ? { message: error.message, hint: error.status === NOT_KNOWN ? OLDER_SERVER : error.hint }
     : { message: error instanceof Error ? error.message : String(error) };
 
 const catalog = ref<Catalog>();
@@ -55,6 +63,8 @@ const folderProblem = ref<Problem>();
 
 const basket = ref<Basket>([]);
 const selected = ref<string>();
+/** The prerequisites first: they show what the project can have, and what the basket would unlock. */
+const view = ref<View>('prerequisites');
 /** What was typed in the options: a value that was cleared stays cleared, it is not filled in again. */
 const edited = ref<Record<string, PropertyValue | undefined>>({});
 const policy = ref<ConflictPolicy>('fail');
@@ -138,10 +148,16 @@ watch(
   },
 );
 
+const add = (slug: string): void => {
+  basket.value = addModule(everything.value, applied.value, basket.value, slug);
+};
+
 const toggle = (slug: string): void => {
-  basket.value = inBasket.value.has(slug)
-    ? removeModule(everything.value, basket.value, slug)
-    : addModule(everything.value, applied.value, basket.value, slug);
+  if (inBasket.value.has(slug)) {
+    basket.value = removeModule(everything.value, basket.value, slug);
+  } else {
+    add(slug);
+  }
 };
 
 const remove = (slug: string): void => {
@@ -213,10 +229,14 @@ const runApply = async (): Promise<void> => {
       };
     }
   } catch (error) {
-    applyProblem.value = {
-      ...describe(error),
-      hint: 'Some modules may already be applied (the tree shows which). Fix the cause, then create again: it completes the project.',
-    };
+    // A request the server does not know has written nothing; any other failure may have come after some modules.
+    applyProblem.value =
+      error instanceof ApiError && error.status === NOT_KNOWN
+        ? { ...describe(error), hint: `${OLDER_SERVER} Nothing was written.` }
+        : {
+            ...describe(error),
+            hint: 'Some modules may already be applied (the tree shows which). Fix the cause, then create again: it completes the project.',
+          };
   } finally {
     applying.value = false;
   }
@@ -288,16 +308,27 @@ onMounted(async () => {
       <span v-if="problem.hint" :class="styles.hint">{{ problem.hint }}</span>
     </p>
     <p v-else-if="loading" role="status">Loading…</p>
-    <div v-else :class="styles.layout">
+    <div v-else :class="[styles.layout, view === 'prerequisites' && styles.layoutGraph]">
       <section :class="styles.treeColumn" aria-label="Catalog">
         <h2>Modules</h2>
+        <ViewSwitch v-model:view="view" />
         <ModuleTree
+          v-if="view === 'groups'"
           :groups="groups"
           :applied="applied"
           :in-basket="inBasket"
           :selected="selected"
           @select="selected = $event"
           @toggle="toggle"
+        />
+        <PrerequisiteGraph
+          v-else
+          :modules="everything.modules"
+          :applied="applied"
+          :in-basket="inBasket"
+          :selected="selected"
+          @select="selected = $event"
+          @add="add"
         />
       </section>
       <ModuleDetails :module="shown" :applied="applied" :in-basket="inBasket" :also-adds="alsoAdds" @toggle="toggle" />

@@ -2,7 +2,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type Api } from './api';
 import App from './App.vue';
-import type { ApplyResult, BasketPreview, Catalog, ModuleInfo, PreviewRequest, ProjectState } from './types';
+import type { ApplyResult, BasketPreview, Catalog, ModuleInfo, PreviewRequest, ProjectState, View } from './types';
 
 const mod = (
   slug: string,
@@ -75,9 +75,17 @@ describe('page of the local interface', () => {
   let page: VueWrapper | undefined;
   afterEach(() => page?.unmount());
 
-  const open = async (api: Api = apiOf()) => {
+  /**
+   * The page opens on the prerequisites. Most of the tests are about the tree by category (the basket, the options, the
+   * folder...), so they start there: `view` says which one a test starts from.
+   */
+  const open = async (api: Api = apiOf(), view: View = 'groups') => {
     page = mount(App, { attachTo: document.body, props: { api } });
     await flushPromises();
+    // A page that could not start has no choice of view.
+    if (view === 'groups' && page.find('.switch button').exists()) {
+      await page.get('.switch button').trigger('click');
+    }
     return page;
   };
   const node = (key: string) => page!.get(`[data-key="${key}"]`);
@@ -158,6 +166,140 @@ describe('page of the local interface', () => {
 
       expect(page!.get('.details h2').text()).toBe('vitest');
       expect(page!.get('.details').text()).toContain('Adds vitest');
+    });
+  });
+
+  describe('Given the two views of the modules', () => {
+    /** From the tree by category. */
+    const showPrerequisites = async () => {
+      await page!.findAll('.switch button')[1]!.trigger('click');
+    };
+    const graphNode = (slug: string) => page!.get(`.graph [data-slug="${slug}"]`);
+
+    it('shows the prerequisites first, with the choice of the other view', async () => {
+      await open(apiOf(), 'prerequisites');
+
+      expect(page!.find('.graph').exists()).toBe(true);
+      expect(page!.find('[role="tree"]').exists()).toBe(false);
+      expect(page!.findAll('.switch button').map((button) => button.attributes('aria-pressed'))).toEqual([
+        'false',
+        'true',
+      ]);
+      expect(page!.get('.layout').classes()).toContain('layoutGraph');
+    });
+
+    it('shows the modules by category in place of the columns, and back', async () => {
+      await open(apiOf(), 'prerequisites');
+      expect(page!.findAll('.graph button.node').map((button) => button.attributes('data-slug'))).toEqual(['init']);
+
+      await page!.findAll('.switch button')[0]!.trigger('click');
+      expect(page!.find('[role="tree"]').exists()).toBe(true);
+      expect(page!.find('.graph').exists()).toBe(false);
+      expect(page!.get('.layout').classes()).not.toContain('layoutGraph');
+
+      await showPrerequisites();
+      expect(page!.find('.graph').exists()).toBe(true);
+      expect(page!.find('[role="tree"]').exists()).toBe(false);
+    });
+
+    it('adds the module that is pressed to the basket, and shows its details', async () => {
+      await open(
+        apiOf({ project: vi.fn(async () => ({ ...project, applied: [{ slug: 'init', appliedAt: 'x' }] })) }),
+        'prerequisites',
+      );
+
+      await graphNode('typescript').trigger('click');
+
+      expect(basketItems()).toEqual(['typescript']);
+      expect(graphNode('typescript').attributes('data-state')).toBe('in-basket');
+      expect(page!.get('.details').text()).toContain('typescript');
+      expect(page!.get('.details button').text()).toBe('Remove from basket');
+      expect(graphNode('typescript').attributes('aria-current')).toBe('true');
+      expect(graphNode('init').attributes('data-relation')).toBe('prerequisite');
+    });
+
+    it('does not add a module the project has, but shows its details', async () => {
+      await open(
+        apiOf({ project: vi.fn(async () => ({ ...project, applied: [{ slug: 'init', appliedAt: 'x' }] })) }),
+        'prerequisites',
+      );
+
+      await graphNode('init').trigger('click');
+
+      expect(basketItems()).toEqual([]);
+      expect(page!.get('.details').text()).toContain('This module is already applied');
+    });
+
+    it('keeps a module the basket holds when it is pressed again: it is taken out with its Remove button', async () => {
+      await open(apiOf(), 'prerequisites');
+
+      await graphNode('init').trigger('click');
+      await graphNode('init').trigger('click');
+
+      expect(basketItems()).toEqual(['init']);
+      await page!.get('.details button').trigger('click');
+      expect(basketItems()).toEqual([]);
+    });
+
+    it('keeps the module that was chosen in the tree when the view changes, and back', async () => {
+      await open();
+      await node('module:init').trigger('click');
+
+      await showPrerequisites();
+      expect(graphNode('init').attributes('aria-current')).toBe('true');
+
+      await graphNode('init').trigger('click');
+      await graphNode('typescript').trigger('click');
+      await page!.findAll('.switch button')[0]!.trigger('click');
+      expect(node('module:typescript').attributes('aria-selected')).toBe('true');
+    });
+
+    it('shows a module once what it needs is in the basket, and hides it again when that goes', async () => {
+      await open(apiOf(), 'prerequisites');
+      const shown = () => page!.findAll('.graph button.node').map((button) => button.attributes('data-slug'));
+      expect(shown()).toEqual(['init']);
+
+      await graphNode('init').trigger('click');
+      expect(shown()).toEqual(['init', 'typescript', 'prettier']);
+
+      await graphNode('typescript').trigger('click');
+      expect(shown()).toEqual(['init', 'typescript', 'prettier', 'vitest']);
+
+      await page!.get('.basket .item .remove').trigger('click');
+      expect(basketItems()).toEqual(['typescript']);
+      expect(shown()).toEqual(['init', 'typescript', 'vitest']);
+    });
+
+    it('says how many modules wait for what they need', async () => {
+      await open(apiOf(), 'prerequisites');
+
+      expect(page!.get('.waiting').text()).toBe(
+        '4 more modules appear once what they need is applied or in the basket.',
+      );
+    });
+
+    it('shows what the project has and what the basket holds, and follows the basket', async () => {
+      await open(
+        apiOf({ project: vi.fn(async () => ({ ...project, applied: [{ slug: 'init', appliedAt: 'x' }] })) }),
+        'prerequisites',
+      );
+      expect(graphNode('init').attributes('data-state')).toBe('applied');
+      expect(graphNode('typescript').attributes('data-state')).toBe('available');
+
+      await graphNode('typescript').trigger('click');
+
+      expect(graphNode('typescript').attributes('data-state')).toBe('in-basket');
+    });
+
+    it('keeps the basket, the options and the preview when the view changes', async () => {
+      await open();
+      await addFromDetails('init');
+      await preview();
+
+      await showPrerequisites();
+
+      expect(basketItems()).toEqual(['init']);
+      expect(page!.find('.result').exists()).toBe(true);
     });
   });
 
@@ -551,6 +693,41 @@ describe('page of the local interface', () => {
       expect(alert).toContain('permission denied (EACCES)');
       expect(alert).toContain('may already be applied');
       expect(page!.find('.done').exists()).toBe(false);
+    });
+
+    it('says that the server is older than the page when it does not know the request, and that nothing was written', async () => {
+      const api = writable({
+        apply: vi.fn(async () => {
+          throw new ApiError('not found', 404, undefined);
+        }),
+      });
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+
+      await create();
+
+      const alert = page!.get('.basketColumn [role="alert"]').text();
+      expect(alert).toContain('not found');
+      expect(alert).toContain('older than this page');
+      expect(alert).toContain('start crafttype ui again');
+      expect(alert).toContain('Nothing was written');
+      expect(alert).not.toContain('may already be applied');
+    });
+
+    it('says the same for a preview the server does not know', async () => {
+      await open(
+        apiOf({
+          preview: vi.fn(async () => {
+            throw new ApiError('not found', 404, undefined);
+          }),
+        }),
+      );
+      await addFromDetails('init');
+
+      await preview();
+
+      expect(page!.get('.basketColumn [role="alert"]').text()).toContain('older than this page');
     });
 
     it('reads the project again after a failure, since the modules written before it are applied', async () => {

@@ -39,7 +39,7 @@ describe('details of a module', () => {
   it('asks to choose a module while none is', () => {
     const page = show({ module: undefined });
 
-    expect(page.text()).toContain('Choose a module in the tree');
+    expect(page.text()).toContain('Choose a module to see');
     expect(page.find('button').exists()).toBe(false);
   });
 

@@ -89,3 +89,6 @@ export interface AppliedStepInfo {
 export type ApplyResult =
   | { readonly outcome: 'applied'; readonly projectFolder: string; readonly steps: readonly AppliedStepInfo[] }
   | { readonly outcome: 'refused'; readonly preview: BasketPreview };
+
+/** How the modules are laid out: by category (an ARIA tree), or by prerequisites (a graph of columns). */
+export type View = 'groups' | 'prerequisites';

@@ -25,7 +25,7 @@ const needs = computed(() =>
 <template>
   <section :class="styles.details" aria-label="Module details">
     <p v-if="module === undefined" :class="styles.placeholder">
-      Choose a module in the tree to see what it adds and what it needs.
+      Choose a module to see what it adds and what it needs.
     </p>
     <template v-else>
       <h2>{{ module.slug }}</h2>

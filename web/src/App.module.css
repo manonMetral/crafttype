@@ -62,3 +62,19 @@
   display: block;
   color: var(--color-muted);
 }
+/* The graph needs room: it takes what the details and the basket, stacked beside it, leave. */
+.layoutGraph {
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 19rem);
+}
+.layoutGraph .treeColumn {
+  grid-row: span 2;
+  min-width: 0;
+}
+@media (max-width: 60rem) {
+  .layoutGraph {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .layoutGraph .treeColumn {
+    grid-row: auto;
+  }
+}
