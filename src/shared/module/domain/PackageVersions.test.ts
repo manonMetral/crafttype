@@ -14,3 +14,16 @@ describe('PackageVersions', () => {
     expect(() => versions.get('unknown')).toThrow(/unknown/);
   });
 });
+
+describe('PackageVersions immutability', () => {
+  it('is not affected by a later change to the record it was built from', () => {
+    const source: Record<string, string> = { fastify: '5.12.7' };
+    const versions = new PackageVersions(source);
+
+    source['fastify'] = '0.0.0';
+    source['vue'] = '3.5.0';
+
+    expect(versions.get('fastify')).toBe('5.12.7');
+    expect(() => versions.get('vue')).toThrow(UnknownPackageVersionError);
+  });
+});

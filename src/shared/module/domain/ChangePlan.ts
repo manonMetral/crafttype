@@ -1,4 +1,5 @@
 import { ModuleConflictError } from './errors.js';
+import { frozenCopy } from './frozen.js';
 import { describePackageJsonEntry, type PackageJsonEntryKind } from './PackageJsonDocument.js';
 import type { VersionComparator } from './ports.js';
 
@@ -63,10 +64,14 @@ const hasConflictingContent = ({ decision }: DecidedChange): boolean =>
 
 /** What a module would change in a project, before anything is written. */
 export class ChangePlan {
+  readonly changes: readonly PlannedChange[];
+
   constructor(
-    readonly changes: readonly PlannedChange[],
+    changes: readonly PlannedChange[],
     private readonly versions: VersionComparator,
-  ) {}
+  ) {
+    this.changes = frozenCopy(changes);
+  }
 
   /** Settles each change according to the policy, without ever failing: used by the dry run. */
   decide(policy: ConflictPolicy): readonly DecidedChange[] {

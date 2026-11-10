@@ -105,6 +105,10 @@ const COMMON_OPTIONS = {
   help: { type: 'boolean', short: 'h' },
 } as const;
 
+/** The entry `[key, value]` when the option was given, else nothing: the properties are built in one go. */
+const entryOf = (key: string, value: PropertyValue | undefined): [string, PropertyValue][] =>
+  value === undefined ? [] : [[key, value]];
+
 const apply = (args: readonly string[], service: ModulesApplicationService, { out, err }: CliIo): number => {
   const [slug, ...options] = args;
   if (slug === '--help' || slug === '-h') {
@@ -138,13 +142,12 @@ const apply = (args: readonly string[], service: ModulesApplicationService, { ou
   }
 
   const parsed: Readonly<Record<string, string | boolean | undefined>> = values;
-  const raw: Record<string, PropertyValue> = {};
-  // Resolved here, not in the domain: `.` and `..` must name the project after the real folder.
-  if (values['project-folder'] !== undefined) raw['projectFolder'] = resolve(values['project-folder']);
-  for (const { key } of definition.custom) {
-    const value = parsed[toOption(key)];
-    if (value !== undefined) raw[key] = value;
-  }
+  // The folder is resolved here, not in the domain: `.` and `..` must name the project after the real folder.
+  const folder = values['project-folder'] === undefined ? undefined : resolve(values['project-folder']);
+  const raw: Readonly<Record<string, PropertyValue>> = Object.fromEntries([
+    ...entryOf('projectFolder', folder),
+    ...definition.custom.flatMap(({ key }) => entryOf(key, parsed[toOption(key)])),
+  ]);
 
   if (values.force === true && values['skip-conflicts'] === true) {
     err('Error: --force and --skip-conflicts are incompatible');

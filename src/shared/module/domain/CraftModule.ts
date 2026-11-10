@@ -36,11 +36,11 @@ export interface CraftModule {
 export class ModuleSource {
   constructor(readonly module: string) {}
 
-  template(path: string): { module: string; path: string; rendered: true } {
+  template(path: string): { readonly module: string; readonly path: string; readonly rendered: true } {
     return { module: this.module, path: `${path}.mustache`, rendered: true };
   }
 
-  file(path: string): { module: string; path: string; rendered: false } {
+  file(path: string): { readonly module: string; readonly path: string; readonly rendered: false } {
     return { module: this.module, path, rendered: false };
   }
 }
@@ -92,7 +92,7 @@ export class CraftModuleBuilder {
   }
 
   setPackageJsonField(key: string, value: unknown): this {
-    this.fields[key] = value;
+    this.fields[key] = structuredClone(value);
     return this;
   }
 
@@ -102,7 +102,7 @@ export class CraftModuleBuilder {
       files: [...this.files],
       edits: [...this.edits],
       packageJson: {
-        fields: { ...this.fields },
+        fields: structuredClone(this.fields),
         dependencies: { ...this.dependencies },
         devDependencies: { ...this.devDependencies },
         scripts: { ...this.scripts },
