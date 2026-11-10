@@ -59,6 +59,28 @@ moduleResource()
   .factory((properties) => modules.buildModule(properties)); // const modules = new EslintApplicationService(versions)
 ```
 
+A module can also say what it needs or brings in terms of *capabilities*, after `dependsOn` or `standalone`, in any order:
+
+```ts
+moduleResource()
+  .slug('fetch-client')
+  // ...
+  .dependsOn('vitest')
+  .requires('front')        // a module that provides `front` must be applied first, whichever it is
+  .tags('frontend')
+  .factory(...);
+
+moduleResource()
+  .slug('vue-app')
+  // ...
+  .dependsOn('typescript')
+  .provides('front')        // what the modules that require `front` look for
+  .tags('webapp')
+  .factory(...);
+```
+
+Use `dependsOn` when the module needs *that* module (`pinia` needs `vue-app` itself) and `requires` when any module of a family will do. A project has at most one module per capability: applying a second provider is refused with `CapabilityAlreadyProvidedError`, and the interface hides the alternatives once one is chosen. The catalog must list the providers of a capability before the modules that require it (a test checks it, and that every required capability has a provider).
+
 `apiDoc` (group and label) and `tags` are catalog metadata: `list` only prints the label, the rest is reserved for future filtering or an API.
 
 The compiler enforces the order of the steps, as in Seed4J's builder.
