@@ -649,10 +649,10 @@ describe('ModulesApplicationService', () => {
           });
 
         expect(read(projectFolder, 'src/server/main.ts')).toContain(
-          '  Object.assign(settings, loadConfig(settings));\n  // crafttype-needle-main-settings',
+          '  loadConfig,\n  // crafttype-needle-main-settings-steps',
         );
         expect(read(projectFolder, 'src/server/app.ts')).toContain(
-          '  serverOptions.genReqId = genReqId;\n  // crafttype-needle-app-server-options',
+          '    { genReqId },\n    // crafttype-needle-app-server-options-parts',
         );
       });
 

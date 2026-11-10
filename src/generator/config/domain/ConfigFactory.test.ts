@@ -13,7 +13,7 @@ describe('ConfigFactory', () => {
     mkdirSync(join(projectFolder, 'src/server'), { recursive: true });
     writeFileSync(
       join(projectFolder, 'src/server/main.ts'),
-      '// crafttype-needle-main-imports\nconst settings = {};\n// crafttype-needle-main-settings\n',
+      '// crafttype-needle-main-imports\nconst settingsSteps = [\n  // crafttype-needle-main-settings-steps\n];\n',
     );
     return projectFolder;
   };
@@ -28,11 +28,11 @@ describe('ConfigFactory', () => {
     expect(factory.buildModule(propertiesFixture()).files.every(({ rendered }) => !rendered)).toBe(true);
   });
 
-  it('completes the defaults of main.ts with the validated configuration', () => {
+  it('adds the validated configuration as a step that completes the defaults of main.ts', () => {
     assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithServer() }))).hasFileContaining(
       'src/server/main.ts',
       "import { loadConfig } from './config.js';",
-      'Object.assign(settings, loadConfig(settings));',
+      '  loadConfig,\n  // crafttype-needle-main-settings-steps',
     );
   });
 });
