@@ -1,42 +1,21 @@
 <script setup lang="ts">
-import type { BasketPreview, Decision, ReportInfo } from './types';
+import { DECISION_LABEL, sentence } from './report';
+import type { BasketPreview } from './types';
 import styles from './PreviewResult.module.css';
 
-defineProps<{ preview: BasketPreview }>();
+withDefaults(defineProps<{ preview: BasketPreview; applying?: boolean; label?: string }>(), {
+  applying: false,
+  label: 'Create the project',
+});
+defineEmits<{ apply: [] }>();
 
 const OUTCOME_LABEL = { ready: 'Ready', conflict: 'Conflict', blocked: 'Blocked', 'not-run': 'Not run' } as const;
-
-/** The words of `crafttype apply --dry-run`. */
-const DECISION_LABEL: Record<Decision, string> = {
-  create: 'create',
-  edit: 'modify',
-  unchanged: 'unchanged',
-  keep: 'keep',
-  overwrite: 'replace',
-  skip: 'skip',
-  conflict: 'conflict',
-};
-
-const COUNTS: readonly (readonly [keyof ReportInfo, string])[] = [
-  ['created', 'created'],
-  ['edited', 'modified'],
-  ['replaced', 'replaced'],
-  ['unchanged', 'unchanged'],
-  ['kept', 'kept'],
-  ['skipped', 'skipped'],
-  ['conflicts', 'in conflict'],
-];
-
-const sentence = (report: ReportInfo): string => {
-  const parts = COUNTS.filter(([key]) => report[key] > 0).map(([key, label]) => `${report[key]} ${label}`);
-  return parts.length === 0 ? 'Nothing to change.' : `${parts.join(', ')}.`;
-};
 </script>
 
 <template>
   <section :class="styles.result" aria-label="Preview">
     <h2>Preview</h2>
-    <p role="status" :class="[styles.summary, preview.canApply && styles.ok]">
+    <p id="preview-summary" role="status" :class="[styles.summary, preview.canApply && styles.ok]">
       {{
         preview.canApply ? 'Ready: every module would apply.' : 'The basket cannot apply yet: see the modules below.'
       }}
@@ -82,5 +61,15 @@ const sentence = (report: ReportInfo): string => {
         </p>
       </li>
     </ol>
+    <button
+      type="button"
+      :class="styles.create"
+      :disabled="applying || !preview.canApply"
+      :aria-busy="applying"
+      aria-describedby="preview-summary"
+      @click="$emit('apply')"
+    >
+      {{ applying ? 'Creating…' : label }}
+    </button>
   </section>
 </template>

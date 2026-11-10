@@ -75,6 +75,45 @@ describe('API client', () => {
     ]);
   });
 
+  it('asks to apply a basket by posting it as JSON, with the token, and gives the answer', async () => {
+    const answer = { outcome: 'applied', projectFolder: '/p', steps: [] };
+    const { calls, fetchJson } = answering(200, answer);
+    const request = { modules: ['init'], properties: { projectName: 'shop' }, onConflict: 'overwrite' as const };
+
+    const result = await createApi('secret', fetchJson).apply(request);
+
+    expect(result).toEqual(answer);
+    expect(calls).toEqual([
+      {
+        path: '/api/basket/apply',
+        headers: { Authorization: 'Bearer secret', 'Content-Type': 'application/json' },
+        method: 'POST',
+        body: JSON.stringify(request),
+      },
+    ]);
+  });
+
+  it('gives a basket that could not apply as an answer, not as an error: nothing was written', async () => {
+    const answer = { outcome: 'refused', preview: { projectFolder: '/p', steps: [], canApply: false } };
+    const { fetchJson } = answering(200, answer);
+
+    expect(await createApi('secret', fetchJson).apply({ modules: ['init'] })).toEqual(answer);
+  });
+
+  it('turns what the server refuses in an application into an error, with its reason', async () => {
+    const { fetchJson } = answering(422, { error: 'cannot access /p: permission denied (EACCES)' });
+
+    const failure = await createApi('secret', fetchJson)
+      .apply({ modules: ['init'] })
+      .catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({
+      name: 'ApiError',
+      message: 'cannot access /p: permission denied (EACCES)',
+      status: 422,
+    });
+  });
+
   it('turns what the server refuses in a preview into an error, with its reason', async () => {
     const { fetchJson } = answering(422, { error: 'Unknown module: nope' });
 

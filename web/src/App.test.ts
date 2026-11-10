@@ -2,7 +2,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type Api } from './api';
 import App from './App.vue';
-import type { BasketPreview, Catalog, ModuleInfo, PreviewRequest, ProjectState } from './types';
+import type { ApplyResult, BasketPreview, Catalog, ModuleInfo, PreviewRequest, ProjectState } from './types';
 
 const mod = (
   slug: string,
@@ -48,11 +48,25 @@ const readyPreview: BasketPreview = {
   ],
 };
 
+const appliedResult: ApplyResult = {
+  outcome: 'applied',
+  projectFolder: '/work/shop',
+  steps: [
+    {
+      slug: 'init',
+      report: { created: 1, edited: 0, replaced: 0, unchanged: 0, kept: 0, skipped: 0, conflicts: 0 },
+      warnings: [],
+      changes: [{ kind: 'file', target: 'README.md', decision: 'create', description: 'README.md' }],
+    },
+  ],
+};
+
 const apiOf = (overrides: Partial<Api> = {}) => {
   const api = {
     catalog: vi.fn(async () => catalog),
     project: vi.fn(async (_folder?: string) => project),
     preview: vi.fn(async (_request: PreviewRequest) => readyPreview),
+    apply: vi.fn(async (_request: PreviewRequest): Promise<ApplyResult> => appliedResult),
   };
   return Object.assign(api, overrides);
 };
@@ -74,6 +88,10 @@ describe('page of the local interface', () => {
   };
   const preview = async () => {
     await page!.get('button.preview').trigger('click');
+    await flushPromises();
+  };
+  const create = async () => {
+    await page!.get('button.create').trigger('click');
     await flushPromises();
   };
 
@@ -377,6 +395,229 @@ describe('page of the local interface', () => {
 
       expect(page!.find('.result').exists()).toBe(false);
       expect(page!.get('button.preview').text()).toBe('Preview');
+    });
+  });
+
+  describe('Given a basket to apply', () => {
+    const afterInit: ProjectState = {
+      ...project,
+      applied: [{ slug: 'init', appliedAt: '2026-10-20T10:00:00.000Z' }],
+    };
+    const conflictPreview: BasketPreview = {
+      projectFolder: '/work/shop',
+      canApply: false,
+      steps: [
+        {
+          slug: 'init',
+          outcome: 'conflict',
+          report: { created: 0, edited: 0, replaced: 0, unchanged: 0, kept: 0, skipped: 0, conflicts: 1 },
+          warnings: [],
+          changes: [
+            { kind: 'field', target: 'name', decision: 'conflict', description: 'name (existing: "a", module: "b")' },
+          ],
+        },
+      ],
+    };
+    /** The project as the server tells it: it changes once the basket is written. */
+    const writable = (overrides: Partial<Api> = {}) => {
+      let written = false;
+      return apiOf({
+        project: vi.fn(async (_folder?: string) => (written ? afterInit : project)),
+        apply: vi.fn(async (_request: PreviewRequest) => {
+          written = true;
+          return appliedResult;
+        }),
+        ...overrides,
+      });
+    };
+
+    it('offers to create the project once the preview says that every module would apply', async () => {
+      await open();
+      await addFromDetails('init');
+      expect(page!.find('button.create').exists()).toBe(false);
+
+      await preview();
+
+      expect(page!.get('button.create').text()).toBe('Create the project');
+    });
+
+    it('shows it, but cannot be pressed, when the preview says that the basket cannot apply', async () => {
+      const api = apiOf({ preview: vi.fn(async () => conflictPreview) });
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+
+      expect(page!.get('button.create').attributes('disabled')).toBeDefined();
+      await page!.get('button.create').trigger('click');
+      expect(api.apply).not.toHaveBeenCalled();
+    });
+
+    it('offers to add to the project when the project already has modules', async () => {
+      await open(apiOf({ project: vi.fn(async () => afterInit) }));
+      await addFromDetails('typescript');
+
+      await preview();
+
+      expect(page!.get('button.create').text()).toBe('Add to the project');
+    });
+
+    it('writes the basket that was previewed: the same modules, options, policy and folder', async () => {
+      const api = writable();
+      await open(api);
+      await addFromDetails('fastify-server');
+      await page!.get('#option-serverPort').setValue('4100');
+      await page!.get('select').setValue('skip');
+      await preview();
+
+      await create();
+
+      expect(api.apply).toHaveBeenCalledTimes(1);
+      expect(api.apply).toHaveBeenCalledWith(vi.mocked(api.preview).mock.calls[0]?.[0]);
+    });
+
+    it('shows what it did, in place of the preview', async () => {
+      await open(writable());
+      await addFromDetails('init');
+      await preview();
+
+      await create();
+
+      expect(page!.find('.result').exists()).toBe(false);
+      expect(page!.find('button.create').exists()).toBe(false);
+      expect(page!.get('.done [role="status"]').text()).toContain('1 module applied');
+      expect(page!.get('.done .step').text()).toContain('init');
+    });
+
+    it('reads the project again: the tree shows what is applied, and the basket is empty', async () => {
+      const api = writable();
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+
+      await create();
+
+      expect(api.project).toHaveBeenLastCalledWith('/work/shop');
+      expect(node('module:init').text()).toContain('Applied');
+      expect(basketItems()).toEqual([]);
+    });
+
+    it('waits for the end of the writing, with the buttons locked meanwhile', async () => {
+      let done: (value: ApplyResult) => void = () => {};
+      const api = writable({ apply: vi.fn(() => new Promise<ApplyResult>((resolve) => (done = resolve))) });
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+
+      await page!.get('button.create').trigger('click');
+      expect(page!.get('button.create').text()).toBe('Creating…');
+      expect(page!.get('button.create').attributes('disabled')).toBeDefined();
+      expect(page!.get('button.preview').attributes('disabled')).toBeDefined();
+      await page!.get('button.create').trigger('click');
+      expect(api.apply).toHaveBeenCalledTimes(1);
+
+      done(appliedResult);
+      await flushPromises();
+      expect(page!.find('.done').exists()).toBe(true);
+      expect(page!.get('button.preview').attributes('disabled')).toBeUndefined();
+    });
+
+    it('says that nothing was written when the basket can no longer apply, and shows why', async () => {
+      const api = apiOf({ apply: vi.fn(async () => ({ outcome: 'refused', preview: conflictPreview }) as const) });
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+
+      await create();
+
+      expect(page!.get('.basketColumn [role="alert"]').text()).toContain('Nothing was written');
+      expect(page!.find('.done').exists()).toBe(false);
+      expect(page!.get('.result .step').attributes('data-outcome')).toBe('conflict');
+      expect(page!.get('button.create').attributes('disabled')).toBeDefined();
+    });
+
+    it('shows what the server refused, and that some modules may already be applied', async () => {
+      const api = writable({
+        apply: vi.fn(async () => {
+          throw new ApiError('cannot access /work/shop: permission denied (EACCES)', 422, undefined);
+        }),
+      });
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+
+      await create();
+
+      const alert = page!.get('.basketColumn [role="alert"]').text();
+      expect(alert).toContain('permission denied (EACCES)');
+      expect(alert).toContain('may already be applied');
+      expect(page!.find('.done').exists()).toBe(false);
+    });
+
+    it('reads the project again after a failure, since the modules written before it are applied', async () => {
+      let attempts = 0;
+      const api = apiOf({
+        project: vi.fn(async (_folder?: string) => (attempts === 0 ? project : afterInit)),
+        apply: vi.fn(async () => {
+          attempts += 1;
+          throw new ApiError('disk full', 422, undefined);
+        }),
+      });
+      await open(api);
+      await addFromDetails('vitest');
+      await preview();
+
+      await create();
+
+      expect(api.project).toHaveBeenLastCalledWith('/work/shop');
+      expect(node('module:init').text()).toContain('Applied');
+      expect(basketItems()).toEqual(['typescript', 'vitest']);
+    });
+
+    it("shows a failure that is not the server's answer, and forgets it at the next try", async () => {
+      const api = writable({
+        apply: vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue(appliedResult),
+      });
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+
+      await create();
+      expect(page!.get('.basketColumn [role="alert"]').text()).toContain('Failed to fetch');
+      expect(page!.find('button.create').exists()).toBe(true);
+
+      await create();
+      expect(page!.find('.basketColumn [role="alert"]').exists()).toBe(false);
+      expect(page!.find('.done').exists()).toBe(true);
+    });
+
+    it('keeps the result until a new basket is started', async () => {
+      await open(writable());
+      await addFromDetails('init');
+      await preview();
+      await create();
+
+      await node('module:vitest').trigger('click');
+      expect(page!.find('.done').exists()).toBe(true);
+
+      await addFromDetails('prettier');
+      expect(page!.find('.done').exists()).toBe(false);
+    });
+
+    it('does not show the result of a project when the folder shown is another one', async () => {
+      const other: ProjectState = { projectFolder: '/work/other', applied: [], presets: {} };
+      const api = writable({
+        project: vi.fn(async (folder?: string) => (folder === '/work/other' ? other : project)),
+      });
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+      await create();
+
+      await page!.get('input[name="folder"]').setValue('/work/other');
+      await page!.get('form.folder').trigger('submit');
+      await flushPromises();
+
+      expect(page!.find('.done').exists()).toBe(false);
     });
   });
 

@@ -10,6 +10,8 @@ defineProps<{
   values: Readonly<Record<string, PropertyValue | undefined>>;
   policy: ConflictPolicy;
   loading: boolean;
+  /** The basket is being written: it must not be previewed again meanwhile. */
+  busy: boolean;
 }>();
 const emit = defineEmits<{
   remove: [slug: string];
@@ -100,7 +102,12 @@ const typed = (event: Event, type: SharedProperty['type']): PropertyValue | unde
       </select>
     </div>
 
-    <button type="button" :class="styles.preview" :disabled="items.length === 0 || loading" @click="emit('preview')">
+    <button
+      type="button"
+      :class="styles.preview"
+      :disabled="items.length === 0 || loading || busy"
+      @click="emit('preview')"
+    >
       {{ loading ? 'Previewing…' : 'Preview' }}
     </button>
   </section>

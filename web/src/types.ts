@@ -63,6 +63,7 @@ export type StepInfo =
   | { readonly slug: string; readonly outcome: 'blocked'; readonly error: string; readonly missing: readonly string[] }
   | { readonly slug: string; readonly outcome: 'not-run'; readonly after: string };
 
+/** The request of a preview and of an application: the same basket, so that what is written is what was previewed. */
 export interface PreviewRequest {
   readonly projectFolder?: string;
   readonly modules: readonly string[];
@@ -75,3 +76,16 @@ export interface BasketPreview {
   readonly steps: readonly StepInfo[];
   readonly canApply: boolean;
 }
+
+/** What a module did when the basket was written. */
+export interface AppliedStepInfo {
+  readonly slug: string;
+  readonly report: ReportInfo;
+  readonly warnings: readonly string[];
+  readonly changes: readonly ChangeInfo[];
+}
+
+/** `applied`: every module was written, in the order of `steps`. `refused`: the basket cannot apply, nothing was written. */
+export type ApplyResult =
+  | { readonly outcome: 'applied'; readonly projectFolder: string; readonly steps: readonly AppliedStepInfo[] }
+  | { readonly outcome: 'refused'; readonly preview: BasketPreview };
