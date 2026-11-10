@@ -272,3 +272,30 @@ describe('request to preview the basket', () => {
     expect(request.properties).toEqual({ verbose: false, serverPort: 0 });
   });
 });
+
+/** Freezes the value and everything inside it: a function that modifies its input then throws a TypeError. */
+const deepFrozen = <T>(value: T): T => {
+  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
+    Object.values(value).forEach(deepFrozen);
+    Object.freeze(value);
+  }
+  return value;
+};
+
+describe('the inputs of the functions of the basket', () => {
+  const frozenCatalog = deepFrozen(structuredClone(catalog));
+  const frozenBasket: Basket = deepFrozen([entry('fastify-server'), entry('init'), entry('typescript', true)]);
+  const frozenApplied: ReadonlySet<string> = new Set(['init']);
+
+  it('are not modified by any function, whatever it returns', () => {
+    expect(() => {
+      addModule(frozenCatalog, frozenApplied, frozenBasket, 'auth');
+      removeModule(frozenCatalog, frozenBasket, 'typescript');
+      inCatalogOrder(frozenCatalog, frozenBasket);
+      missingPrerequisites(frozenCatalog, frozenApplied, frozenBasket, 'auth');
+      sharedProperties(frozenCatalog, frozenBasket);
+      presetValues(frozenCatalog, frozenBasket, deepFrozen({ init: { projectName: 'shop' } }));
+      toRequest(frozenCatalog, frozenBasket, deepFrozen({ projectName: 'shop' }), 'fail', '/work');
+    }).not.toThrow();
+  });
+});
