@@ -174,11 +174,15 @@ const loadProject = async (): Promise<void> => {
       return;
     }
     project.value = next;
-    // The modules that project already has are no longer something to apply.
+    // The modules that project already has are no longer something to apply, and what it lacks, that the other one
+    // had, is what the modules of the basket now need.
     const has = new Set(next.applied.map(({ slug }) => slug));
-    basket.value = basket.value
+    const rest = basket.value
       .filter(({ slug }) => has.has(slug))
-      .reduce((rest, { slug }) => removeModule(everything.value, rest, slug), basket.value);
+      .reduce((kept, { slug }) => removeModule(everything.value, kept, slug), basket.value);
+    basket.value = rest
+      .filter(({ auto }) => !auto)
+      .reduce((completed, { slug }) => addModule(everything.value, has, completed, slug), rest);
   } catch (error) {
     if (current === latestLoad) {
       folderProblem.value = describe(error);
