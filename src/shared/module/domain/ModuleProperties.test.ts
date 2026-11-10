@@ -176,6 +176,88 @@ describe('ModulePropertiesDefinition', () => {
     });
   });
 
+  describe('presets', () => {
+    const database = ModulePropertiesDefinition.builder()
+      .addString('databaseName', { description: 'Database name', mandatory: true })
+      .addNumber('poolSize', {
+        description: 'Pool size',
+        defaultValue: 10,
+        validate: (size) => (Number(size) >= 1 ? undefined : 'at least 1'),
+      })
+      .addBoolean('migrations', { description: 'Enables migrations', defaultValue: true })
+      .addString('schema', { description: 'Schema, without a default value' })
+      .build();
+
+    it('are the values already set in the project, else the default values', () => {
+      expect(database.presets('app', { databaseName: 'shop', poolSize: 25 })).toEqual({
+        databaseName: 'shop',
+        poolSize: 25,
+        migrations: true,
+      });
+    });
+
+    it('leave out a mandatory property that has no value, and keep the others', () => {
+      expect(database.presets('app')).toEqual({ poolSize: 10, migrations: true });
+    });
+
+    it('leave out a value that is no longer valid, and keep the others', () => {
+      expect(database.presets('app', { databaseName: 'shop', poolSize: 0, migrations: false })).toEqual({
+        databaseName: 'shop',
+        migrations: false,
+      });
+    });
+
+    it('leave out a value that has the wrong type, and keep the others', () => {
+      expect(database.presets('app', { databaseName: 'shop', poolSize: 'many' })).toEqual({
+        databaseName: 'shop',
+        migrations: true,
+      });
+    });
+
+    it('ignore what the module does not declare', () => {
+      expect(database.presets('app', { databaseName: 'shop', serverPort: 4000 })).toEqual({
+        databaseName: 'shop',
+        poolSize: 10,
+        migrations: true,
+      });
+    });
+
+    it('are the same as the resolved values when everything resolves', () => {
+      const known = { projectName: 'shop', serverPort: 4000 };
+
+      expect(definition.presets('app', known)).toEqual(definition.resolve({ projectFolder: 'app' }, known).values);
+    });
+
+    it('have no value when the project folder is blank', () => {
+      expect(definition.presets('  ', { projectName: 'shop' })).toEqual({});
+    });
+
+    it('do not hide an error that is not about a property', () => {
+      const exploding = ModulePropertiesDefinition.builder()
+        .addString('flavor', {
+          description: 'Flavor',
+          defaultValue: () => {
+            throw new TypeError('bug in a default value');
+          },
+        })
+        .build();
+
+      expect(() => exploding.presets('app')).toThrow('bug in a default value');
+    });
+
+    it('cannot be modified, and do not modify what they receive', () => {
+      const known = { databaseName: 'shop' };
+      const snapshot = structuredClone(known);
+
+      const presets = database.presets('app', known);
+
+      expect(() => {
+        (presets as Record<string, unknown>)['databaseName'] = 'other';
+      }).toThrow(TypeError);
+      expect(known).toEqual(snapshot);
+    });
+  });
+
   describe('property definition', () => {
     it.each(['projectFolder', 'force', 'skipConflicts', 'dryRun', 'help'])('rejects the reserved key %s', (key) => {
       expect(() => ModulePropertiesDefinition.builder().addString(key, { description: 'x' })).toThrow(

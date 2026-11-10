@@ -66,8 +66,8 @@ export interface ProjectState {
   readonly applied: readonly AppliedModule[];
   /**
    * For each module of the catalog, the value of each of its properties if the module were applied now: the value
-   * already chosen in the project, else the default. A module whose values cannot be computed (a mandatory property
-   * without default, a recorded value that is no longer valid) has none.
+   * already chosen in the project, else the default. A property whose value cannot be computed (mandatory without
+   * default, a recorded value that is no longer valid) has none: the other properties of the module keep theirs.
    */
   readonly presets: Readonly<Record<ModuleSlug, KnownProperties>>;
 }
@@ -135,7 +135,10 @@ export class ModulesApplicationService {
     const applied = this.dependencies.history.list(projectFolder);
     const known = mergedProperties(applied);
     const presets = Object.fromEntries(
-      this.dependencies.resources.map((resource) => [resource.slug, presetOf(resource, projectFolder, known)]),
+      this.dependencies.resources.map((resource) => [
+        resource.slug,
+        resource.propertiesDefinition.presets(projectFolder, known),
+      ]),
     );
     return { projectFolder, applied, presets };
   }
@@ -429,18 +432,6 @@ const propertiesDeclaredBy = (
 
 const mergedProperties = (applied: readonly AppliedModule[]): KnownProperties =>
   applied.reduce<KnownProperties>((known, { properties }) => ({ ...known, ...properties }), {});
-
-const presetOf = (resource: ModuleResource, projectFolder: string, known: KnownProperties): KnownProperties => {
-  try {
-    return resource.propertiesDefinition.resolve({ projectFolder }, known).values;
-  } catch (error) {
-    // The form of this module will ask for what is missing or wrong; the other modules are not concerned.
-    if (error instanceof CraftTypeError) {
-      return {};
-    }
-    throw error;
-  }
-};
 
 const sameProperties = (left: KnownProperties, right: KnownProperties): boolean => {
   const keys = Object.keys(left);
