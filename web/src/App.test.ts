@@ -695,6 +695,41 @@ describe('page of the local interface', () => {
       expect(page!.find('.done').exists()).toBe(false);
     });
 
+    it('says that the server is older than the page when it does not know the request, and that nothing was written', async () => {
+      const api = writable({
+        apply: vi.fn(async () => {
+          throw new ApiError('not found', 404, undefined);
+        }),
+      });
+      await open(api);
+      await addFromDetails('init');
+      await preview();
+
+      await create();
+
+      const alert = page!.get('.basketColumn [role="alert"]').text();
+      expect(alert).toContain('not found');
+      expect(alert).toContain('older than this page');
+      expect(alert).toContain('start crafttype ui again');
+      expect(alert).toContain('Nothing was written');
+      expect(alert).not.toContain('may already be applied');
+    });
+
+    it('says the same for a preview the server does not know', async () => {
+      await open(
+        apiOf({
+          preview: vi.fn(async () => {
+            throw new ApiError('not found', 404, undefined);
+          }),
+        }),
+      );
+      await addFromDetails('init');
+
+      await preview();
+
+      expect(page!.get('.basketColumn [role="alert"]').text()).toContain('older than this page');
+    });
+
     it('reads the project again after a failure, since the modules written before it are applied', async () => {
       let attempts = 0;
       const api = apiOf({

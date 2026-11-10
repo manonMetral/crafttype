@@ -37,9 +37,14 @@ interface Problem {
   message: string;
   hint?: string | undefined;
 }
+/** A route the server does not know: it was started before an update, and is older than the page that asks. */
+const NOT_KNOWN = 404;
+const OLDER_SERVER =
+  'The server does not know this request: it is older than this page. Stop it, update or build CraftType, and start crafttype ui again.';
+
 const describe = (error: unknown): Problem =>
   error instanceof ApiError
-    ? { message: error.message, hint: error.hint }
+    ? { message: error.message, hint: error.status === NOT_KNOWN ? OLDER_SERVER : error.hint }
     : { message: error instanceof Error ? error.message : String(error) };
 
 const catalog = ref<Catalog>();
@@ -224,10 +229,14 @@ const runApply = async (): Promise<void> => {
       };
     }
   } catch (error) {
-    applyProblem.value = {
-      ...describe(error),
-      hint: 'Some modules may already be applied (the tree shows which). Fix the cause, then create again: it completes the project.',
-    };
+    // A request the server does not know has written nothing; any other failure may have come after some modules.
+    applyProblem.value =
+      error instanceof ApiError && error.status === NOT_KNOWN
+        ? { ...describe(error), hint: `${OLDER_SERVER} Nothing was written.` }
+        : {
+            ...describe(error),
+            hint: 'Some modules may already be applied (the tree shows which). Fix the cause, then create again: it completes the project.',
+          };
   } finally {
     applying.value = false;
   }
