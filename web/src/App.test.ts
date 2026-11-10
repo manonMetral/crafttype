@@ -202,7 +202,7 @@ describe('page of the local interface', () => {
       expect(page!.find('[role="tree"]').exists()).toBe(false);
     });
 
-    it('chooses the module that is pressed, and shows its details', async () => {
+    it('adds the module that is pressed to the basket, and shows its details', async () => {
       await open(
         apiOf({ project: vi.fn(async () => ({ ...project, applied: [{ slug: 'init', appliedAt: 'x' }] })) }),
         'prerequisites',
@@ -210,9 +210,35 @@ describe('page of the local interface', () => {
 
       await graphNode('typescript').trigger('click');
 
+      expect(basketItems()).toEqual(['typescript']);
+      expect(graphNode('typescript').attributes('data-state')).toBe('in-basket');
       expect(page!.get('.details').text()).toContain('typescript');
+      expect(page!.get('.details button').text()).toBe('Remove from basket');
       expect(graphNode('typescript').attributes('aria-current')).toBe('true');
-      expect(graphNode('init').text()).toContain('prerequisite');
+      expect(graphNode('init').attributes('data-relation')).toBe('prerequisite');
+    });
+
+    it('does not add a module the project has, but shows its details', async () => {
+      await open(
+        apiOf({ project: vi.fn(async () => ({ ...project, applied: [{ slug: 'init', appliedAt: 'x' }] })) }),
+        'prerequisites',
+      );
+
+      await graphNode('init').trigger('click');
+
+      expect(basketItems()).toEqual([]);
+      expect(page!.get('.details').text()).toContain('This module is already applied');
+    });
+
+    it('keeps a module the basket holds when it is pressed again: it is taken out with its Remove button', async () => {
+      await open(apiOf(), 'prerequisites');
+
+      await graphNode('init').trigger('click');
+      await graphNode('init').trigger('click');
+
+      expect(basketItems()).toEqual(['init']);
+      await page!.get('.details button').trigger('click');
+      expect(basketItems()).toEqual([]);
     });
 
     it('keeps the module that was chosen in the tree when the view changes, and back', async () => {
@@ -222,7 +248,7 @@ describe('page of the local interface', () => {
       await showPrerequisites();
       expect(graphNode('init').attributes('aria-current')).toBe('true');
 
-      await page!.get('.details button').trigger('click');
+      await graphNode('init').trigger('click');
       await graphNode('typescript').trigger('click');
       await page!.findAll('.switch button')[0]!.trigger('click');
       expect(node('module:typescript').attributes('aria-selected')).toBe('true');
@@ -234,11 +260,9 @@ describe('page of the local interface', () => {
       expect(shown()).toEqual(['init']);
 
       await graphNode('init').trigger('click');
-      await page!.get('.details button').trigger('click');
       expect(shown()).toEqual(['init', 'typescript', 'prettier']);
 
       await graphNode('typescript').trigger('click');
-      await page!.get('.details button').trigger('click');
       expect(shown()).toEqual(['init', 'typescript', 'prettier', 'vitest']);
 
       await page!.get('.basket .item .remove').trigger('click');
@@ -263,7 +287,6 @@ describe('page of the local interface', () => {
       expect(graphNode('typescript').attributes('data-state')).toBe('available');
 
       await graphNode('typescript').trigger('click');
-      await page!.get('.details button').trigger('click');
 
       expect(graphNode('typescript').attributes('data-state')).toBe('in-basket');
     });

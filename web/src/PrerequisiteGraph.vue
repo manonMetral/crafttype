@@ -12,7 +12,11 @@ const props = defineProps<{
   inBasket: ReadonlySet<string>;
   selected: string | undefined;
 }>();
-defineEmits<{ select: [slug: string] }>();
+const emit = defineEmits<{
+  select: [slug: string];
+  /** The module is neither in the project nor in the basket: pressing it puts it in the basket. */
+  add: [slug: string];
+}>();
 
 const ARROW = 'prerequisite-arrow';
 const ARROW_ON = 'prerequisite-arrow-on';
@@ -58,13 +62,23 @@ const chainOf = ({ from, to }: GraphEdge): 'prerequisites' | 'dependents' | 'unr
 
 const onChain = (edge: GraphEdge): boolean => ['prerequisites', 'dependents'].includes(chainOf(edge));
 
+const addable = (slug: string): boolean => !props.applied.has(slug) && !props.inBasket.has(slug);
+
+/** Pressing a module chooses it, and puts it in the basket unless the project has it or the basket holds it. */
+const press = (slug: string): void => {
+  emit('select', slug);
+  if (addable(slug)) {
+    emit('add', slug);
+  }
+};
+
 const info = (slug: string) => props.modules.find((module) => module.slug === slug);
 const list = (slugs: readonly string[]): string => (slugs.length === 0 ? 'nothing' : slugs.join(', '));
 /** For a screen reader: the links are drawn, and the lists say the same. */
 const links = (slug: string): string => {
   const needs = info(slug)?.dependsOn ?? [];
   const neededBy = props.modules.filter(({ dependsOn }) => dependsOn.includes(slug)).map((module) => module.slug);
-  return `Needs ${list(needs)}. Needed by ${list(neededBy)}.`;
+  return `Needs ${list(needs)}. Needed by ${list(neededBy)}.${addable(slug) ? ' Pressing it adds it to the basket.' : ''}`;
 };
 const linksId = (slug: string): string => `graph-links-${slug}`;
 </script>
@@ -127,7 +141,7 @@ const linksId = (slug: string): string => `graph-links-${slug}`;
           :data-relation="relationOf(node.slug)"
           :aria-current="selected === node.slug ? 'true' : undefined"
           :aria-describedby="linksId(node.slug)"
-          @click="$emit('select', node.slug)"
+          @click="press(node.slug)"
         >
           <span :class="styles.name">{{ node.slug }}</span>
           <span v-if="STATE_LABEL[stateOf(node.slug)]" :class="styles.state">{{
@@ -143,7 +157,7 @@ const linksId = (slug: string): string => `graph-links-${slug}`;
     </div>
     <p :class="styles.note">
       Arrows go from a module to the modules that need it. Only direct prerequisites are drawn: a module also needs what
-      its prerequisites need. Choose a module to see its chain.
+      its prerequisites need. Click a module to add it to the basket and see its chain.
     </p>
   </div>
 </template>

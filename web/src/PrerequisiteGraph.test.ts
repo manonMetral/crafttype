@@ -94,6 +94,39 @@ describe('graph of the prerequisites', () => {
 
       expect(page.emitted('select')).toEqual([['vitest']]);
     });
+
+    it('also asks to add it to the basket when the project does not have it and the basket does not hold it', async () => {
+      const page = show({ applied: new Set(['init', 'typescript']) });
+
+      await node(page, 'vitest').trigger('click');
+
+      expect(page.emitted('select')).toEqual([['vitest']]);
+      expect(page.emitted('add')).toEqual([['vitest']]);
+    });
+
+    it.each([
+      ['has', { applied: new Set(['init', 'typescript']) }, 'typescript'],
+      ['holds', { inBasket: new Set(['init', 'typescript']), applied: new Set<string>() }, 'typescript'],
+    ])('does not ask to add a module that the %s already', async (_who, props, slug) => {
+      const page = show(props);
+
+      await node(page, slug).trigger('click');
+
+      expect(page.emitted('select')).toEqual([[slug]]);
+      expect(page.emitted('add')).toBeUndefined();
+    });
+
+    it('tells a screen reader that pressing a module adds it to the basket, when it does', () => {
+      const page = show({ applied: new Set(['init', 'typescript']), inBasket: new Set(['vitest']) });
+
+      const description = (slug: string) => page.get(`#${node(page, slug).attributes('aria-describedby')}`).text();
+      expect(description('typescript')).toBe('Needs init. Needed by vitest, fastify-server.');
+      expect(description('vitest')).toBe('Needs typescript. Needed by fastify-server.');
+      const available = show({ applied: new Set(['init', 'typescript']) });
+      expect(available.get(`#${node(available, 'vitest').attributes('aria-describedby')}`).text()).toBe(
+        'Needs typescript. Needed by fastify-server. Pressing it adds it to the basket.',
+      );
+    });
   });
 
   describe('links', () => {
@@ -114,7 +147,9 @@ describe('graph of the prerequisites', () => {
     });
 
     it('says in a sentence what they show', () => {
-      expect(show().get('.note').text()).toContain('direct prerequisites');
+      const note = show().get('.note').text();
+      expect(note).toContain('direct prerequisites');
+      expect(note).toContain('Click a module to add it to the basket');
     });
 
     it('is not for a screen reader, which has the lists of each module', () => {

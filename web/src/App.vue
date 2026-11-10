@@ -143,10 +143,16 @@ watch(
   },
 );
 
+const add = (slug: string): void => {
+  basket.value = addModule(everything.value, applied.value, basket.value, slug);
+};
+
 const toggle = (slug: string): void => {
-  basket.value = inBasket.value.has(slug)
-    ? removeModule(everything.value, basket.value, slug)
-    : addModule(everything.value, applied.value, basket.value, slug);
+  if (inBasket.value.has(slug)) {
+    basket.value = removeModule(everything.value, basket.value, slug);
+  } else {
+    add(slug);
+  }
 };
 
 const remove = (slug: string): void => {
@@ -313,6 +319,7 @@ onMounted(async () => {
           :in-basket="inBasket"
           :selected="selected"
           @select="selected = $event"
+          @add="add"
         />
       </section>
       <ModuleDetails :module="shown" :applied="applied" :in-basket="inBasket" :also-adds="alsoAdds" @toggle="toggle" />
