@@ -4,7 +4,9 @@ import Fastify, {
 } from 'fastify';
 // crafttype-needle-app-imports
 
-export function buildApp(options: { logger?: boolean } = {}): FastifyInstance {
+export function buildApp(
+  options: { readonly logger?: boolean } = {},
+): FastifyInstance {
   // The server options are merged from parts, in order (a later part wins): none is modified once built.
   const serverOptionsParts: readonly FastifyServerOptions[] = [
     { logger: options.logger ?? true },

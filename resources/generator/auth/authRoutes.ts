@@ -7,8 +7,8 @@ import {
 import { createJwtService } from './jwt.js';
 
 interface TokenRequestBody {
-  sub: string;
-  role?: string;
+  readonly sub: string;
+  readonly role?: string;
 }
 
 /** Adds JWT routes and the bearer middleware to the Fastify app. */

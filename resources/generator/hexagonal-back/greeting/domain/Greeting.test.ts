@@ -21,4 +21,19 @@ describe('Greeting', () => {
       'Invalid name: at most 50 characters',
     );
   });
+
+  it('is equal to another greeting to the same name, and only to those', () => {
+    expect(Greeting.to(' Ada').equals(Greeting.to('Ada'))).toBe(true);
+    expect(Greeting.to().equals(Greeting.to('world'))).toBe(true);
+    expect(Greeting.to('Ada').equals(Greeting.to('Grace'))).toBe(false);
+  });
+
+  it('cannot be modified once created', () => {
+    const greeting = Greeting.to('Ada');
+
+    expect(() => {
+      (greeting as { name: string }).name = 'Grace';
+    }).toThrow(TypeError);
+    expect(greeting.message).toBe('Hello, Ada!');
+  });
 });

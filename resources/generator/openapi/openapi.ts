@@ -27,7 +27,10 @@ export function docsEnabled(
 }
 
 /** Name and version of the project, read from its package.json (two folders above `src/server` and `dist/server`). */
-function readProject(): { name: string; version: string } {
+function readProject(): {
+  readonly name: string;
+  readonly version: string;
+} {
   const file = new URL('../../package.json', import.meta.url);
   const { name, version } = JSON.parse(readFileSync(file, 'utf8')) as {
     name?: unknown;
