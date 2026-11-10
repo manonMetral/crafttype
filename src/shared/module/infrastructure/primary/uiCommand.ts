@@ -66,7 +66,7 @@ export const runUi = async (
     throw explainPortInUse(error, port);
   });
 
-  out(`CraftType API listening on ${server.origin} (read only, this machine only). Stop it with Ctrl+C.`);
+  out(`CraftType API listening on ${server.origin} (this machine only). Stop it with Ctrl+C.`);
   out(`Project folder: ${projectFolder}`);
   const page = `${server.origin}/?token=${token}`;
   if (webRoot !== undefined) {

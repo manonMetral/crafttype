@@ -81,7 +81,7 @@ describe('crafttype ui', () => {
       const token = started[0]?.token;
       expect(output()).toBe(
         [
-          'CraftType API listening on http://127.0.0.1:4242 (read only, this machine only). Stop it with Ctrl+C.',
+          'CraftType API listening on http://127.0.0.1:4242 (this machine only). Stop it with Ctrl+C.',
           `Project folder: ${process.cwd()}`,
           `Token: ${token}`,
           `Try: curl -H "Authorization: Bearer ${token}" http://127.0.0.1:4242/api/modules`,
@@ -112,7 +112,7 @@ describe('crafttype ui', () => {
       const token = started[0]?.token;
       expect(output()).toBe(
         [
-          'CraftType API listening on http://127.0.0.1:4242 (read only, this machine only). Stop it with Ctrl+C.',
+          'CraftType API listening on http://127.0.0.1:4242 (this machine only). Stop it with Ctrl+C.',
           `Project folder: ${process.cwd()}`,
           `Open: http://127.0.0.1:4242/?token=${token}`,
           `Token: ${token}`,

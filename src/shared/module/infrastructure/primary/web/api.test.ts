@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createModulesApplicationService } from '../../../../../composition.js';
 import { UnknownModuleError } from '../../../domain/errors.js';
@@ -6,7 +8,7 @@ import { apiRoute } from './api.js';
 
 const clock = () => new Date('2026-10-20T10:00:00Z');
 
-describe('read-only API', () => {
+describe('API', () => {
   const service = createModulesApplicationService({ clock });
   const get = (path: string, defaultProjectFolder = tmpDirForTest()) => {
     const url = new URL(path, 'http://127.0.0.1');
@@ -249,6 +251,127 @@ describe('read-only API', () => {
         });
       },
     );
+
+    it('leaves an unknown module to the server, as any error of the tool', () => {
+      expect(() => post({ modules: ['nope'] })).toThrow(UnknownModuleError);
+    });
+  });
+
+  describe('POST /api/basket/apply', () => {
+    const post = (body: unknown, defaultProjectFolder = tmpDirForTest()) => {
+      const url = new URL('/api/basket/apply', 'http://127.0.0.1');
+      return apiRoute(service, defaultProjectFolder, url.pathname)?.handle({ url, body });
+    };
+    const absolute = () => tmpDirForTest();
+
+    it('only answers to POST: it writes', () => {
+      expect(apiRoute(service, absolute(), '/api/basket/apply')?.methods).toEqual(['POST']);
+    });
+
+    it('writes the basket, and says what each module did, in the order they depend on', () => {
+      const projectFolder = join(absolute(), 'shop');
+
+      const response = post({ projectFolder, modules: ['typescript', 'init'], properties: { projectName: 'shop' } });
+
+      expect(response?.status).toBe(200);
+      expect(response?.body).toEqual({
+        outcome: 'applied',
+        projectFolder,
+        steps: [
+          expect.objectContaining({ slug: 'init', report: expect.objectContaining({ created: expect.any(Number) }) }),
+          expect.objectContaining({ slug: 'typescript' }),
+        ],
+      });
+      expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).name).toBe('shop');
+      expect(service.projectState(projectFolder).applied.map(({ slug }) => slug)).toEqual(['init', 'typescript']);
+    });
+
+    it('describes the changes without sending the content of the files', () => {
+      const response = post({ projectFolder: absolute(), modules: ['init'] });
+
+      const { steps } = response?.body as { steps: Record<string, any>[] };
+      expect(Object.keys(steps[0] ?? {})).toEqual(['slug', 'report', 'warnings', 'changes']);
+      const changes = steps[0]?.['changes'] as Record<string, string>[];
+      for (const change of changes) {
+        expect(Object.keys(change)).toEqual(['kind', 'target', 'decision', 'description']);
+      }
+      expect(changes).toContainEqual({
+        kind: 'file',
+        target: 'README.md',
+        decision: 'create',
+        description: 'README.md',
+      });
+    });
+
+    it('refuses a basket that cannot apply, says why as the preview does, and writes nothing', () => {
+      const projectFolder = absolute();
+
+      const response = post({ projectFolder, modules: ['init', 'vitest', 'prettier'] });
+
+      expect(response?.status).toBe(200);
+      expect(response?.body).toEqual({
+        outcome: 'refused',
+        preview: {
+          projectFolder,
+          canApply: false,
+          steps: [
+            expect.objectContaining({ slug: 'init', outcome: 'ready' }),
+            {
+              slug: 'vitest',
+              outcome: 'blocked',
+              error: expect.stringContaining('typescript'),
+              missing: ['typescript'],
+            },
+            { slug: 'prettier', outcome: 'not-run', after: 'vitest' },
+          ],
+        },
+      });
+      expect(readdirSync(projectFolder)).toEqual([]);
+    });
+
+    it('applies the policy for the conflicts of the whole basket', () => {
+      const projectFolder = absolute();
+      service.apply('init', { projectFolder, projectName: 'shop' });
+      const request = { projectFolder, modules: ['init'], properties: { projectName: 'other' } };
+
+      expect((post(request)?.body as { outcome: string }).outcome).toBe('refused');
+      expect((post({ ...request, onConflict: 'overwrite' })?.body as { outcome: string }).outcome).toBe('applied');
+      expect(JSON.parse(readFileSync(join(projectFolder, 'package.json'), 'utf8')).name).toBe('other');
+    });
+
+    it('writes in the folder the interface was launched in when none is given', () => {
+      const launchFolder = absolute();
+
+      const response = post({ modules: ['init'] }, launchFolder);
+
+      expect(response?.body).toMatchObject({ outcome: 'applied', projectFolder: launchFolder });
+      expect(readdirSync(launchFolder)).toContain('package.json');
+    });
+
+    it.each([
+      ['no body', undefined, 'the body must be a JSON object'],
+      ['no modules', {}, '"modules" must be a non-empty list of module names'],
+      [
+        'properties that are not values',
+        { modules: ['init'], properties: { projectName: [1] } },
+        '"properties" must be an object of texts, numbers and booleans',
+      ],
+      [
+        'an unknown policy',
+        { modules: ['init'], onConflict: 'force' },
+        '"onConflict" must be "fail", "skip" or "overwrite"',
+      ],
+      [
+        'a relative folder',
+        { modules: ['init'], projectFolder: 'relative/folder' },
+        'the folder must be an absolute path',
+      ],
+    ])('refuses %s, as the preview does, and writes nothing', (_case, body, error) => {
+      const launchFolder = absolute();
+
+      expect(post(body, launchFolder)).toEqual({ status: 400, body: { error } });
+      expect(readdirSync(launchFolder)).toEqual([]);
+    });
 
     it('leaves an unknown module to the server, as any error of the tool', () => {
       expect(() => post({ modules: ['nope'] })).toThrow(UnknownModuleError);
