@@ -26,7 +26,7 @@ import { createModulesApplicationService } from '../../../composition.js';
 import { databaseModuleResources } from '../../test/databaseModuleResources.js';
 import { tmpDirForTest } from '../../test/ModuleAssertions.js';
 import { from, moduleBuilder } from '../domain/CraftModule.js';
-import { moduleResource } from '../domain/ModuleResource.js';
+import { moduleResource, type ModuleResource } from '../domain/ModuleResource.js';
 import { ModulePropertiesDefinition } from '../domain/ModuleProperties.js';
 import {
   DuplicateDestinationError,
@@ -649,10 +649,10 @@ describe('ModulesApplicationService', () => {
           });
 
         expect(read(projectFolder, 'src/server/main.ts')).toContain(
-          '  Object.assign(settings, loadConfig(settings));\n  // crafttype-needle-main-settings',
+          '  loadConfig,\n  // crafttype-needle-main-settings-steps',
         );
         expect(read(projectFolder, 'src/server/app.ts')).toContain(
-          '  serverOptions.genReqId = genReqId;\n  // crafttype-needle-app-server-options',
+          '    { genReqId },\n    // crafttype-needle-app-server-options-parts',
         );
       });
 
@@ -1053,6 +1053,42 @@ describe('ModulesApplicationService', () => {
       const reference = tmpDirForTest();
       applyAll(reference, [...FILES_BEFORE_VUE_APP, 'vue-app']);
       expect(tree(projectFolder)).toEqual(tree(reference));
+    });
+  });
+
+  describe('immutability', () => {
+    const serviceOver = (resources: ModuleResource[]) => {
+      const root = resourcesRoot();
+      const files = new FileSystemProjectFiles();
+      return new ModulesApplicationService({
+        resources,
+        files,
+        resourcesReader: new FileSystemModuleResourcesReader(root),
+        renderer: new MustacheTemplateRenderer(),
+        history: new FileSystemModulesHistory(files),
+        versions: new SemverVersionComparator(),
+        paths: new NodePathNormalizer(),
+        simulator: new OverlayProjectSimulator(files),
+        clock,
+      });
+    };
+    const catalog = () => [...allModuleResources(new FileSystemNodePackagesVersionsReader(resourcesRoot()))];
+
+    it('is not affected by a later change to the catalog array it was built from', () => {
+      const resources = catalog();
+      const service = serviceOver(resources);
+      const size = resources.length;
+
+      resources.length = 0;
+
+      expect(service.list()).toHaveLength(size);
+      expect(service.find('init').slug).toBe('init');
+    });
+
+    it('lists the modules without letting the caller modify them', () => {
+      const service = serviceOver(catalog());
+
+      expect(() => (service.list() as ModuleResource[]).pop()).toThrow(TypeError);
     });
   });
 });

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SharedProperty } from './basket';
 import type { ConflictPolicy, PropertyValue } from './types';
+import styles from './BasketPanel.module.css';
 
 defineProps<{
   /** In the order of the catalog. */
@@ -36,24 +37,24 @@ const typed = (event: Event, type: SharedProperty['type']): PropertyValue | unde
 </script>
 
 <template>
-  <section class="basket" aria-label="Basket">
+  <section :class="styles.basket" aria-label="Basket">
     <h2>Basket ({{ items.length }})</h2>
-    <p v-if="items.length === 0" class="empty">
+    <p v-if="items.length === 0" :class="styles.empty">
       Nothing in the basket. Choose modules in the tree: Space adds the module that has the focus.
     </p>
-    <ul v-else class="items">
-      <li v-for="item in items" :key="item.slug" class="item">
-        <span class="name">{{ item.slug }}</span>
-        <span v-if="item.auto" class="auto">Added automatically</span>
+    <ul v-else :class="styles.items">
+      <li v-for="item in items" :key="item.slug" :class="styles.item">
+        <span :class="styles.name">{{ item.slug }}</span>
+        <span v-if="item.auto" :class="styles.auto">Added automatically</span>
         <button
           type="button"
-          class="remove"
+          :class="styles.remove"
           :aria-label="`Remove ${item.slug} from the basket`"
           @click="emit('remove', item.slug)"
         >
           Remove
         </button>
-        <p v-if="item.missing.length > 0" class="missing">
+        <p v-if="item.missing.length > 0" :class="styles.missing">
           Needs {{ item.missing.join(', ') }}, which the project does not have and the basket does not bring.
         </p>
       </li>
@@ -61,10 +62,10 @@ const typed = (event: Event, type: SharedProperty['type']): PropertyValue | unde
 
     <fieldset v-if="properties.length > 0">
       <legend>Options</legend>
-      <div v-for="property in properties" :key="property.key" class="field">
+      <div v-for="property in properties" :key="property.key" :class="styles.field">
         <label :for="`option-${property.key}`">
           <code>{{ property.key }}</code>
-          <strong v-if="property.mandatory" class="required">required</strong>
+          <strong v-if="property.mandatory" :class="styles.required">required</strong>
         </label>
         <input
           v-if="property.type === 'boolean'"
@@ -82,13 +83,13 @@ const typed = (event: Event, type: SharedProperty['type']): PropertyValue | unde
           :aria-describedby="`option-${property.key}-help`"
           @input="emit('update-value', property.key, typed($event, property.type))"
         />
-        <span :id="`option-${property.key}-help`" class="help">
+        <span :id="`option-${property.key}-help`" :class="styles.help">
           {{ property.description }}. Used by {{ property.usedBy.join(', ') }}.
         </span>
       </div>
     </fieldset>
 
-    <div class="policy">
+    <div :class="styles.policy">
       <label for="policy">What to do with conflicts</label>
       <select
         id="policy"
@@ -99,105 +100,8 @@ const typed = (event: Event, type: SharedProperty['type']): PropertyValue | unde
       </select>
     </div>
 
-    <button type="button" class="preview" :disabled="items.length === 0 || loading" @click="emit('preview')">
+    <button type="button" :class="styles.preview" :disabled="items.length === 0 || loading" @click="emit('preview')">
       {{ loading ? 'Previewing…' : 'Preview' }}
     </button>
   </section>
 </template>
-
-<style scoped>
-h2 {
-  margin: 0 0 0.5rem;
-}
-.empty {
-  color: var(--color-muted);
-}
-.items {
-  margin: 0 0 1rem;
-  padding: 0;
-  list-style: none;
-}
-.item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0;
-  border-bottom: 1px solid var(--color-border);
-}
-.name {
-  font-family: var(--font-mono);
-  font-weight: 600;
-}
-.auto {
-  padding: 0 0.5rem;
-  border: 1px solid var(--color-primary);
-  border-radius: 999px;
-  background: var(--color-primary-soft);
-  color: var(--color-primary-strong);
-  font-size: 0.8125rem;
-}
-.remove {
-  margin-left: auto;
-  padding: 0.125rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font: inherit;
-  cursor: pointer;
-}
-.missing {
-  flex-basis: 100%;
-  margin: 0;
-  color: var(--color-danger);
-  font-size: 0.875rem;
-}
-fieldset {
-  margin: 0 0 1rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-.field {
-  display: grid;
-  gap: 0.125rem;
-  margin-bottom: 0.5rem;
-}
-.field input[type='text'],
-.field input[type='number'],
-select {
-  padding: 0.375rem 0.5rem;
-  border: 1px solid var(--color-muted);
-  border-radius: var(--radius);
-  font: inherit;
-}
-.required {
-  margin-left: 0.5rem;
-  color: var(--color-primary-strong);
-}
-.help {
-  color: var(--color-muted);
-  font-size: 0.875rem;
-}
-.policy {
-  display: grid;
-  gap: 0.125rem;
-  margin-bottom: 1rem;
-}
-.preview {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font: inherit;
-  cursor: pointer;
-}
-.preview:disabled {
-  border-color: var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-muted);
-  cursor: not-allowed;
-}
-</style>

@@ -90,3 +90,18 @@ describe('normalizeDestinations', () => {
     });
   });
 });
+
+describe('normalizeDestinations immutability', () => {
+  it('leaves the module it receives unchanged', () => {
+    const properties = ModulePropertiesDefinition.builder().build().resolve({ projectFolder: 'app' });
+    const module = moduleBuilder(properties)
+      .addFile(from('demo').file('a.txt'), './src/a.txt')
+      .insertAtNeedle('./src/main.ts', 'imports', 'import a from "a";')
+      .build();
+    const snapshot = structuredClone(module);
+
+    normalizeDestinations(module, { normalize: (path) => path.replace(/^\.\//, '') });
+
+    expect(module).toEqual(snapshot);
+  });
+});

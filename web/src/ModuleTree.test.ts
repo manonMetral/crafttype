@@ -137,11 +137,11 @@ describe('tree of the modules', () => {
     it('closes and opens a group when its name is clicked', async () => {
       const page = show();
 
-      await item(page, 'group:Quality').get('.group-name').trigger('click');
+      await item(page, 'group:Quality').get('.groupName').trigger('click');
       expect(item(page, 'group:Quality').attributes('aria-expanded')).toBe('false');
       expect(page.find('[data-key="module:eslint"]').exists()).toBe(false);
 
-      await item(page, 'group:Quality').get('.group-name').trigger('click');
+      await item(page, 'group:Quality').get('.groupName').trigger('click');
       expect(item(page, 'group:Quality').attributes('aria-expanded')).toBe('true');
       expect(page.find('[data-key="module:eslint"]').exists()).toBe(true);
     });
@@ -179,7 +179,7 @@ describe('tree of the modules', () => {
 
     it('skips the modules of a group that is closed', async () => {
       const page = show();
-      await item(page, 'group:Tests').get('.group-name').trigger('click');
+      await item(page, 'group:Tests').get('.groupName').trigger('click');
 
       await press(page, 'ArrowDown', 'module:init');
       expect(focused()).toBe('group:Tests');
@@ -189,7 +189,7 @@ describe('tree of the modules', () => {
 
     it('opens a closed group with the right arrow, then goes into it', async () => {
       const page = show();
-      await item(page, 'group:Tests').get('.group-name').trigger('click');
+      await item(page, 'group:Tests').get('.groupName').trigger('click');
 
       await press(page, 'ArrowRight', 'group:Tests');
       expect(item(page, 'group:Tests').attributes('aria-expanded')).toBe('true');

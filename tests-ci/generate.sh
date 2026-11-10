@@ -14,6 +14,8 @@ else
 fi
 IMAGE=""
 CONTAINER=""
+# Secret of the `auth` module, required in production (at least 32 characters).
+AUTH_SECRET="ci-only-secret-of-at-least-32-characters"
 SERVER_PID=""
 cleanup() {
   status=$?
@@ -75,6 +77,12 @@ rm src/webapp/probe.ts
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid PORT' PORT=abc
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid LOG_LEVEL' LOG_LEVEL=verbose
 node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid OPENAPI_DOCS' OPENAPI_DOCS=maybe
+# The `auth` module has no secret known in advance: production needs one of at least 32 characters, and the token
+# route (which signs any subject without credentials) is a demo tool that production refuses.
+node "$ROOT/tests-ci/expect-startup-error.mjs" 'Missing AUTH_JWT_SECRET' NODE_ENV=production AUTH_JWT_SECRET=
+node "$ROOT/tests-ci/expect-startup-error.mjs" 'Invalid AUTH_JWT_SECRET' AUTH_JWT_SECRET=short
+node "$ROOT/tests-ci/expect-startup-error.mjs" 'AUTH_DEMO_TOKENS cannot be enabled' \
+  NODE_ENV=production "AUTH_JWT_SECRET=$AUTH_SECRET" AUTH_DEMO_TOKENS=true
 
 # The built server describes its routes (module `openapi`): the OpenAPI document and the Swagger UI answer, and
 # production serves neither by default. Each server listens on a free port and is stopped whatever happens.
@@ -96,7 +104,7 @@ stop_server() {
 }
 
 SERVER_PORT="$(free_port)"
-PORT="$SERVER_PORT" node dist/server/main.js > /dev/null 2>&1 &
+AUTH_DEMO_TOKENS=true PORT="$SERVER_PORT" node dist/server/main.js > /dev/null 2>&1 &
 SERVER_PID=$!
 wait_for_health "$SERVER_PORT"
 curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/openapi.json" | node -e "
@@ -133,9 +141,12 @@ curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/auth/me" \
 stop_server
 
 SERVER_PORT="$(free_port)"
-NODE_ENV=production PORT="$SERVER_PORT" node dist/server/main.js > /dev/null 2>&1 &
+NODE_ENV=production AUTH_JWT_SECRET="$AUTH_SECRET" PORT="$SERVER_PORT" node dist/server/main.js > /dev/null 2>&1 &
 SERVER_PID=$!
 wait_for_health "$SERVER_PORT"
+status_code="$(curl --silent -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:$SERVER_PORT/api/auth/token" \
+  -H 'content-type: application/json' -d '{"sub":"ci-user","role":"admin"}')"
+[ "$status_code" = '404' ] || { echo "NODE_ENV=production should not serve the token route" >&2; exit 1; }
 if curl --silent --fail "http://127.0.0.1:$SERVER_PORT/api/openapi.json" > /dev/null 2>&1; then
   echo "NODE_ENV=production should not serve /api/openapi.json by default" >&2
   exit 1
@@ -149,7 +160,7 @@ stop_server
 if [ -n "${CRAFTTYPE_DOCKER:-}" ]; then
   IMAGE="crafttype-fullapp:$$"
   docker build --quiet -t "$IMAGE" .
-  CONTAINER="$(docker run -d -p 127.0.0.1::3000 "$IMAGE")"
+  CONTAINER="$(docker run -d -e "AUTH_JWT_SECRET=$AUTH_SECRET" -p 127.0.0.1::3000 "$IMAGE")"
   HOST_PORT="$(docker port "$CONTAINER" 3000/tcp | head -n 1 | sed 's/.*://')"
   for _ in $(seq 1 30); do
     curl --silent --fail "http://127.0.0.1:$HOST_PORT/api/health" | grep -q '"UP"' && break

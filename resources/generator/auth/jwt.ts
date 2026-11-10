@@ -46,6 +46,10 @@ export const createJwtService = (
         throw new Error('Invalid JWT subject: expected a non-empty string');
       }
 
+      if (claims.role !== undefined && claims.role.trim() === '') {
+        throw new Error('Invalid JWT role: expected a non-empty string');
+      }
+
       const issuedAt = Math.floor(now() / 1000);
       const payload = encodeBase64Url(
         JSON.stringify({

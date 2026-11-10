@@ -13,7 +13,7 @@ describe('LogsFactory', () => {
     mkdirSync(join(projectFolder, 'src/server'), { recursive: true });
     writeFileSync(
       join(projectFolder, 'src/server/app.ts'),
-      '// crafttype-needle-app-imports\n// crafttype-needle-app-server-options\n// crafttype-needle-app-plugins\n',
+      '// crafttype-needle-app-imports\nconst parts = [\n  // crafttype-needle-app-server-options-parts\n];\n// crafttype-needle-app-plugins\n',
     );
     return projectFolder;
   };
@@ -30,11 +30,11 @@ describe('LogsFactory', () => {
     expect({ ...dependencies, ...devDependencies }).toEqual({});
   });
 
-  it('configures the logger and the request id in buildApp', () => {
+  it('adds the logger and the request id to the server options of buildApp as parts, without mutating them', () => {
     assertThatModule(factory.buildModule(propertiesFixture({ projectFolder: projectWithServer() }))).hasFileContaining(
       'src/server/app.ts',
       "import { echoRequestId, genReqId, loggerOptions } from './logger.js';",
-      'if (options.logger !== false) {\n  serverOptions.logger = loggerOptions();\n}\nserverOptions.genReqId = genReqId;',
+      'options.logger === false ? {} : { logger: loggerOptions() },\n  { genReqId },\n  // crafttype-needle-app-server-options-parts',
       'echoRequestId(app);',
     );
   });

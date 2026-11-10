@@ -1,7 +1,12 @@
 import { UnknownPackageVersionError } from './errors.js';
+import { frozenRecord } from './frozen.js';
 
 export class PackageVersions {
-  constructor(private readonly versions: Readonly<Record<string, string>>) {}
+  private readonly versions: Readonly<Record<string, string>>;
+
+  constructor(versions: Readonly<Record<string, string>>) {
+    this.versions = frozenRecord(versions);
+  }
 
   get(packageName: string): string {
     const version = this.versions[packageName];

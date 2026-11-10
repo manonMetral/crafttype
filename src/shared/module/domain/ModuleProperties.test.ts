@@ -5,7 +5,7 @@ import {
   MissingPropertyError,
   PropertyAccessError,
 } from './errors.js';
-import { ModulePropertiesDefinition, moduleProperties } from './ModuleProperties.js';
+import { ModulePropertiesDefinition, moduleProperties, type PropertyDefinition } from './ModuleProperties.js';
 
 describe('ModulePropertiesDefinition', () => {
   const definition = ModulePropertiesDefinition.builder().addProjectName().addServerPort().build();
@@ -199,5 +199,59 @@ describe('ModulePropertiesDefinition', () => {
           .addNumber('label', { description: 'y' }),
       ).toThrow(InvalidPropertyDefinitionError);
     });
+  });
+});
+
+describe('ModuleProperties immutability', () => {
+  it('is not affected by a later change to the values it was built from', () => {
+    const source: Record<string, string> = { projectName: 'demo' };
+    const properties = moduleProperties('app', source);
+
+    source['projectName'] = 'other';
+    source['extra'] = 'x';
+
+    expect(properties.string('projectName')).toBe('demo');
+    expect(properties.values).toEqual({ projectName: 'demo' });
+  });
+
+  it('exposes values that cannot be modified', () => {
+    const properties = moduleProperties('app', { projectName: 'demo' });
+
+    expect(() => {
+      (properties.values as Record<string, string>)['projectName'] = 'other';
+    }).toThrow(TypeError);
+  });
+
+  it('is not affected by a later change to the definitions it was built from', () => {
+    const port: PropertyDefinition = { key: 'port', type: 'number', mandatory: false, description: 'Port' };
+    const host: PropertyDefinition = { key: 'host', type: 'string', mandatory: false, description: 'Host' };
+    const source = [port];
+    const definition = ModulePropertiesDefinition.create(source);
+
+    source.push(host);
+
+    expect(definition.properties.map(({ key }) => key)).toEqual(['port']);
+    expect(() => (definition.properties as unknown[]).push({})).toThrow(TypeError);
+  });
+
+  it('leaves a builder unchanged when another definition is derived from it', () => {
+    const base = ModulePropertiesDefinition.builder();
+    const derived = base.addServerPort();
+
+    expect(derived.build().custom.map(({ key }) => key)).toEqual(['serverPort']);
+    expect(base.build().custom).toEqual([]);
+  });
+
+  it('resolves without modifying what it receives', () => {
+    const definition = ModulePropertiesDefinition.builder().addServerPort().build();
+    const raw = { projectFolder: 'app', serverPort: '4000' };
+    const known = { serverPort: 5000 };
+    const rawSnapshot = structuredClone(raw);
+    const knownSnapshot = structuredClone(known);
+
+    definition.resolve(raw, known);
+
+    expect(raw).toEqual(rawSnapshot);
+    expect(known).toEqual(knownSnapshot);
   });
 });

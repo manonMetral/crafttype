@@ -118,7 +118,7 @@ describe('page of the local interface', () => {
       await open();
 
       expect(page!.get<HTMLInputElement>('input[name="folder"]').element.value).toBe('/work/shop');
-      const groups = page!.findAll('[aria-level="1"]').map((group) => group.get('.group-name').text());
+      const groups = page!.findAll('[aria-level="1"]').map((group) => group.get('.groupName').text());
       expect(groups).toEqual(['Init', 'TypeScript', 'Tests', 'Quality', 'Server']);
     });
 
@@ -327,7 +327,7 @@ describe('page of the local interface', () => {
 
       await preview();
 
-      const alert = page!.get('.basket-column [role="alert"]').text();
+      const alert = page!.get('.basketColumn [role="alert"]').text();
       expect(alert).toContain('Unknown module: nope');
       expect(alert).toContain('check the catalog');
       expect(page!.find('.result').exists()).toBe(false);
@@ -341,10 +341,10 @@ describe('page of the local interface', () => {
       await addFromDetails('init');
 
       await preview();
-      expect(page!.get('.basket-column [role="alert"]').text()).toContain('Failed to fetch');
+      expect(page!.get('.basketColumn [role="alert"]').text()).toContain('Failed to fetch');
 
       await preview();
-      expect(page!.find('.basket-column [role="alert"]').exists()).toBe(false);
+      expect(page!.find('.basketColumn [role="alert"]').exists()).toBe(false);
       expect(page!.find('.result').exists()).toBe(true);
     });
 
@@ -645,6 +645,38 @@ describe('page of the local interface', () => {
     });
 
     it('takes out of the basket what the project of that folder already has, and keeps the rest', async () => {
+      const api = apiOf({ project: vi.fn(async (folder?: string) => (folder === undefined ? project : other)) });
+      await open(api);
+      await addFromDetails('vitest');
+
+      await load('/work/other');
+
+      expect(basketItems()).toEqual(['typescript', 'vitest']);
+    });
+
+    it('completes the basket with what that project lacks: what the other one had may not be there', async () => {
+      const empty: ProjectState = { projectFolder: '/work/empty', applied: [], presets: {} };
+      const had: ProjectState = {
+        ...project,
+        applied: [
+          { slug: 'init', appliedAt: 'x' },
+          { slug: 'typescript', appliedAt: 'x' },
+        ],
+      };
+      const api = apiOf({ project: vi.fn(async (folder?: string) => (folder === undefined ? had : empty)) });
+      await open(api);
+      await addFromDetails('vitest');
+      expect(basketItems()).toEqual(['vitest']);
+
+      await load('/work/empty');
+
+      expect(basketItems()).toEqual(['init', 'typescript', 'vitest']);
+      const labelled = page!.findAll('.basket .item').map((item) => item.text().includes('Added automatically'));
+      expect(labelled).toEqual([true, true, false]);
+      expect(page!.find('.basket .missing').exists()).toBe(false);
+    });
+
+    it('does not bring back, for the project it loads, a module that is applied there', async () => {
       const api = apiOf({ project: vi.fn(async (folder?: string) => (folder === undefined ? project : other)) });
       await open(api);
       await addFromDetails('vitest');

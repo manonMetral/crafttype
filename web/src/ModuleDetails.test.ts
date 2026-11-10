@@ -84,7 +84,10 @@ describe('details of a module', () => {
   it('lists the options, which one is required, and their type', () => {
     const page = show();
 
-    const options = page.findAll('.option').map((option) => option.text());
+    const options = page
+      .findAll('li')
+      .filter((item) => item.find('.type').exists())
+      .map((option) => option.text());
     expect(options).toEqual([expect.stringContaining('serverPort'), expect.stringContaining('owner')]);
     expect(options[0]).toContain('number');
     expect(options[0]).toContain('HTTP port of the server');

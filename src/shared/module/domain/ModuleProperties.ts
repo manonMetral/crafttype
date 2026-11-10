@@ -4,6 +4,7 @@ import {
   MissingPropertyError,
   PropertyAccessError,
 } from './errors.js';
+import { frozenCopy, frozenRecord } from './frozen.js';
 
 export type PropertyType = 'string' | 'number' | 'boolean';
 export type PropertyValue = string | number | boolean;
@@ -35,7 +36,8 @@ export interface ModuleProperties {
   boolean(key: string): boolean;
 }
 
-export const moduleProperties = (projectFolder: string, values: KnownProperties = {}): ModuleProperties => {
+export const moduleProperties = (projectFolder: string, given: KnownProperties = {}): ModuleProperties => {
+  const values = frozenRecord(given);
   const read = <T extends PropertyValue>(key: string, type: PropertyType): T => {
     const value = values[key];
     if (value === undefined) {
@@ -79,7 +81,11 @@ const PROJECT_FOLDER_DEFINITION: PropertyDefinition = {
 
 /** Describes the properties a module asks for (equivalent of Seed4JModulePropertiesDefinition). */
 export class ModulePropertiesDefinition {
-  private constructor(readonly properties: readonly PropertyDefinition[]) {}
+  readonly properties: readonly PropertyDefinition[];
+
+  private constructor(properties: readonly PropertyDefinition[]) {
+    this.properties = frozenCopy(properties);
+  }
 
   static builder(): ModulePropertiesDefinitionBuilder {
     return new ModulePropertiesDefinitionBuilder([PROJECT_FOLDER_DEFINITION]);

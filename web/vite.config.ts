@@ -12,6 +12,8 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
+    // The tests find elements by the class names written in the CSS files, not by their hashed form.
+    css: { modules: { classNameStrategy: 'non-scoped' } },
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',

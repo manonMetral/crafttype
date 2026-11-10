@@ -103,17 +103,17 @@ export const presetValues = (
   catalog: Catalog,
   basket: Basket,
   presets: Readonly<Record<string, Readonly<Record<string, PropertyValue>>>>,
-): Record<string, PropertyValue> => {
-  const values: Record<string, PropertyValue> = {};
-  for (const { slug, properties } of inCatalogOrder(catalog, basket).flatMap(({ slug }) => find(catalog, slug) ?? [])) {
-    for (const { key } of properties) {
-      const proposed = presets[slug]?.[key];
-      if (!(key in values) && proposed !== undefined) {
-        values[key] = proposed;
-      }
-    }
-  }
-  return values;
+): Readonly<Record<string, PropertyValue>> => {
+  const proposals = inCatalogOrder(catalog, basket)
+    .flatMap(({ slug }) => find(catalog, slug) ?? [])
+    .flatMap(({ slug, properties }) =>
+      properties.flatMap(({ key }) => {
+        const proposed = presets[slug]?.[key];
+        return proposed === undefined ? [] : [[key, proposed] as const];
+      }),
+    );
+  // `Object.fromEntries` keeps the last entry of a key: the order is reversed so that the first module of the catalog wins.
+  return Object.fromEntries([...proposals].reverse());
 };
 
 /**
