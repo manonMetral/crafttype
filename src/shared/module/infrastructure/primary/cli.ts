@@ -47,9 +47,14 @@ export const runCli = (
   try {
     switch (command) {
       case 'list':
-        for (const { slug, apiDoc, dependsOn } of service.list()) {
-          const requires = dependsOn.length > 0 ? ` (after: ${dependsOn.join(', ')})` : '';
-          out(`${slug.padEnd(16)} ${apiDoc.operation}${requires}`);
+        for (const { slug, apiDoc, dependsOn, requires, provides } of service.list()) {
+          const relations = [
+            dependsOn.length > 0 ? `after: ${dependsOn.join(', ')}` : '',
+            requires.length > 0 ? `needs ${requires.join(', ')}` : '',
+            provides.length > 0 ? `provides ${provides.join(', ')}` : '',
+          ].filter((part) => part !== '');
+          const suffix = relations.length > 0 ? ` (${relations.join('; ')})` : '';
+          out(`${slug.padEnd(16)} ${apiDoc.operation}${suffix}`);
         }
         return 0;
       case 'apply':
@@ -163,8 +168,10 @@ const apply = (args: readonly string[], service: ModulesApplicationService, { ou
   } catch (error) {
     if (error instanceof MissingModuleDependenciesError) {
       err(`Error: ${error.message}`);
+      // A missing module first, else the first module that brings the missing capability.
+      const first = error.missing[0] ?? error.missingCapabilities[0]?.providers[0];
       err(
-        `Apply them first, for example: crafttype apply ${error.missing[0]} --project-folder ${shellQuote(String(raw['projectFolder']))}`,
+        `Apply them first, for example: crafttype apply ${first} --project-folder ${shellQuote(String(raw['projectFolder']))}`,
       );
       return 1;
     }
@@ -260,6 +267,7 @@ const describe = (error: DomainError): string => {
     case 'property-access':
     case 'invalid-property-definition':
     case 'missing-module-dependencies':
+    case 'capability-already-provided':
     case 'unknown-package-version':
     case 'duplicate-destination':
     case 'invalid-destination':

@@ -74,10 +74,22 @@ const press = (slug: string): void => {
 
 const info = (slug: string) => props.modules.find((module) => module.slug === slug);
 const list = (slugs: readonly string[]): string => (slugs.length === 0 ? 'nothing' : slugs.join(', '));
+const providersOf = (capability: string): string[] =>
+  props.modules.filter(({ provides }) => provides.includes(capability)).map((module) => module.slug);
 /** For a screen reader: the links are drawn, and the lists say the same. */
 const links = (slug: string): string => {
-  const needs = info(slug)?.dependsOn ?? [];
-  const neededBy = props.modules.filter(({ dependsOn }) => dependsOn.includes(slug)).map((module) => module.slug);
+  const module = info(slug);
+  const needs = [
+    ...(module?.dependsOn ?? []),
+    ...(module?.requires ?? []).map((capability) => `${capability} (${providersOf(capability).join(' or ')})`),
+  ];
+  const provided = module?.provides ?? [];
+  const neededBy = props.modules
+    .filter(
+      ({ dependsOn, requires }) =>
+        dependsOn.includes(slug) || requires.some((capability) => provided.includes(capability)),
+    )
+    .map((other) => other.slug);
   return `Needs ${list(needs)}. Needed by ${list(neededBy)}.${addable(slug) ? ' Pressing it adds it to the basket.' : ''}`;
 };
 const linksId = (slug: string): string => `graph-links-${slug}`;

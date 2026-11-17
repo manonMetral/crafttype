@@ -9,11 +9,14 @@ const mod = (
   group: string,
   dependsOn: string[] = [],
   properties: ModuleInfo['properties'] = [],
+  { requires = [], provides = [] }: { requires?: string[]; provides?: string[] } = {},
 ): ModuleInfo => ({
   slug,
   group,
   description: `Adds ${slug}`,
   dependsOn,
+  requires,
+  provides,
   tags: [],
   properties,
 });
@@ -795,6 +798,99 @@ describe('page of the local interface', () => {
       await flushPromises();
 
       expect(page!.find('.done').exists()).toBe(false);
+    });
+  });
+
+  describe('Given modules that provide the same capability', () => {
+    /** Two fronts, a module that needs one, and a database that only one module provides. */
+    const alternatives: Catalog = {
+      modules: [
+        mod('init', 'Init'),
+        mod('typescript', 'TypeScript', ['init']),
+        mod('vitest', 'Tests', ['typescript']),
+        mod('sqlite', 'Data', ['typescript'], [], { provides: ['database'] }),
+        mod('vue-app', 'Frontend', ['typescript'], [], { provides: ['front'] }),
+        mod('react-app', 'Frontend', ['typescript'], [], { provides: ['front'] }),
+        mod('fetch-client', 'Frontend', ['vitest'], [], { requires: ['front'] }),
+        mod('repository', 'Data', ['vitest'], [], { requires: ['database'] }),
+      ],
+    };
+    const emptyProject: ProjectState = { projectFolder: '/work/shop', applied: [], presets: {} };
+    const withVueApp: ProjectState = {
+      ...emptyProject,
+      applied: ['init', 'typescript', 'vue-app'].map((slug) => ({ slug, appliedAt: 'x' })),
+    };
+    const alternativesApi = (state: ProjectState = emptyProject) =>
+      apiOf({ catalog: vi.fn(async () => alternatives), project: vi.fn(async () => state) });
+
+    it('brings the only module that provides a capability along with the module that requires it', async () => {
+      await open(alternativesApi());
+
+      await addFromDetails('repository');
+
+      expect(basketItems()).toEqual(['init', 'typescript', 'vitest', 'sqlite', 'repository']);
+    });
+
+    it('leaves the choice to the person when several modules provide it, and says what is missing', async () => {
+      await open(alternativesApi());
+
+      await addFromDetails('fetch-client');
+
+      expect(basketItems()).toEqual(['init', 'typescript', 'vitest', 'fetch-client']);
+      expect(page!.get('.basket .item .missing').text()).toContain('front: vue-app or react-app');
+    });
+
+    it('stops saying it is missing once the person chose one of them', async () => {
+      await open(alternativesApi());
+      await addFromDetails('fetch-client');
+
+      await addFromDetails('react-app');
+
+      expect(page!.find('.basket .item .missing').exists()).toBe(false);
+      expect(node('module:fetch-client').text()).toContain('front: react-app');
+    });
+
+    it('does not add a module that the project keeps out, says why, and offers nothing', async () => {
+      await open(alternativesApi(withVueApp));
+
+      await node('module:react-app').trigger('click');
+
+      expect(page!.get('.details .excluded').text()).toBe('Cannot be added: front is already provided by vue-app.');
+      expect(page!.find('.details button').exists()).toBe(false);
+      expect(basketItems()).toEqual([]);
+    });
+
+    it('does not add a module that the basket keeps out', async () => {
+      await open(alternativesApi());
+      await addFromDetails('vue-app');
+
+      await node('module:react-app').trigger('click');
+
+      expect(page!.get('.details .excluded').text()).toContain('already provided by vue-app');
+      expect(basketItems()).toEqual(['init', 'typescript', 'vue-app']);
+    });
+
+    it('lets the person change their mind: the other module can be added once the first is out', async () => {
+      await open(alternativesApi());
+      await addFromDetails('vue-app');
+      await page!.get('.details button').trigger('click');
+
+      await addFromDetails('react-app');
+
+      expect(basketItems()).toEqual(['init', 'typescript', 'react-app']);
+    });
+
+    it('shows both modules in the graph until one is chosen, then only that one', async () => {
+      await open(alternativesApi(), 'prerequisites');
+      await page!.get('.graph [data-slug="init"]').trigger('click');
+      await page!.get('.graph [data-slug="typescript"]').trigger('click');
+      const shown = () => page!.findAll('.graph button.node').map((button) => button.attributes('data-slug'));
+      expect(shown()).toEqual(expect.arrayContaining(['vue-app', 'react-app']));
+
+      await page!.get('.graph [data-slug="vue-app"]').trigger('click');
+
+      expect(shown()).toContain('vue-app');
+      expect(shown()).not.toContain('react-app');
     });
   });
 

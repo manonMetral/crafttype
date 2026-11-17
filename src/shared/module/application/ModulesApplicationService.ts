@@ -7,11 +7,13 @@ import {
   type PlannedChange,
 } from '../domain/ChangePlan.js';
 import {
+  CapabilityAlreadyProvidedError,
   CraftTypeError,
   InvalidPropertyError,
   MissingModuleDependenciesError,
   NeedleError,
   UnknownModuleError,
+  type MissingCapability,
 } from '../domain/errors.js';
 import { PACKAGE_JSON_PATH, PackageJsonDocument } from '../domain/PackageJsonDocument.js';
 import { insertAtNeedle, needleToken, type FileEdit } from '../domain/needles.js';
@@ -100,6 +102,8 @@ export type BasketStep =
       readonly error: string;
       /** The prerequisites that are neither applied nor in the basket, if that is why. */
       readonly missing: readonly ModuleSlug[];
+      /** The capabilities that no applied module provides and no module of the basket brings, if that is why. */
+      readonly missingCapabilities: readonly MissingCapability[];
     }
   | { readonly slug: ModuleSlug; readonly outcome: 'not-run'; readonly after: ModuleSlug };
 
@@ -212,8 +216,14 @@ export class ModulesApplicationService {
       if (!(error instanceof CraftTypeError)) {
         throw error;
       }
-      const missing = error instanceof MissingModuleDependenciesError ? error.missing : [];
-      return { slug, outcome: 'blocked', error: error.message, missing };
+      const lacking = error instanceof MissingModuleDependenciesError ? error : undefined;
+      return {
+        slug,
+        outcome: 'blocked',
+        error: error.message,
+        missing: lacking?.missing ?? [],
+        missingCapabilities: lacking?.missingCapabilities ?? [],
+      };
     }
   }
 
@@ -252,6 +262,7 @@ export class ModulesApplicationService {
     const module = normalizeDestinations(built.module, this.dependencies.paths);
 
     this.checkDependencies(resource, properties);
+    this.checkCapabilities(resource, properties);
     const plan = this.plan(module);
 
     if (dryRun) {
@@ -446,12 +457,35 @@ export class ModulesApplicationService {
   }
 
   private checkDependencies(resource: ModuleResource, properties: ModuleProperties): void {
-    const applied = new Set(this.dependencies.history.list(properties.projectFolder).map(({ slug }) => slug));
+    const applied = this.appliedSlugs(properties.projectFolder);
     const missing = resource.dependsOn.filter((slug) => !applied.has(slug));
+    const missingCapabilities = resource.requires
+      .filter((capability) => !this.providersOf(capability).some((slug) => applied.has(slug)))
+      .map((capability) => ({ capability, providers: this.providersOf(capability) }));
 
-    if (missing.length > 0) {
-      throw new MissingModuleDependenciesError(resource.slug, missing);
+    if (missing.length > 0 || missingCapabilities.length > 0) {
+      throw new MissingModuleDependenciesError(resource.slug, missing, missingCapabilities);
     }
+  }
+
+  /** A project has at most one module for a capability: the module cannot take the place of another one. */
+  private checkCapabilities(resource: ModuleResource, properties: ModuleProperties): void {
+    const applied = this.appliedSlugs(properties.projectFolder);
+    for (const capability of resource.provides) {
+      const provider = this.providersOf(capability).find((slug) => slug !== resource.slug && applied.has(slug));
+      if (provider !== undefined) {
+        throw new CapabilityAlreadyProvidedError(resource.slug, capability, provider);
+      }
+    }
+  }
+
+  private appliedSlugs(projectFolder: string): ReadonlySet<ModuleSlug> {
+    return new Set(this.dependencies.history.list(projectFolder).map(({ slug }) => slug));
+  }
+
+  /** The modules of the catalog that bring the capability, in the order the catalog lists them. */
+  private providersOf(capability: string): ModuleSlug[] {
+    return this.dependencies.resources.filter(({ provides }) => provides.includes(capability)).map(({ slug }) => slug);
   }
 }
 

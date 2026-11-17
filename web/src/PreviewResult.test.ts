@@ -44,12 +44,14 @@ const blocked: StepInfo = {
   outcome: 'blocked',
   error: 'Module vitest requires these modules to be applied first: typescript',
   missing: ['typescript'],
+  missingCapabilities: [],
 };
 const blockedForAnotherReason: StepInfo = {
   slug: 'fastify-server',
   outcome: 'blocked',
   error: 'Invalid property serverPort: not a port',
   missing: [],
+  missingCapabilities: [],
 };
 const notRun: StepInfo = { slug: 'prettier', outcome: 'not-run', after: 'vitest' };
 
@@ -199,6 +201,42 @@ describe('result of the preview', () => {
 
     expect(page.get('.error').text()).toContain('requires these modules');
     expect(page.get('.lacks').text()).toContain('typescript');
+  });
+
+  it('says which capability a blocked module lacks, and the modules that could bring it', () => {
+    const lacking: StepInfo = {
+      slug: 'fetch-client',
+      outcome: 'blocked',
+      error:
+        'Module fetch-client requires these modules to be applied first: a module that provides front (vue-app or react-app)',
+      missing: [],
+      missingCapabilities: [{ capability: 'front', providers: ['vue-app', 'react-app'] }],
+    };
+
+    const page = show(preview([lacking]));
+
+    expect(page.get('.lacks').text()).toBe(
+      'Needs a module that provides front (vue-app or react-app): add one to the basket.',
+    );
+  });
+
+  it('says both the modules and the capabilities a blocked module lacks', () => {
+    const lacking: StepInfo = {
+      slug: 'fetch-client',
+      outcome: 'blocked',
+      error: 'x',
+      missing: ['vitest'],
+      missingCapabilities: [{ capability: 'front', providers: ['vue-app'] }],
+    };
+
+    const lines = show(preview([lacking]))
+      .findAll('.lacks')
+      .map((line) => line.text());
+
+    expect(lines).toEqual([
+      'Needs vitest: add it to the basket.',
+      'Needs a module that provides front (vue-app): add one to the basket.',
+    ]);
   });
 
   it('says why a module is blocked when it lacks nothing', () => {

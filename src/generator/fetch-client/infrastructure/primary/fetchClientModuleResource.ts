@@ -10,8 +10,9 @@ export const createFetchClientModuleResource = (): ModuleResource => {
   return moduleResource()
     .slug(fetchClientSlug)
     .propertiesDefinition(ModulePropertiesDefinition.builder().build())
-    .apiDoc('Frontend', 'Adds a typed HTTP client (fetch) to the Vue application')
-    .dependsOn('vue-app', 'vitest')
+    .apiDoc('Frontend', 'Adds a typed HTTP client (fetch) to the front-end application')
+    .dependsOn('vitest')
+    .requires('front')
     .tags('frontend', 'http')
     .factory((properties) => modules.buildModule(properties));
 };

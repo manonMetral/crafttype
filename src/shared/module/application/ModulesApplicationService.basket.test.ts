@@ -20,12 +20,19 @@ describe('preview of a basket of modules', () => {
     return projectFolder;
   };
 
-  it('relies on the catalog listing a module after the modules it depends on', () => {
+  it('relies on the catalog listing a module after the modules it depends on, and after the modules that provide what it requires', () => {
     const order = service.list().map(({ slug }) => slug);
 
-    for (const { slug, dependsOn } of service.list()) {
+    for (const { slug, dependsOn, requires } of service.list()) {
       for (const dependency of dependsOn) {
         expect(order.indexOf(dependency), `${dependency} before ${slug}`).toBeLessThan(order.indexOf(slug));
+      }
+      for (const capability of requires) {
+        for (const { slug: provider } of service.list().filter(({ provides }) => provides.includes(capability))) {
+          expect(order.indexOf(provider), `${provider} (${capability}) before ${slug}`).toBeLessThan(
+            order.indexOf(slug),
+          );
+        }
       }
     }
   });
@@ -89,6 +96,7 @@ describe('preview of a basket of modules', () => {
         outcome: 'blocked',
         error: expect.stringContaining('typescript'),
         missing: ['typescript'],
+        missingCapabilities: [],
       });
       expect(canApply).toBe(false);
     });
@@ -208,6 +216,7 @@ describe('preview of a basket of modules', () => {
         outcome: 'blocked',
         error: expect.stringContaining('serverPort'),
         missing: [],
+        missingCapabilities: [],
       });
     });
 

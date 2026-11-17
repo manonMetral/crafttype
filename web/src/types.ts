@@ -13,7 +13,12 @@ export interface ModuleInfo {
   readonly slug: string;
   readonly group: string;
   readonly description: string;
+  /** The modules to apply before this one. */
   readonly dependsOn: readonly string[];
+  /** The capabilities it needs: a module that provides each one must be there, whichever it is. */
+  readonly requires: readonly string[];
+  /** What it brings. A project has at most one module for a capability. */
+  readonly provides: readonly string[];
   readonly tags: readonly string[];
   readonly properties: readonly PropertyInfo[];
 }
@@ -51,6 +56,12 @@ export interface ReportInfo {
   readonly conflicts: number;
 }
 
+/** A capability that nothing applied or in the basket provides, with the modules that could. */
+export interface MissingCapability {
+  readonly capability: string;
+  readonly providers: readonly string[];
+}
+
 /** `ready`: it would apply. `conflict`: an existing item differs. `blocked`: it cannot. `not-run`: an earlier step stopped the basket. */
 export type StepInfo =
   | {
@@ -60,7 +71,13 @@ export type StepInfo =
       readonly warnings: readonly string[];
       readonly changes: readonly ChangeInfo[];
     }
-  | { readonly slug: string; readonly outcome: 'blocked'; readonly error: string; readonly missing: readonly string[] }
+  | {
+      readonly slug: string;
+      readonly outcome: 'blocked';
+      readonly error: string;
+      readonly missing: readonly string[];
+      readonly missingCapabilities: readonly MissingCapability[];
+    }
   | { readonly slug: string; readonly outcome: 'not-run'; readonly after: string };
 
 /** The request of a preview and of an application: the same basket, so that what is written is what was previewed. */

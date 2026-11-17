@@ -3,11 +3,17 @@ import { afterEach, describe, expect, it } from 'vitest';
 import ModuleTree from './ModuleTree.vue';
 import type { ModuleInfo } from './types';
 
-const mod = (slug: string, dependsOn: string[] = []): ModuleInfo => ({
+const mod = (
+  slug: string,
+  dependsOn: string[] = [],
+  { requires = [], provides = [] }: { requires?: string[]; provides?: string[] } = {},
+): ModuleInfo => ({
   slug,
   group: '',
   description: `Adds ${slug}`,
   dependsOn,
+  requires,
+  provides,
   tags: [],
   properties: [],
 });
@@ -114,6 +120,54 @@ describe('tree of the modules', () => {
       const page = show();
 
       expect(item(page, 'module:init').find('.need').exists()).toBe(false);
+    });
+
+    describe('when a capability is one of them', () => {
+      const fronts = [
+        {
+          name: 'Frontend',
+          modules: [
+            mod('vue-app', ['typescript'], { provides: ['front'] }),
+            mod('react-app', ['typescript'], { provides: ['front'] }),
+          ],
+        },
+        { name: 'Libraries', modules: [mod('fetch-client', ['vitest'], { requires: ['front'] })] },
+      ];
+      const needsOf = (page: VueWrapper) =>
+        item(page, 'module:fetch-client')
+          .findAll('.need')
+          .map((need) => [need.attributes('data-status'), need.text()]);
+
+      it('says that any module that provides it will do, while none is there', () => {
+        const page = show({ groups: fronts });
+
+        expect(needsOf(page)).toEqual([
+          ['missing', expect.stringContaining('vitest')],
+          ['missing', expect.stringContaining('front: vue-app or react-app')],
+        ]);
+      });
+
+      it('names the module of the project that provides it', () => {
+        const page = show({ groups: fronts, applied: new Set(['react-app']) });
+
+        expect(needsOf(page)[1]).toEqual(['applied', expect.stringContaining('front: react-app')]);
+        expect(needsOf(page)[1]?.[1]).toContain('applied');
+      });
+
+      it('names the module of the basket that provides it', () => {
+        const page = show({ groups: fronts, inBasket: new Set(['vue-app']) });
+
+        expect(needsOf(page)[1]).toEqual(['in-basket', expect.stringContaining('front: vue-app')]);
+      });
+
+      it('shows the needs of a module that only requires a capability', () => {
+        const page = show({
+          groups: [{ name: 'G', modules: [mod('a', [], { requires: ['x'] }), mod('b', [], { provides: ['x'] })] }],
+        });
+
+        expect(item(page, 'module:a').findAll('.need')).toHaveLength(1);
+        expect(item(page, 'module:b').find('.need').exists()).toBe(false);
+      });
     });
   });
 

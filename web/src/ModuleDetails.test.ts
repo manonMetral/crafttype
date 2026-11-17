@@ -8,6 +8,8 @@ const server: ModuleInfo = {
   group: 'Server',
   description: 'Adds a Fastify server with a health endpoint',
   dependsOn: ['typescript', 'vitest'],
+  requires: [],
+  provides: [],
   tags: ['server', 'backend'],
   properties: [
     { key: 'serverPort', type: 'number', mandatory: false, description: 'HTTP port of the server' },
@@ -19,8 +21,25 @@ const plain: ModuleInfo = {
   group: 'Init',
   description: 'Initializes',
   dependsOn: [],
+  requires: [],
+  provides: [],
   tags: [],
   properties: [],
+};
+const vue: ModuleInfo = {
+  ...plain,
+  slug: 'vue-app',
+  group: 'Frontend',
+  dependsOn: ['typescript'],
+  provides: ['front'],
+};
+const react: ModuleInfo = { ...vue, slug: 'react-app' };
+const client: ModuleInfo = {
+  ...plain,
+  slug: 'fetch-client',
+  group: 'Frontend',
+  dependsOn: ['vitest'],
+  requires: ['front'],
 };
 
 type Props = InstanceType<typeof ModuleDetails>['$props'];
@@ -28,9 +47,11 @@ const show = (props: Partial<Props> = {}) =>
   mount(ModuleDetails, {
     props: {
       module: server,
+      modules: [server, plain, vue, react, client],
       applied: new Set<string>(),
       inBasket: new Set<string>(),
       alsoAdds: [],
+      excludedBy: undefined,
       ...props,
     },
   });
@@ -72,6 +93,31 @@ describe('details of a module', () => {
     const page = show({ inBasket: new Set(['vitest']) });
 
     expect(page.find('.need[data-status="in-basket"]').text()).toContain('in basket');
+  });
+
+  describe('when a capability is one of the prerequisites', () => {
+    const needs = (page: ReturnType<typeof show>) =>
+      page.findAll('.need').map((need) => [need.attributes('data-status'), need.text()]);
+
+    it('says that any module that provides it will do, while none is there', () => {
+      const page = show({ module: client });
+
+      expect(needs(page)).toEqual([
+        ['missing', expect.stringContaining('vitest')],
+        ['missing', expect.stringContaining('front: vue-app or react-app')],
+      ]);
+    });
+
+    it('names the module of the project or of the basket that provides it', () => {
+      expect(needs(show({ module: client, applied: new Set(['react-app']) }))[1]).toEqual([
+        'applied',
+        expect.stringContaining('front: react-app'),
+      ]);
+      expect(needs(show({ module: client, inBasket: new Set(['vue-app']) }))[1]).toEqual([
+        'in-basket',
+        expect.stringContaining('front: vue-app'),
+      ]);
+    });
   });
 
   it('says so when the module needs nothing', () => {
@@ -122,6 +168,20 @@ describe('details of a module', () => {
       expect(page.find('.also').exists()).toBe(false);
       await page.get('button').trigger('click');
       expect(page.emitted('toggle')).toEqual([['fastify-server']]);
+    });
+  });
+
+  describe('Given a module that another module keeps out', () => {
+    it('says which module brings the capability already, and offers nothing', () => {
+      const page = show({ module: react, excludedBy: { capability: 'front', by: 'vue-app' } });
+
+      expect(page.get('.excluded').text()).toBe('Cannot be added: front is already provided by vue-app.');
+      expect(page.find('button').exists()).toBe(false);
+      expect(page.find('.also').exists()).toBe(false);
+    });
+
+    it('does not say it for a module that nothing keeps out', () => {
+      expect(show({ module: react }).find('.excluded').exists()).toBe(false);
     });
   });
 
