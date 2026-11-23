@@ -11,8 +11,7 @@ defineProps<{ result: Extract<ApplyResult, { outcome: 'applied' }> }>();
     <h2>Done</h2>
     <p role="status" :class="styles.summary">
       {{ result.steps.length }} {{ result.steps.length === 1 ? 'module' : 'modules' }} applied in
-      <code>{{ result.projectFolder }}</code
-      >.
+      <code>{{ result.projectFolder }}</code>.
     </p>
     <ol>
       <li v-for="step in result.steps" :key="step.slug" :class="styles.step">
